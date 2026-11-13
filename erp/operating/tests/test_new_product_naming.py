@@ -56,6 +56,15 @@ class NewProductNamingTest(TestCase):
         self.assertTrue(r.json()["success"], r.json())
         self.assertEqual(Product.objects.filter(title="Duvet cover").count(), 2)
 
+    def test_existing_variants_come_with_their_values_labelled(self):
+        self._receive("Duvet cover", "DUVETCOVER")
+        pid = Product.objects.get(sku="DUVETCOVER").pk
+        r = self.client.get(reverse("operating:catalog_product_variants",
+                                    args=[self.warehouse.pk, pid]))
+        v = r.json()["results"][0]
+        self.assertEqual(v["variant_sku"], "DUVETCOVER.WHITE")
+        self.assertEqual(v["shown"], [{"name": "Color", "value": "White"}])
+
     def test_the_card_asks_whether_a_sku_is_free(self):
         Product.objects.create(title="Duvet cover", sku="DUVETCOVER", featured=False)
         url = reverse("operating:warehouse_product_sku_available")

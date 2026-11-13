@@ -3105,6 +3105,7 @@ def catalog_product_variants(request, pk, product_id):
     "exists" for a variant the list never showed. One with no warehouse
     row yet (an order's variant nothing has been received for) says so
     through `in_warehouse`."""
+    from marketing.attributes import attribute_label, display_value
     # Scoped like catalog_base_search (see _receivable_products) so this
     # intake endpoint can't be used to read out a storefront-only product's
     # SKU/barcode/quantity by guessing its id.
@@ -3120,8 +3121,12 @@ def catalog_product_variants(request, pk, product_id):
     variants = list(variants)
     suppliers = suppliers_of(v.id for v in variants)
     results = []
+    # Every variant's values in the product's own attribute order, so the
+    # list reads down alike: Color, then Width, …
+    order = {name: i for i, name in enumerate(product_attribute_names(product))}
     for v in variants:
-        values = sorted(v.product_variant_attribute_values.all(), key=lambda x: x.id)
+        values = sorted(v.product_variant_attribute_values.all(),
+                        key=lambda x: (order.get(x.product_variant_attribute.name, len(order)), x.id))
         av = values[0] if values else None
         results.append({
             "id": v.id,
@@ -3132,6 +3137,11 @@ def catalog_product_variants(request, pk, product_id):
             "attributes": [{"name": x.product_variant_attribute.name,
                             "value": x.product_variant_attribute_value}
                            for x in values],
+            # The same values as the reader reads them: "Width" / "320 cm".
+            "shown": [{"name": attribute_label(x.product_variant_attribute.name),
+                       "value": display_value(x.product_variant_attribute.name,
+                                              x.product_variant_attribute_value)}
+                      for x in values],
             "variant_sku": v.variant_sku,
             "variant_barcode": v.variant_barcode,
             # Live, not the stored mirror: a variant whose only roll was

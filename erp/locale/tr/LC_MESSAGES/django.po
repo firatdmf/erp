@@ -16170,3 +16170,6 @@ msgstr "elde olanı şimdi gönderin. Kalanı, yoldaki alımlarla birlikte yeni 
 
 msgid "How to write values"
 msgstr "Değerler nasıl yazılır"
+
+msgid "Products we have — pick one instead:"
+msgstr "Elimizdeki ürünler — bunun yerine birini seçin:"

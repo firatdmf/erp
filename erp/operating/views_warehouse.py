@@ -770,8 +770,10 @@ def _barcode_taken(code, *, exclude_roll_ids=()):
     roll_q = WarehouseProductItem.objects.filter(barcode__iexact=code)
     if exclude_roll_ids:
         roll_q = roll_q.exclude(pk__in=list(exclude_roll_ids))
+    from marketing.models import ProductVariant
     return (roll_q.exists()
-            or WarehouseProduct.objects.filter(barcode__iexact=code).exists())
+            or WarehouseProduct.objects.filter(barcode__iexact=code).exists()
+            or ProductVariant.everywhere.filter(variant_barcode__iexact=code).exists())
 
 
 def _unlabelled():
@@ -797,6 +799,7 @@ def _barcode_minter(prefix, reserved=()):
     stock item could be handed a code a manual stock item in the same batch is about to
     claim, and the two would collide only at write time."""
     import re as _re
+    from marketing.models import ProductVariant
     prefix = (prefix or "").upper()[:6] or _fallback_prefix()
     existing = set(str(r).strip() for r in (reserved or ()) if str(r).strip())
     for qs in (
@@ -804,6 +807,8 @@ def _barcode_minter(prefix, reserved=()):
         .values_list("barcode", flat=True),
         WarehouseProduct.objects.filter(barcode__startswith=prefix)
         .values_list("barcode", flat=True),
+        ProductVariant.everywhere.filter(variant_barcode__startswith=prefix)
+        .values_list("variant_barcode", flat=True),
     ):
         existing.update(b for b in qs if b)
     # Seed the counter only from OUR own clean "PREFIX######" sequence — never
@@ -832,6 +837,20 @@ def _barcode_minter(prefix, reserved=()):
     return mint
 
 
+def _product_barcode_prefix(product):
+    """The code family for a product's new barcodes: its supplier's, else
+    the brand's."""
+    supplier = getattr(product, "supplier_account", None)
+    return _consonant_prefix(supplier.name) if supplier else _fallback_prefix()
+
+
+def mint_variant_barcode(variant):
+    """A code of our own for a variant of goods sold by count that came
+    without one: printed on a label and stuck on the goods, it is what a
+    scan finds."""
+    return _barcode_minter(_product_barcode_prefix(variant.product))()
+
+
 def label_unlabelled_items(product):
     """Give each stock item of `product` that has no barcode one of its own.
 
@@ -841,8 +860,7 @@ def label_unlabelled_items(product):
     family a row's rolls already carry, else the supplier's.
     Returns [(warehouse product, how many)]."""
     from django.db.models import Q as _Q
-    supplier = getattr(product, "supplier_account", None)
-    fallback = _consonant_prefix(supplier.name) if supplier else _fallback_prefix()
+    fallback = _product_barcode_prefix(product)
     minters, labelled = {}, []
     rows = (WarehouseProduct.objects.filter(catalog_variant__product=product)
             .select_related("warehouse").order_by("warehouse__name", "sku"))

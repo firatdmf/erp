@@ -2045,7 +2045,8 @@
         {# Shown while the product is tracked by variant: then this code is on every piece. #}
         <div class="form-group" id="modal_variant_barcode_group">
           <label for="modal_variant_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
-          <input type="text" id="modal_variant_barcode" class="form-input">
+          <input type="text" id="modal_variant_barcode" class="form-input"
+                 placeholder="{% trans 'Empty: we make one to print' %}">
         </div>
       </div>
 

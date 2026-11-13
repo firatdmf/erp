@@ -1602,8 +1602,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         """What switching this product's tracking leaves to be done, said
         under the Tracking field before saving. To "each item": its
         unlabelled stock items get a barcode each, and the variants lose
-        theirs. To "by variant": variants without a barcode can't be found
-        by a scan until someone enters the code printed on the goods."""
+        theirs. To "by variant": variants without a barcode get one of ours
+        unless the code printed on the goods is typed first."""
         from django.db.models import Q
         from django.utils.translation import ngettext
         from operating.models import WarehouseProductItem
@@ -1632,10 +1632,12 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         notes = [_gettext("Stock items keep their labels.")]
         if missing:
             notes.append(ngettext(
-                "%(n)s variant has no barcode (%(skus)s). A scan won't find it until you enter "
-                "the code printed on the goods in its Barcode, under Variants.",
-                "%(n)s variants have no barcode (%(skus)s). A scan won't find them until you enter "
-                "the code printed on the goods in each one's Barcode, under Variants.",
+                "%(n)s variant has no barcode (%(skus)s). If the goods carry a printed code, "
+                "type it in its Barcode, under Variants; otherwise saving gives it a code of ours "
+                "to print and stick on.",
+                "%(n)s variants have no barcode (%(skus)s). If the goods carry a printed code, "
+                "type it in each one's Barcode, under Variants; otherwise saving gives each a "
+                "code of ours to print and stick on.",
                 len(missing)) % {"n": len(missing), "skus": ", ".join(missing[:5])
                                  + (" …" if len(missing) > 5 else "")})
         return {"to": "variant", "notes": notes}
@@ -1649,10 +1651,16 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         if not labelled:
             return
         total = sum(n for _wp, n in labelled)
-        messages.success(self.request, ngettext(
-            "%(n)s item in stock got a barcode of its own.",
-            "%(n)s items in stock got a barcode of their own.",
-            total) % {"n": total})
+        if self.object.sold_by_count:
+            messages.success(self.request, ngettext(
+                "%(n)s item in stock needs a label with its variant's new barcode.",
+                "%(n)s items in stock need a label with their variant's new barcode.",
+                total) % {"n": total})
+        else:
+            messages.success(self.request, ngettext(
+                "%(n)s item in stock got a barcode of its own.",
+                "%(n)s items in stock got a barcode of their own.",
+                total) % {"n": total})
         self.request.session[f"labels_to_print_{self.object.pk}"] = [
             [wp.warehouse_id, wp.pk, wp.warehouse.name, wp.name or wp.sku, n]
             for wp, n in labelled]

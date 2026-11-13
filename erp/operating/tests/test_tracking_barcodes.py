@@ -126,6 +126,20 @@ class NoBarcodeAboveTrackedItemsTest(TestCase):
         v.refresh_from_db()
         self.assertIsNone(v.variant_barcode)
 
+    def test_a_variant_sold_by_count_without_a_code_gets_one_of_ours(self):
+        from operating.models import WarehouseProduct
+        row = WarehouseProduct.objects.create(warehouse=self.warehouse, name="r", sku="ROLLS.RED")
+        WarehouseProductItem.objects.create(product=row, quantity=1, quantity_remaining=1,
+                                            barcode="DMF000001")
+        v = self._variant(self.boxes, "BOXES.BLUE", None)
+        v.refresh_from_db()
+        self.assertTrue(v.variant_barcode)
+        self.assertNotEqual(v.variant_barcode, "DMF000001")
+        w = self._variant(self.boxes, "BOXES.GREEN", "")
+        w.refresh_from_db()
+        self.assertTrue(w.variant_barcode)
+        self.assertNotEqual(v.variant_barcode, w.variant_barcode)
+
     def test_a_variant_sold_by_count_keeps_its_barcode(self):
         v = self._variant(self.boxes, "BOXES.WHITE", "8690000000017")
         v.refresh_from_db()
@@ -195,9 +209,19 @@ class SwitchingTrackingTest(TestCase):
         self.product.set_unit(tracking="item")
         codes = sorted(WarehouseProductItem.objects.exclude(barcode=None).values_list("barcode", flat=True))
         self.product.set_unit(tracking="variant")
-        self.assertEqual(self.product.labelled_items, ())
         self.assertEqual(sorted(WarehouseProductItem.objects.exclude(barcode=None)
                                 .values_list("barcode", flat=True)), codes)
+
+    def test_by_variant_gives_each_variant_a_code_and_offers_its_labels(self):
+        self.product.set_unit(tracking="item")
+        self.variant.refresh_from_db()
+        self.assertIsNone(self.variant.variant_barcode)
+        self.product.set_unit(tracking="variant")
+        self.variant.refresh_from_db()
+        self.assertTrue(self.variant.variant_barcode)
+        self.assertNotIn(self.variant.variant_barcode,
+                         WarehouseProductItem.objects.values_list("barcode", flat=True))
+        self.assertEqual(self.product.labelled_items, [(self.row, 2)])
 
     def test_the_edit_page_says_what_a_switch_does(self):
         url = reverse("marketing:product_edit", args=[self.product.pk])
@@ -210,6 +234,7 @@ class SwitchingTrackingTest(TestCase):
         switch = self.client.get(url).context["tracking_switch"]
         self.assertEqual(switch["to"], "variant")
         self.assertIn("1 variant has no barcode (BOXES.WHITE)", " ".join(switch["notes"]))
+        self.assertIn("saving gives it a code of ours", " ".join(switch["notes"]))
 
     def test_the_product_page_offers_the_new_labels_once(self):
         session = self.client.session

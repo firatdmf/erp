@@ -112,7 +112,12 @@ def labels_pdf_bytes(pairs, detail_url=None, title=None, brand=None):
         base = cat["base_name"] or product.name or "—"
         token = cat["original_token"] or ""
         sku = product.sku or ""
-        bc_val = (roll.barcode if (roll and roll.barcode) else (product.barcode or sku or ""))
+        # A stock item's own code, else its variant's (goods sold by count
+        # carry one code per variant, on every piece).
+        variant = product.catalog_variant
+        bc_val = ((roll.barcode if roll else None)
+                  or (variant.variant_barcode if variant else None)
+                  or product.barcode or sku or "")
         # What is physically on the stock item NOW, not what it arrived
         # at: a cut roll carries quantity_remaining, and the reprinted label
         # goes back on that shorter roll. quantity_remaining is null for a

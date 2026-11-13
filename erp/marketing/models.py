@@ -552,10 +552,35 @@ class Product(models.Model):
                 # Its boxes came in unlabelled while it was sold by count.
                 from operating.views_warehouse import label_unlabelled_items
                 self.labelled_items = label_unlabelled_items(self)
+        elif (self.sold_by_count and before.get("tracking")
+              and not units.by_variant(before.get("tracking"))):
+            self.labelled_items = self.give_variants_barcodes()
 
-    # Stock items given a barcode by the last save that switched this
-    # product to "each item": [(warehouse product, how many)].
+    # Labels the last save that switched this product's tracking left to
+    # print: [(warehouse product, how many stock items)]. To "each item",
+    # the items it gave a barcode; to "by variant", the stock of the
+    # variants it gave one.
     labelled_items = ()
+
+    def give_variants_barcodes(self):
+        """Give each variant without a barcode one of ours (ProductVariant
+        .save makes it). Returns the stock to label with them:
+        [(warehouse product, how many items)]."""
+        from operating.models import WarehouseProduct
+        coded = []
+        for variant in ProductVariant.everywhere.filter(product=self).filter(
+                models.Q(variant_barcode__isnull=True) | models.Q(variant_barcode="")):
+            variant.product = self
+            variant.save(update_fields=["variant_barcode"])
+            coded.append(variant.pk)
+        rows = (WarehouseProduct.objects.filter(catalog_variant_id__in=coded)
+                .select_related("warehouse").order_by("warehouse__name", "sku"))
+        stock = []
+        for wp in rows:
+            n = wp.stock_items.exclude(status="consumed").count()
+            if n:
+                stock.append((wp, n))
+        return stock
 
     def drop_item_barcodes(self):
         """A product tracked item by item has no barcode above its items:
@@ -783,8 +808,17 @@ class ProductVariant(models.Model):
         # count. A product tracked item by item labels each item instead,
         # so its variants keep none, whichever screen, scan or import wrote
         # one (Product.sold_by_count).
-        if self.variant_barcode and self.product_id and not self.product.sold_by_count:
-            self.variant_barcode = None
+        # Tracked by variant, a variant always has one: the code printed on
+        # the goods when typed, else one of ours to print and stick on.
+        barcode = (self.variant_barcode or "").strip() or None
+        if self.product_id:
+            if not self.product.sold_by_count:
+                barcode = None
+            elif not barcode:
+                from operating.views_warehouse import mint_variant_barcode
+                barcode = mint_variant_barcode(self)
+        if barcode != self.variant_barcode:
+            self.variant_barcode = barcode
             if kwargs.get("update_fields") is not None:
                 kwargs["update_fields"] = {*kwargs["update_fields"], "variant_barcode"}
         super().save(*args, **kwargs)

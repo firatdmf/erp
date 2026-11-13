@@ -277,10 +277,10 @@
   </div>
 
   {% if labels_to_print %}
-  {# Stock items just given a barcode (the product switched to "each item"). #}
+  {# Stock whose barcode the last tracking switch made: its labels to print. #}
   <div class="labels-to-print">
     <h2><i class="fa fa-print"></i> {% trans "Labels to print" %}</h2>
-    <p>{% trans "These items in stock got a barcode of their own. Print each row's labels and stick them on." %}</p>
+    <p>{% trans "These items in stock need new labels. Print each row's and stick them on the goods." %}</p>
     <ul>
       {% for row in labels_to_print %}
       <li><a href="{{ row.url }}" target="_blank" rel="noopener">{{ row.name }}</a>

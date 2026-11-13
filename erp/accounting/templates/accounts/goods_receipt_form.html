@@ -3173,7 +3173,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
           if (!exact && !naming) {
             html += '<div class="np-sup-opt create" data-create="1">' +
                     '<span><i class="fa fa-plus"></i> ' +
-                    '{% filter escapejs %}{% trans "Create “{name}” as a new product" %}{% endfilter %}'.replace('{name}', npEsc(q)) +
+                    '{% filter escapejs %}{% trans "Create “{name}” as a new product" %}{% endfilter %}'.replace('{name}', npEsc(npTitleCase(q))) +
                     '</span></div>';
           }
           drop.innerHTML = html;
@@ -3187,8 +3187,17 @@ site's menus and the page's own way back are left out.{% endcomment %}
         }).catch(function () { drop.hidden = true; });
     }, 250);
   };
+  // The create row offers the name with each word capitalised, and that is
+  // the name it fills in; the field is the user's to change from there.
+  // Only first letters change: codes and brand names (R10489, DEMFIRAT)
+  // keep their spelling.
+  function npTitleCase(text) {
+    return String(text || '').trim().replace(/(^|\s)(\p{Ll})/gu, function (m, space, ch) {
+      return space + ch.toLocaleUpperCase('en');
+    });
+  }
   function npMainChoose(card, row) {
-    if (row.dataset.create) npMainCreate(card, card.querySelector('.np-main-search').value);
+    if (row.dataset.create) npMainCreate(card, npTitleCase(card.querySelector('.np-main-search').value));
     else npMainPickExisting(card, row.dataset.id, row.dataset.title, row.dataset.sku);
   }
   window.npMainKey = function (e, inputEl) {

@@ -263,12 +263,14 @@ site's menus and the page's own way back are left out.{% endcomment %}
   .np-v-barcode { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
   .np-new-main [hidden] { display: none !important; }
   .np-main-sku-state.bad { color: #B91C1C; }
-  /* A quiet text button. base.css pads every <button>, so padding is reset. */
-  .np-link {
-    margin-top: 8px; padding: 0; border: 0; background: none; cursor: pointer;
-    font: 600 12px var(--font-sans); color: var(--nejum-teal-600, #006B6B);
-  }
-  .np-link i { font-size: 10px; margin-right: 3px; }
+  /* A new product's name field carries the × that goes back to searching. */
+  .np-name-box { position: relative; }
+  .np-name-box .np-main-name { padding-right: 38px; }
+  .np-name-box .np-sup-clear { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); }
+  .np-new-tag { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: #EFF6F5;
+                color: #0B5F60; font-size: 9.5px; letter-spacing: .04em; }
+  /* Its two fields carry their own labels. */
+  .np-product-card.np-is-new .np-main-label { display: none; }
 
   /* (i) beside a label: its data-tip shows on hover, and on a tap for
      phones, which have no hover. The text sits in one box on the page
@@ -1541,7 +1543,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '<button type="button" class="np-mini-x np-product-rm" title="{% trans "Remove" %}" onclick="npRemoveProduct(this)">' + NP_TRASH + '</button>' +
       '</div>' +
       '<div class="np-field">' +
-        '<label>{% trans "Main product" %}</label>' +
+        '<label class="np-main-label">{% trans "Main product" %}</label>' +
         // One box: typing finds a product we have; what it doesn't find
         // can be created from the same list (npSearchMain).
         '<div class="np-sup np-main-box">' +
@@ -1555,23 +1557,26 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '</div>' +
         '<input type="hidden" class="np-main-id">' +
         '<input type="hidden" class="np-main-existing-sku">' +
-        // What was typed is the product's SKU, spelled as a code ("Duvet
-        // cover" → DUVETCOVER), and its title. A name of its own is asked
-        // only when wanted; with none, the title is the SKU.
-        '<div class="np-new-main" hidden style="margin-top:10px;">' +
+        // A new product: what was typed stays in an editable name field (the
+        // product's title), and its SKU is filled once from it, spelled as a
+        // code ("Duvet cover" → DUVETCOVER). Renaming it afterwards leaves
+        // the SKU be; a product with no name is titled by its SKU.
+        '<div class="np-new-main" hidden>' +
           '<div class="np-main-row">' +
+            '<div class="np-col np-col-name">' +
+              '<label>{% trans "Product name" %} <span class="np-new-tag">{% trans "New" %}</span></label>' +
+              '<div class="np-name-box">' +
+                '<input class="np-input np-main-name" placeholder="{% trans "e.g. Star Blackout" %}" oninput="npOnNameInput(this)">' +
+                '<button type="button" class="np-sup-clear" onclick="npMainClear(this)" title="{% trans "Change product" %}">&times;</button>' +
+              '</div>' +
+            '</div>' +
             '<div class="np-col np-col-sku">' +
               '<label>{% trans "Product SKU" %}</label>' +
               '<input class="np-input np-main-sku" maxlength="' + GR_SKU_MAX + '" placeholder="{% trans "e.g. 2086" %}" spellcheck="false"' +
                 ' oninput="npMainSkuInput(this)" onblur="npMainSkuBlur(this)">' +
               '<div class="np-hint np-main-sku-state">{% trans "Change it to the mill’s code if it has one. A name can repeat; a SKU can’t." %}</div>' +
             '</div>' +
-            '<div class="np-col np-col-name" hidden>' +
-              '<label>{% trans "Product name" %}</label>' +
-              '<input class="np-input np-main-name" placeholder="{% trans "e.g. Star Blackout" %}" oninput="npOnNameInput(this)">' +
-            '</div>' +
           '</div>' +
-          '<button type="button" class="np-link np-add-name" onclick="npShowName(this)"><i class="fa fa-plus"></i> {% trans "Add product name" %}</button>' +
         '</div>' +
         '<div class="np-existing-variants" style="display:none;"></div>' +
       '</div>' +
@@ -1659,8 +1664,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   window.npSetMode = function (card, mode) {
     card._npMode = mode;
     card.querySelector('.np-main-box').hidden = !!mode;
-    card.querySelector('.np-main-chip').hidden = !mode;
+    card.querySelector('.np-main-chip').hidden = mode !== 'existing';
     card.querySelector('.np-new-main').hidden = mode !== 'new';
+    card.classList.toggle('np-is-new', mode === 'new');
     const drop = card.querySelector('.np-main-drop');
     drop.hidden = true; drop.innerHTML = '';
     npApplyProductFacts(card, null);
@@ -1722,8 +1728,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
     card.querySelector('.np-main-name').value = '';
     const skuEl = card.querySelector('.np-main-sku');
     if (skuEl) { skuEl.value = ''; delete skuEl.dataset.touched; }
-    card.querySelector('.np-col-name').hidden = true;
-    card.querySelector('.np-add-name').hidden = false;
     npSetMode(card, '');
     search.focus();
   };
@@ -2126,15 +2130,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
   window.addEventListener('scroll', npTipFollow, true);
   window.addEventListener('resize', npTipFollow);
 
-  // A name of the product's own, when the SKU isn't one.
-  window.npShowName = function (btn) {
-    const card = btn.closest('.np-product-card');
-    card.querySelector('.np-col-name').hidden = false;
-    btn.hidden = true;
-    const nameEl = card.querySelector('.np-main-name');
-    nameEl.focus();
-    nameEl.select();
-  };
   window.npCheckVariantMatch = function (vEl) {
     const badge = vEl.querySelector('.np-v-match');
     const skuI = vEl.querySelector('.np-v-sku');
@@ -3689,11 +3684,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
         if (skuEl && mp.sku) skuEl.value = mp.sku;
         npApplyAutoSku(card);
         npCheckMainSku(card);
-        // A name that is more than its SKU spelled out shows as the name.
-        if (mp.name && slug(mp.name) !== (skuEl.value || '').toUpperCase()) {
-          card.querySelector('.np-col-name').hidden = false;
-          card.querySelector('.np-add-name').hidden = true;
-        }
         npMainChipText(card);
       }
       const catSel = card.querySelector('.np-main-cat');

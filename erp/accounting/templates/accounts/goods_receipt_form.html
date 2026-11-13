@@ -270,26 +270,27 @@ site's menus and the page's own way back are left out.{% endcomment %}
   }
   .np-link i { font-size: 10px; margin-right: 3px; }
 
-  /* (i) beside a label: the explanation shows on hover, and on a tap for
-     phones, which have no hover (npInfo toggles .open). */
+  /* (i) beside a label: its data-tip shows on hover, and on a tap for
+     phones, which have no hover. The text sits in one box on the page
+     (#npTip, placed by npTipShow) rather than inside the card, so no
+     card or column edge can cut it off and it is kept on screen. */
+  .np-col > label:has(> .np-info) { display: flex; align-items: center; gap: 5px; }
   .np-info {
-    position: relative; display: inline-flex; align-items: center; justify-content: center;
-    width: 15px; height: 15px; padding: 0; margin-left: 4px; vertical-align: -3px;
-    border: 1px solid currentColor; border-radius: 50%; background: none; cursor: help;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 14px; height: 14px; padding: 0; margin: 0; box-sizing: border-box;
+    border: 1.2px solid currentColor; border-radius: 50%; background: none; cursor: help;
     font: 700 9px/1 var(--font-sans); color: var(--gray-500); text-transform: none; letter-spacing: 0;
   }
-  .np-info::after {
-    content: attr(data-tip);
-    position: absolute; z-index: 30; top: calc(100% + 8px); left: -10px;
-    width: max-content; max-width: min(280px, calc(100vw - 48px)); padding: 9px 11px; border-radius: 8px;
-    background: #0F1419; color: #fff; text-align: left; white-space: pre-line;
-    font: 500 12px/1.45 var(--font-sans); text-transform: none; letter-spacing: 0;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
-    opacity: 0; visibility: hidden; transition: opacity 120ms; pointer-events: none;
-  }
+  .np-info:hover, .np-info.open { color: var(--nejum-teal-600, #006B6B); }
   .np-info[hidden] { display: none; }
-  .np-info:hover::after, .np-info.open::after { opacity: 1; visibility: visible; }
   .np-info:empty::before { content: "i"; }
+  .np-tip {
+    position: fixed; z-index: 1000; max-width: min(300px, calc(100vw - 32px));
+    padding: 9px 11px; border-radius: 8px; background: #0F1419; color: #fff;
+    white-space: pre-line; font: 500 12px/1.45 var(--font-sans);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18); pointer-events: none;
+  }
+  .np-tip[hidden] { display: none; }
   /* The variant's name, read from its values. */
   .np-v-name { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px;
                font: 500 12.5px var(--font-sans); color: var(--gray-600, #4B5563); }
@@ -932,6 +933,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
     'size': '{% trans "e.g. 130 x 210 cm" %}', 'size per panel': '{% trans "e.g. 130 x 210 cm" %}',
     'header': '{% trans "e.g. grommet" %}', 'width': '{% trans "e.g. 155" %}'
   };
+  const NP_VALUES_TIP = "{% filter escapejs %}{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white." %}{% endfilter %}\n\n{% filter escapejs %}{% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320." %}{% endfilter %}";
   function npAttrKey(n) { return String(n || '').toLowerCase().split(/\s+/).filter(Boolean).join(' '); }
   function npAttrLabel(n) {
     return NP_ATTR_LABELS[n] || (n.charAt(0).toUpperCase() + n.slice(1));
@@ -1018,9 +1020,14 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (!box) return;
     const typed = {};
     box.querySelectorAll('.np-v-attr').forEach(function (i) { typed[i.dataset.attr] = i.value; });
-    box.innerHTML = (card._npAttrs || []).map(function (n) {
+    box.innerHTML = (card._npAttrs || []).map(function (n, i) {
       return '<div class="np-col np-sup">' +
-        '<label>' + npEsc(npAttrLabel(n)) + '</label>' +
+        '<label>' + npEsc(npAttrLabel(n)) +
+          // How values are written, beside the row's first field.
+          (i === 0 ? '<button type="button" class="np-info" onclick="npInfo(event, this)"' +
+                     ' aria-label="{% filter escapejs %}{% trans "How to write values" %}{% endfilter %}"' +
+                     ' data-tip="' + npEsc(NP_VALUES_TIP) + '"></button>' : '') +
+        '</label>' +
         '<input class="np-input np-v-attr" data-attr="' + npEsc(n) + '" value="' + npEsc(typed[n] || '') + '"' +
         ' placeholder="' + npEsc(NP_ATTR_HINTS[n] || '') + '" autocomplete="off"' +
         ' oninput="npRowAttrInput(this); npValueTyped(this)" onkeydown="npValueKey(event, this)"' +
@@ -1485,7 +1492,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
       fetch(NP_PRODUCT_SKU_CHECK + '?sku=' + encodeURIComponent(sku), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          if ((skuEl.value || '').trim() !== sku || !d || d.available) return;
+          if ((skuEl.value || '').trim() !== sku || !d || d.available !== false) return;
           state.classList.add('bad');
           state.textContent = '{% filter escapejs %}{% trans "“{sku}” is already the SKU of “{product}”. Pick that product from the list, or give this one another SKU." %}{% endfilter %}'
             .replace('{sku}', sku).replace('{product}', d.used_by || '');
@@ -1605,7 +1612,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '<div class="np-attr-bar"><span class="np-attr-chips"></span>' +
           '<select class="np-select np-attr-add" onchange="npAddCardAttr(this)"></select></div>' +
         '<div class="np-hint np-attr-needed" hidden style="color:#B91C1C;">{% trans "Add an attribute (color, width…): every variant needs at least one value."|escapejs %}</div>' +
-        '<div class="np-hint">{% trans "Write each value in words. To combine colours, put + between them: gold+ecru, silver+off white."|escapejs %} {% trans "The SKU is built from the values: capitals without spaces, a - between values, and a _ between combined colours. gold+ecru at 320 cm → 2086.GOLD_ECRU-320."|escapejs %}</div>' +
       '</div>' +
       '<div class="np-variants-wrap">' +
         '<div class="np-variants"></div>' +
@@ -2072,17 +2078,53 @@ site's menus and the page's own way back are left out.{% endcomment %}
   }
 
   // (i) buttons: hover shows the text; a tap or click pins it open, which
-  // is the only way on a phone. A tap anywhere else closes it.
+  // is the only way on a phone. A tap anywhere else closes it. One box on
+  // the page shows it, placed under the icon (above it when there is no
+  // room below) and slid sideways to stay on screen.
+  const npTip = document.createElement('div');
+  npTip.className = 'np-tip';
+  npTip.hidden = true;
+  npTip.setAttribute('role', 'tooltip');
+  document.body.appendChild(npTip);
+  function npTipShow(btn) {
+    npTip.textContent = btn.dataset.tip || '';
+    npTip.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const w = npTip.offsetWidth, h = npTip.offsetHeight, gap = 8, edge = 16;
+    const left = Math.max(edge, Math.min(r.left - 10, window.innerWidth - w - edge));
+    const below = r.bottom + gap;
+    npTip.style.left = left + 'px';
+    npTip.style.top = (below + h > window.innerHeight - edge && r.top - gap - h > edge
+                       ? r.top - gap - h : below) + 'px';
+  }
+  function npTipHide() {
+    npTip.hidden = true;
+    document.querySelectorAll('.np-info.open').forEach(function (b) { b.classList.remove('open'); });
+  }
   window.npInfo = function (e, btn) {
     e.preventDefault();
     e.stopPropagation();
     const open = !btn.classList.contains('open');
-    document.querySelectorAll('.np-info.open').forEach(function (b) { b.classList.remove('open'); });
-    btn.classList.toggle('open', open);
+    npTipHide();
+    if (open) { btn.classList.add('open'); npTipShow(btn); }
   };
-  document.addEventListener('click', function () {
-    document.querySelectorAll('.np-info.open').forEach(function (b) { b.classList.remove('open'); });
+  document.addEventListener('mouseover', function (e) {
+    const btn = e.target.closest && e.target.closest('.np-info');
+    if (btn && !document.querySelector('.np-info.open')) npTipShow(btn);
   });
+  document.addEventListener('mouseout', function (e) {
+    const btn = e.target.closest && e.target.closest('.np-info');
+    if (btn && !btn.classList.contains('open')) npTip.hidden = true;
+  });
+  document.addEventListener('click', npTipHide);
+  // A pinned tip follows its icon when the page moves or resizes under it
+  // (a phone resizes as its address bar slides away on scroll).
+  function npTipFollow() {
+    const open = document.querySelector('.np-info.open');
+    if (open) npTipShow(open); else npTip.hidden = true;
+  }
+  window.addEventListener('scroll', npTipFollow, true);
+  window.addEventListener('resize', npTipFollow);
 
   // A name of the product's own, when the SKU isn't one.
   window.npShowName = function (btn) {

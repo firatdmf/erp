@@ -16167,3 +16167,6 @@ msgstr "Yukarıdaki bir alımı açın"
 
 msgid "ship what is here now. The rest, with the purchases still on their way, is carried to a new order."
 msgstr "elde olanı şimdi gönderin. Kalanı, yoldaki alımlarla birlikte yeni bir siparişe aktarılır."
+
+msgid "How to write values"
+msgstr "Değerler nasıl yazılır"

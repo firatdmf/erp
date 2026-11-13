@@ -544,6 +544,19 @@ class Product(models.Model):
         super().save(*args, **kwargs)
         if old_sku and self.sku and old_sku != self.sku:
             self.carry_variant_skus(old_sku)
+        if not self.sold_by_count and (update_fields is None or "tracking" in update_fields):
+            self.drop_item_barcodes()
+
+    def drop_item_barcodes(self):
+        """A product tracked item by item has no barcode above its items:
+        its variants and their warehouse rows keep none. Run when it is
+        saved that way, so switching a product to "each item" empties what
+        it carried while it was sold by count."""
+        from operating.models import WarehouseProduct
+        ProductVariant.everywhere.filter(product=self).exclude(
+            variant_barcode__isnull=True).update(variant_barcode=None)
+        WarehouseProduct.objects.filter(catalog_variant__product=self).exclude(
+            barcode__isnull=True).update(barcode=None)
 
     def carry_variant_skus(self, old_sku):
         """A variant SKU is PARENT.VALUES, so renaming the parent renames
@@ -754,6 +767,17 @@ class ProductVariant(models.Model):
     # Walled by its product — see ProductPartManager.
     objects = ProductPartManager("product")
     everywhere = models.Manager()
+
+    def save(self, *args, **kwargs):
+        # A variant barcode is the code on every piece of a product sold by
+        # count. A product tracked item by item labels each item instead,
+        # so its variants keep none, whichever screen, scan or import wrote
+        # one (Product.sold_by_count).
+        if self.variant_barcode and self.product_id and not self.product.sold_by_count:
+            self.variant_barcode = None
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "variant_barcode"}
+        super().save(*args, **kwargs)
 
     def validate_unique(self, exclude=None):
         super().validate_unique(exclude=exclude)

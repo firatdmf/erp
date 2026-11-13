@@ -151,8 +151,11 @@ class ProductBarcodeIsNotStampedFromRollsTest(TestCase):
 
     def test_a_hand_entered_product_barcode_survives_roll_changes(self):
         """The field is now only ever set deliberately, so nothing may wipe
-        it — the old cleanup helper would have, on the next roll change."""
+        it — the old cleanup helper would have, on the next roll change.
+        Only goods sold by count have one (WarehouseProduct.save), so the
+        product is switched to that first."""
         self._receive("2000043130007")
+        Product.objects.filter(sku="K24644").update(tracking="variant")
         wp = WarehouseProduct.objects.get(sku="K24644.G07")
         wp.barcode = "ARTICLE-8690000"
         wp.save(update_fields=["barcode"])

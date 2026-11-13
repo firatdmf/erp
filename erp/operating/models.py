@@ -2133,6 +2133,17 @@ class WarehouseProduct(models.Model):
             return rows.filter(sku__iexact=other.sku).first()
         return None
 
+    def save(self, *args, **kwargs):
+        # The row's barcode is the variant's, carried for goods sold by
+        # count. A product tracked item by item has a barcode on each item
+        # and none here — not a scanned roll's label copied up, nor one
+        # typed on the edit form or read from a sheet.
+        if self.barcode and self.catalog_variant_id and not self.sold_by_count:
+            self.barcode = None
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "barcode"}
+        super().save(*args, **kwargs)
+
     @property
     def catalog_product(self):
         """The main product this row is stock of, or None while unlinked.

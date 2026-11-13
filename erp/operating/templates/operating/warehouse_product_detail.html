@@ -967,10 +967,13 @@
             <span class="info-k">{% trans "SKU" %}</span>
             <span class="info-v"><span class="mono">{{ product.sku|default:"—" }}</span></span>
           </div>
+          {# Goods tracked item by item have their barcodes on the items. #}
+          {% if product.sold_by_count %}
           <div class="info-row" style="grid-column: 1 / -1;">
             <span class="info-k">{% trans "Barcode" %}</span>
             <span class="info-v"><span class="mono">{{ product.barcode|default:"—" }}</span></span>
           </div>
+          {% endif %}
           {% if product.model %}
           <div class="info-row">
             <span class="info-k">{% trans "Model" %}</span>
@@ -1819,10 +1822,12 @@
         <div id="peCatalogDrop" class="pe-ac-drop"></div>
       </div>
       {% endif %}
+      {% if product.sold_by_count %}
       <div class="so-fld">
         <label>{% trans "Barcode" %}</label>
         <input class="so-input" type="text" name="barcode" value="{{ product.barcode|default:'' }}">
       </div>
+      {% endif %}
       <div class="so-fld">
         <label>{% trans "Model" %}</label>
         <input class="so-input" type="text" name="model" value="{{ product.model|default:'' }}">

@@ -8768,10 +8768,10 @@ class WarehouseRollScan(View):
                         purchase_price, purchase_currency)
                 except (InvalidOperation, TypeError):
                     pass
-            # Update product-level barcode if it didn't have one (per-roll
-            # barcode is the source of truth for stock-out scanning, but
-            # the product-level field stays handy for product search).
-            if barcode and not product.barcode:
+            # Goods sold by count share one barcode, so the first scanned
+            # names the row too. A product tracked item by item keeps its
+            # barcodes on its items only (WarehouseProduct.save).
+            if barcode and not product.barcode and product.sold_by_count:
                 product.barcode = barcode[:64]
 
             # Save the roll.
@@ -8835,6 +8835,8 @@ class WarehouseRollScan(View):
                 "name": product.name,
                 "sku": product.sku,
                 "barcode": product.barcode,
+                # A product barcode is asked only of goods sold by count.
+                "sold_by_count": product.sold_by_count,
                 "quantity": float(product.quantity or 0),
                 "rolls_count": product.stock_items.count(),
                 "main_product": (catalog_info["product_title"] if catalog_info else None),

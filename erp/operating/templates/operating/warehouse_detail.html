@@ -2076,7 +2076,8 @@
              title="{% trans 'Rename it in the catalog' %}"
              style="background:#F3F4F6;color:#4B5563;cursor:not-allowed;">
         <div style="font-size:12px;color:var(--gray-500);margin-top:4px;">{% trans "Rename or move it in the catalog." %}</div></div>
-      <div class="rse-fld"><label>{% trans "Product barcode" %}</label><input id="rseProdBc" class="rse-input" type="text" autocomplete="off"></div>
+      {# Only goods sold by count have a barcode above their items. #}
+      <div class="rse-fld" id="rseProdBcFld"><label>{% trans "Product barcode" %}</label><input id="rseProdBc" class="rse-input" type="text" autocomplete="off"></div>
       <hr class="rse-sep">
       <div class="rse-fld"><label>{% trans "Roll barcode" %}</label><input id="rseRollBc" class="rse-input" type="text" autocomplete="off"></div>
       <div style="display:flex; gap:10px;">
@@ -3786,6 +3787,7 @@
       productId: data.product.id, rollId: data.roll.id,
       name: data.product.name || '', sku: data.product.sku || '',
       productBarcode: data.product.barcode || '',
+      soldByCount: !!data.product.sold_by_count,
       rollBarcode: (data.roll && data.roll.barcode) || '',
       quantity: data.roll.quantity, lot: (data.roll.lot_number || ''),
       mainProduct: data.product.main_product || ''
@@ -3810,6 +3812,7 @@
     document.getElementById('rseName').value = it.name || '';
     document.getElementById('rseSku').value = it.sku || '';
     document.getElementById('rseProdBc').value = it.productBarcode || '';
+    document.getElementById('rseProdBcFld').style.display = it.soldByCount ? '' : 'none';
     document.getElementById('rseRollBc').value = it.rollBarcode || '';
     document.getElementById('rseMeters').value = it.quantity || '';
     document.getElementById('rseLot').value = it.lot || '';

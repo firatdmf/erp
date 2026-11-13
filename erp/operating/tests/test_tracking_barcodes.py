@@ -103,3 +103,48 @@ class VariantBarcodeFollowsTrackingTest(TestCase):
             variant_sku="BOXES.WHITE", variant_barcode="8690000000017",
             existing_base_product=counted)
         self.assertEqual(v.variant_barcode, "8690000000017")
+
+
+class NoBarcodeAboveTrackedItemsTest(TestCase):
+    """Whatever writes it — a screen, a scan, a sheet — a product tracked
+    item by item has no barcode on its variants or their warehouse rows."""
+
+    def setUp(self):
+        self.warehouse = Warehouse.objects.create(name="Fabrika", accounting_book=Book.objects.create(name="Demfirat"))
+        self.rolls = Product.objects.create(title="ROLLS", sku="ROLLS", tracking="item")
+        self.boxes = Product.objects.create(title="BOXES", sku="BOXES", unit="piece", tracking="variant")
+
+    def _variant(self, product, sku, barcode):
+        return ProductVariant.objects.create(product=product, variant_sku=sku, variant_barcode=barcode)
+
+    def test_a_variant_of_rolls_drops_its_barcode(self):
+        v = self._variant(self.rolls, "ROLLS.WHITE", "KRV000123")
+        v.refresh_from_db()
+        self.assertIsNone(v.variant_barcode)
+        v.variant_barcode = "KRV000124"
+        v.save(update_fields=["variant_cost"])
+        v.refresh_from_db()
+        self.assertIsNone(v.variant_barcode)
+
+    def test_a_variant_sold_by_count_keeps_its_barcode(self):
+        v = self._variant(self.boxes, "BOXES.WHITE", "8690000000017")
+        v.refresh_from_db()
+        self.assertEqual(v.variant_barcode, "8690000000017")
+
+    def test_a_row_of_rolls_drops_its_barcode(self):
+        from operating.models import WarehouseProduct
+        v = self._variant(self.rolls, "ROLLS.WHITE", None)
+        wp = WarehouseProduct.objects.create(warehouse=self.warehouse, name="r", sku=v.variant_sku,
+                                             catalog_variant=v, barcode="KRV000123")
+        wp.refresh_from_db()
+        self.assertIsNone(wp.barcode)
+
+    def test_switching_to_each_item_empties_what_it_carried(self):
+        from operating.models import WarehouseProduct
+        v = self._variant(self.boxes, "BOXES.WHITE", "8690000000017")
+        wp = WarehouseProduct.objects.create(warehouse=self.warehouse, name="b", sku=v.variant_sku,
+                                             catalog_variant=v, barcode="8690000000017")
+        self.boxes.set_unit(tracking="item")
+        v.refresh_from_db(); wp.refresh_from_db()
+        self.assertIsNone(v.variant_barcode)
+        self.assertIsNone(wp.barcode)

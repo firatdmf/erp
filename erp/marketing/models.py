@@ -538,14 +538,24 @@ class Product(models.Model):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None and "unit" in update_fields:
             kwargs["update_fields"] = {*update_fields, "unit_of_measurement"}
-        old_sku = None
-        if self.pk and (update_fields is None or "sku" in update_fields):
-            old_sku = Product.everywhere.filter(pk=self.pk).values_list("sku", flat=True).first()
+        before = {}
+        if self.pk and (update_fields is None or {"sku", "tracking"} & set(update_fields)):
+            before = Product.everywhere.filter(pk=self.pk).values("sku", "tracking").first() or {}
         super().save(*args, **kwargs)
+        self.labelled_items = ()
+        old_sku = before.get("sku")
         if old_sku and self.sku and old_sku != self.sku:
             self.carry_variant_skus(old_sku)
         if not self.sold_by_count and (update_fields is None or "tracking" in update_fields):
             self.drop_item_barcodes()
+            if units.by_variant(before.get("tracking")):
+                # Its boxes came in unlabelled while it was sold by count.
+                from operating.views_warehouse import label_unlabelled_items
+                self.labelled_items = label_unlabelled_items(self)
+
+    # Stock items given a barcode by the last save that switched this
+    # product to "each item": [(warehouse product, how many)].
+    labelled_items = ()
 
     def drop_item_barcodes(self):
         """A product tracked item by item has no barcode above its items:

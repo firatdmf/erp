@@ -832,6 +832,35 @@ def _barcode_minter(prefix, reserved=()):
     return mint
 
 
+def label_unlabelled_items(product):
+    """Give each stock item of `product` that has no barcode one of its own.
+
+    A product switched to "each item" needs this. While it was tracked by
+    variant, its boxes came in unlabelled. Used-up items are left alone,
+    because there is nothing left to stick a label on. Codes continue the
+    family a row's rolls already carry, else the supplier's.
+    Returns [(warehouse product, how many)]."""
+    from django.db.models import Q as _Q
+    supplier = getattr(product, "supplier_account", None)
+    fallback = _consonant_prefix(supplier.name) if supplier else _fallback_prefix()
+    minters, labelled = {}, []
+    rows = (WarehouseProduct.objects.filter(catalog_variant__product=product)
+            .select_related("warehouse").order_by("warehouse__name", "sku"))
+    for wp in rows:
+        items = list(wp.stock_items.filter(_Q(barcode__isnull=True) | _Q(barcode=""))
+                     .exclude(status="consumed").order_by("id"))
+        if not items:
+            continue
+        prefix = _barcode_prefix_from_existing(wp, fallback)
+        if prefix not in minters:
+            minters[prefix] = _barcode_minter(prefix)
+        for item in items:
+            item.barcode = minters[prefix]()
+            item.save(update_fields=["barcode"])
+        labelled.append((wp, len(items)))
+    return labelled
+
+
 def _slug_token(text):
     """Compact ASCII-upper alnum token for an auto variant-SKU suffix:
     'Açık Mavi' -> 'ACIKMAVI'."""

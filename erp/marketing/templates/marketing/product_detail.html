@@ -276,6 +276,20 @@
     </div>
   </div>
 
+  {% if labels_to_print %}
+  {# Stock items just given a barcode (the product switched to "each item"). #}
+  <div class="labels-to-print">
+    <h2><i class="fa fa-print"></i> {% trans "Labels to print" %}</h2>
+    <p>{% trans "These items in stock got a barcode of their own. Print each row's labels and stick them on." %}</p>
+    <ul>
+      {% for row in labels_to_print %}
+      <li><a href="{{ row.url }}" target="_blank" rel="noopener">{{ row.name }}</a>
+        <span class="lp-where">{{ row.warehouse }} · {{ row.count }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <!-- Variants Section -->
   {% if product_variants %}
   <div class="variants-section">
@@ -756,6 +770,15 @@
 
   /* Quantity input red flash when below minimum */
   .b2b-qty.is-invalid { border-color: #FCA5A5 !important; box-shadow: 0 0 0 3px rgba(220,38,38,0.12) !important; }
+
+  .labels-to-print { margin: 16px 0; padding: 14px 16px; border-radius: 12px;
+    background: #FFFBEB; border: 1px solid #FDE68A; }
+  .labels-to-print h2 { font-size: 15px; margin: 0 0 4px; }
+  .labels-to-print p { margin: 0 0 8px; color: #92400E; font-size: 13px; }
+  .labels-to-print ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .labels-to-print li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .labels-to-print a { font-weight: 600; word-break: break-word; }
+  .labels-to-print .lp-where { color: #64748B; font-size: 12.5px; }
 
   @media (max-width: 640px) {
     .b2b-row { grid-template-columns: 1fr; }

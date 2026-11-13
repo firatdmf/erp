@@ -148,3 +148,75 @@ class NoBarcodeAboveTrackedItemsTest(TestCase):
         v.refresh_from_db(); wp.refresh_from_db()
         self.assertIsNone(v.variant_barcode)
         self.assertIsNone(wp.barcode)
+
+
+class SwitchingTrackingTest(TestCase):
+    """Switching a product with stock between "by variant" and "each item".
+    To each item: every item still in stock gets a barcode of its own, and
+    the product page offers their labels. To by variant: the items keep
+    their labels, and the edit page says which variants a scan can't find."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="switch_tester", password="pw", email="s@w.t")
+        self.client.force_login(self.user)
+        from operating.models import WarehouseProduct
+        self.warehouse = Warehouse.objects.create(name="Fabrika", accounting_book=Book.objects.create(name="Demfirat"))
+        self.product = Product.objects.create(title="BOXES", sku="BOXES", unit="piece", tracking="variant")
+        self.variant = ProductVariant.objects.create(product=self.product, variant_sku="BOXES.WHITE",
+                                                     variant_barcode="8690000000017")
+        self.row = WarehouseProduct.objects.create(warehouse=self.warehouse, name="Boxes white",
+                                                   sku="BOXES.WHITE", catalog_variant=self.variant)
+        self.boxes = [WarehouseProductItem.objects.create(product=self.row, quantity=1, quantity_remaining=1)
+                      for _ in range(2)]
+        self.used_up = WarehouseProductItem.objects.create(product=self.row, quantity=1,
+                                                           quantity_remaining=0, status="consumed")
+
+    def test_each_item_labels_the_boxes_in_stock(self):
+        self.product.set_unit(tracking="item")
+        for box in self.boxes:
+            box.refresh_from_db()
+        codes = [b.barcode for b in self.boxes]
+        self.assertTrue(all(codes))
+        self.assertEqual(len(set(codes)), 2)
+        self.used_up.refresh_from_db()
+        self.assertIsNone(self.used_up.barcode)
+        self.assertEqual(self.product.labelled_items, [(self.row, 2)])
+
+    def test_new_codes_continue_the_rows_own_family(self):
+        WarehouseProductItem.objects.create(product=self.row, quantity=1, quantity_remaining=1,
+                                            barcode="KRV000041")
+        self.product.set_unit(tracking="item")
+        self.assertEqual(sorted(WarehouseProductItem.objects.filter(
+            product=self.row, status="in_stock").values_list("barcode", flat=True)),
+            ["KRV000041", "KRV000042", "KRV000043"])
+
+    def test_by_variant_keeps_the_labels(self):
+        self.product.set_unit(tracking="item")
+        codes = sorted(WarehouseProductItem.objects.exclude(barcode=None).values_list("barcode", flat=True))
+        self.product.set_unit(tracking="variant")
+        self.assertEqual(self.product.labelled_items, ())
+        self.assertEqual(sorted(WarehouseProductItem.objects.exclude(barcode=None)
+                                .values_list("barcode", flat=True)), codes)
+
+    def test_the_edit_page_says_what_a_switch_does(self):
+        url = reverse("marketing:product_edit", args=[self.product.pk])
+        switch = self.client.get(url).context["tracking_switch"]
+        self.assertEqual(switch["to"], "item")
+        self.assertIn("2 items in stock have no barcode", " ".join(switch["notes"]))
+        self.assertIn("1 variant's barcode is cleared", " ".join(switch["notes"]))
+
+        self.product.set_unit(tracking="item")
+        switch = self.client.get(url).context["tracking_switch"]
+        self.assertEqual(switch["to"], "variant")
+        self.assertIn("1 variant has no barcode (BOXES.WHITE)", " ".join(switch["notes"]))
+
+    def test_the_product_page_offers_the_new_labels_once(self):
+        session = self.client.session
+        session[f"labels_to_print_{self.product.pk}"] = [
+            [self.warehouse.pk, self.row.pk, "Fabrika", "Boxes white", 2]]
+        session.save()
+        url = reverse("marketing:product_detail", args=[self.product.pk])
+        label_url = reverse("operating:warehouse_product_label", args=[self.warehouse.pk, self.row.pk])
+        self.assertContains(self.client.get(url), label_url)
+        self.assertNotContains(self.client.get(url), label_url)

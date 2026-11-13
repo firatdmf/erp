@@ -420,7 +420,17 @@ class ProductDetail(generic.DetailView):
         context['product_suppliers'] = supplier_rows(
             self.object, getattr(self.request.user, "member", None))
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
-        
+        # Stock items the last save gave a barcode (switched to "each item"):
+        # their labels, ready to print, once.
+        from erp.roles import may_print_labels
+        to_print = self.request.session.pop(f"labels_to_print_{self.object.pk}", None)
+        if to_print and may_print_labels(self.request.user):
+            context["labels_to_print"] = [
+                {"url": reverse("operating:warehouse_product_label",
+                                kwargs={"warehouse_pk": w, "product_pk": p}),
+                 "warehouse": warehouse, "name": name, "count": n}
+                for w, p, warehouse, name, n in to_print]
+
         context_time = time.time() - context_start
         print(f"   ✓ Context built: {context_time:.4f}s")
         
@@ -1585,7 +1595,67 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         # Variants are already prefetched in get_queryset(), no need to force evaluation
         # Forcing evaluation with list() can cause cursor issues
         context["variants"] = self.object.variants.all()
+        context["tracking_switch"] = self._tracking_switch()
         return context
+
+    def _tracking_switch(self):
+        """What switching this product's tracking leaves to be done, said
+        under the Tracking field before saving. To "each item": its
+        unlabelled stock items get a barcode each, and the variants lose
+        theirs. To "by variant": variants without a barcode can't be found
+        by a scan until someone enters the code printed on the goods."""
+        from django.db.models import Q
+        from django.utils.translation import ngettext
+        from operating.models import WarehouseProductItem
+        product = self.object
+        if product.sold_by_count:
+            unlabelled = (WarehouseProductItem.objects
+                          .filter(product__catalog_variant__product=product)
+                          .filter(Q(barcode__isnull=True) | Q(barcode=""))
+                          .exclude(status="consumed").count())
+            barcoded = product.variants.exclude(variant_barcode__isnull=True) \
+                .exclude(variant_barcode="").count()
+            notes = []
+            if unlabelled:
+                notes.append(ngettext(
+                    "%(n)s item in stock has no barcode. Saving gives it one of its own; "
+                    "its label is offered for printing after.",
+                    "%(n)s items in stock have no barcode. Saving gives each one of its own; "
+                    "their labels are offered for printing after.", unlabelled) % {"n": unlabelled})
+            if barcoded:
+                notes.append(ngettext(
+                    "%(n)s variant's barcode is cleared: each item's own label names it.",
+                    "%(n)s variants' barcodes are cleared: each item's own label names them.",
+                    barcoded) % {"n": barcoded})
+            return {"to": "item", "notes": notes}
+        missing = [v.variant_sku for v in product.variants.all() if not v.variant_barcode]
+        notes = [_gettext("Stock items keep their labels.")]
+        if missing:
+            notes.append(ngettext(
+                "%(n)s variant has no barcode (%(skus)s). A scan won't find it until you enter "
+                "the code printed on the goods in its Barcode, under Variants.",
+                "%(n)s variants have no barcode (%(skus)s). A scan won't find them until you enter "
+                "the code printed on the goods in each one's Barcode, under Variants.",
+                len(missing)) % {"n": len(missing), "skus": ", ".join(missing[:5])
+                                 + (" …" if len(missing) > 5 else "")})
+        return {"to": "variant", "notes": notes}
+
+    def _offer_new_labels(self):
+        """After a save that switched the product to "each item": say how
+        many stock items got a barcode, and keep their rows for the product
+        page to offer their labels."""
+        from django.utils.translation import ngettext
+        labelled = getattr(self.object, "labelled_items", ())
+        if not labelled:
+            return
+        total = sum(n for _wp, n in labelled)
+        messages.success(self.request, ngettext(
+            "%(n)s item in stock got a barcode of its own.",
+            "%(n)s items in stock got a barcode of their own.",
+            total) % {"n": total})
+        self.request.session[f"labels_to_print_{self.object.pk}"] = [
+            [wp.warehouse_id, wp.pk, wp.warehouse.name, wp.name or wp.sku, n]
+            for wp, n in labelled]
 
     # # This sends data to the form.
     def get_form_kwargs(self):
@@ -1617,6 +1687,7 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # print(self.request.POST)
             save_start = time.time()
             self.object = form.save()
+            self._offer_new_labels()
             save_time = time.time() - save_start
             if save_time > 0.05:
                 print(f"\n⏱️  Form save: {save_time:.3f}s")

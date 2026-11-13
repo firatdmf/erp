@@ -19,6 +19,10 @@
   .html-source-btn.active { background: #333; color: #fff; border-color: #333; }
   .html-source-area { display: none; width: 100%; min-height: 120px; font-family: monospace; font-size: 13px; padding: 10px; border: none; border-top: 1px solid #e0e0e0; resize: vertical; box-sizing: border-box; }
   .html-source-area.visible { display: block; }
+  .tracking-switch-note { margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+    background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; font-size: 12.5px; line-height: 1.45; }
+  .tracking-switch-note p { margin: 0; }
+  .tracking-switch-note p + p { margin-top: 4px; }
 </style>
 <!-- Mobile Responsive Styles -->
 <style>
@@ -765,6 +769,23 @@
             {{ form.minimum_inventory_level }}
           </div>
         </div>
+        {% if tracking_switch.notes %}
+        {# Shown while Tracking is set away from what is saved: what the switch does. #}
+        <div class="tracking-switch-note" id="trackingSwitchNote"
+             data-to="{{ tracking_switch.to }}" hidden>
+          {% for note in tracking_switch.notes %}<p>{{ note }}</p>{% endfor %}
+        </div>
+        <script>
+          (function () {
+            var sel = document.getElementById('id_tracking');
+            var note = document.getElementById('trackingSwitchNote');
+            if (!sel || !note) return;
+            function show() { note.hidden = sel.value !== note.dataset.to; }
+            sel.addEventListener('change', show);
+            show();
+          })();
+        </script>
+        {% endif %}
       </div>
 
       <!-- Shipping (Moved to Sidebar) -->

@@ -2,6 +2,7 @@ import traceback
 from decimal import Decimal
 from functools import lru_cache
 
+from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404
@@ -1993,6 +1994,34 @@ class Warehouse(models.Model):
 
     def product_count(self):
         return self.products.count()
+
+
+class ShippingRule(models.Model):
+    """What one country may be sent from warehouses in other countries:
+    what the storefront offers a buyer there, and what their web order may
+    hold (operating.shipping).
+
+    A country with no rule takes goods from anywhere, nearest warehouse
+    country first. A warehouse always ships inside its own country, so a
+    rule only speaks of other countries. Countries are ISO codes ("TR"),
+    the way warehouses and addresses store them (operating/countries.py).
+    """
+    destination = models.CharField(max_length=2, unique=True)
+    # Nothing from abroad: customs keep the goods out (Turkey takes no
+    # textiles from other countries).
+    only_from_inside = models.BooleanField(default=False)
+    # Countries that can't send here (Russia to Ukraine).
+    not_from = ArrayField(models.CharField(max_length=2), default=list, blank=True)
+    # Countries that send here best — a customs union, a cheap lane — so
+    # they come before nearer ones (Kazakhstan to Russia).
+    best_from = ArrayField(models.CharField(max_length=2), default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["destination"]
+
+    def __str__(self):
+        return self.destination
 
 
 class WarehouseProduct(models.Model):

@@ -7492,7 +7492,8 @@ def create_web_order(request):
                 "Some items in the cart are not in the catalog as chosen.", unknown=unknown)
 
         with transaction.atomic():
-            groups = lines_by_book([(item_data, variant) for item_data, _p, variant in lines])
+            groups = lines_by_book([(item_data, variant) for item_data, _p, variant in lines],
+                                   ship_to=data.get('delivery_country') or '')
             product_of = {id(item_data): product for item_data, product, _v in lines}
             variant_of = {id(item_data): variant for item_data, _p, variant in lines}
             split_group = uuid4() if len(groups) > 1 else None
@@ -7590,7 +7591,7 @@ def create_web_order(request):
 
     except WebOrderRefused as refused:
         return JsonResponse({'error': str(refused), 'gone': refused.gone,
-                             'unknown': refused.unknown}, status=409)
+                             'unknown': refused.unknown, 'blocked': refused.blocked}, status=409)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:

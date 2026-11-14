@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Shipping between countries" %} | Nejum ERP{% endblock %}
+{% block content %}
+<style>
+  .sr-page { background: #f8fafc; min-height: 100vh; padding: 24px 12px; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .sr-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; max-width: 720px; margin: 0 auto; box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.08); }
+  .sr-card h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .sr-lead { color: #64748b; font-size: 13.5px; line-height: 1.5; margin: 0 0 16px; }
+  .sr-msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; border: 1px solid; }
+  .sr-msg.error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .sr-msg.success { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+  .sr-stock { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #334155; margin-bottom: 20px; }
+  .sr-stock b { color: #0f172a; }
+  .sr-stock .warn { color: #b45309; margin-top: 4px; }
+  .sr-rule { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .sr-rule-head { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .sr-rule-head label { font-size: 13px; font-weight: 700; color: #475569; white-space: nowrap; }
+  .sr-rule select { padding: 8px 10px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13.5px; color: #0f172a; background: #fff; font-family: inherit; max-width: 100%; }
+  .sr-rule-head select { flex: 1; min-width: 0; font-weight: 600; }
+  .sr-remove { background: none; border: 0; color: #94a3b8; font-size: 13px; cursor: pointer; padding: 6px 8px !important; }
+  .sr-remove:hover { color: #dc2626; }
+  .sr-modes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .sr-modes label { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: #0f172a; cursor: pointer; }
+  .sr-modes input { accent-color: #6366f1; }
+  .sr-sub { margin: 4px 0 10px 24px; }
+  .sr-field-label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .4px; margin: 10px 0 6px; }
+  .sr-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .sr-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .sr-chip { display: inline-flex; align-items: center; gap: 4px; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 12.5px; font-weight: 600; }
+  .sr-chip button { background: none; border: 0; color: #6366f1; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px !important; }
+  .sr-says { font-size: 12.5px; color: #475569; background: #f8fafc; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  .sr-empty { color: #94a3b8; font-size: 13.5px; padding: 12px 0; }
+  .sr-actions { display: flex; gap: 10px; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; }
+  .sr-btn { padding: 10px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 700; cursor: pointer; border: 1.5px solid #e2e8f0; background: #fff; color: #0f172a; font-family: inherit; }
+  .sr-btn.primary { background: #6366f1; border-color: #6366f1; color: #fff; }
+  .sr-btn:disabled { opacity: .5; cursor: not-allowed; }
+  @media (max-width: 520px) { .sr-card { padding: 18px 16px; } .sr-rule-head { flex-wrap: wrap; } }
+</style>
+
+<div class="sr-page">
+  <div class="sr-card">
+    <h1>{% trans "Shipping between countries" %}</h1>
+    <p class="sr-lead">{% blocktrans trimmed %}
+      The storefront offers a buyer stock from their own country first, then from the nearest country that may send to them.
+      A warehouse always ships inside its own country. Add a country here only when it can't take goods from somewhere, or when another country ships there best.
+    {% endblocktrans %}</p>
+
+    {% for m in messages %}
+      <div class="sr-msg {% if m.tags == 'success' %}success{% else %}error{% endif %}">{{ m }}</div>
+    {% endfor %}
+
+    <div class="sr-stock">
+      <b>{% trans "Stock on the storefront stands in:" %}</b>
+      {% for name, warehouses in places %}{{ name }} ({{ warehouses|join:", " }}){% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}
+      {% if unplaced %}
+        <div class="warn">{% blocktrans trimmed with names=unplaced|join:", " %}No country typed in, so no rule applies to it: {{ names }}. Set its country on the warehouse.{% endblocktrans %}</div>
+      {% endif %}
+    </div>
+
+    <form method="post" id="sr-form">
+      {% csrf_token %}
+      <div id="sr-rules">
+        {% for row in rows %}
+          {% include "operating/partials/_shipping_rule.html" with key=forloop.counter row=row %}
+        {% empty %}
+          <div class="sr-empty" id="sr-empty">{% trans "No rules: every country takes goods from anywhere." %}</div>
+        {% endfor %}
+      </div>
+      <template id="sr-template">
+        {% include "operating/partials/_shipping_rule.html" with key="__KEY__" row=None %}
+      </template>
+
+      <div class="sr-actions">
+        <button type="button" class="sr-btn" id="sr-add" {% if not can_edit %}disabled{% endif %}>+ {% trans "Add a country" %}</button>
+        <button type="submit" class="sr-btn primary" {% if not can_edit %}disabled title="{% trans 'Only an admin can change where goods may be sent.' %}"{% endif %}>{% trans "Save" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  const names = {};
+  document.querySelectorAll('#sr-template')[0].content.querySelectorAll('select.sr-dest option').forEach(o => { if (o.value) names[o.value] = o.textContent; });
+  const T = {
+    anywhere: "{{ _('{c} takes goods from any country.')|escapejs }}",
+    inside: "{{ _('{c} takes goods only from its own warehouses.')|escapejs }}",
+    except: "{{ _('{c} takes goods from any country except {list}.')|escapejs }}",
+    best: "{{ _('Offered first from {list}, then from the nearest country.')|escapejs }}",
+    remove: "{{ _('Remove')|escapejs }}",
+    pick: "{{ _('This country')|escapejs }}",
+  };
+  let next = 1000;
+  const list = (codes) => codes.map(c => names[c] || c).join(', ');
+
+  function codes(rule, field) {
+    return [...rule.querySelectorAll(`input[data-field="${field}"]`)].map(i => i.value);
+  }
+  function says(rule) {
+    const dest = rule.querySelector('select.sr-dest');
+    const c = dest.value ? names[dest.value] : T.pick;
+    const mode = (rule.querySelector('input[type=radio]:checked') || {}).value || 'anywhere';
+    const notFrom = codes(rule, 'not_from'), best = codes(rule, 'best_from');
+    let text = mode === 'except' && notFrom.length ? T.except.replace('{c}', c).replace('{list}', list(notFrom))
+             : mode === 'inside' ? T.inside.replace('{c}', c) : T.anywhere.replace('{c}', c);
+    if (mode !== 'inside' && best.length) text += ' ' + T.best.replace('{list}', list(best));
+    rule.querySelector('.sr-says').textContent = text;
+    rule.querySelector('.sr-sub-except').hidden = mode !== 'except';
+    rule.querySelector('.sr-best').hidden = mode === 'inside';
+  }
+  function addChip(rule, field, code) {
+    if (!code || codes(rule, field).includes(code)) return;
+    const box = rule.querySelector(`.sr-chips[data-field="${field}"]`);
+    const chip = document.createElement('span');
+    chip.className = 'sr-chip';
+    const key = rule.dataset.key;
+    chip.innerHTML = `<input type="hidden" name="${field}_${key}" data-field="${field}" value="${code}"><span></span><button type="button" aria-label="${T.remove}">×</button>`;
+    chip.querySelector('span').textContent = names[code] || code;
+    box.insertBefore(chip, box.querySelector('select'));
+  }
+  function wire(rule) {
+    rule.addEventListener('change', (e) => {
+      const sel = e.target.closest('select[data-add]');
+      if (sel) { addChip(rule, sel.dataset.add, sel.value); sel.value = ''; }
+      says(rule);
+    });
+    rule.addEventListener('click', (e) => {
+      if (e.target.closest('.sr-chip button')) { e.target.closest('.sr-chip').remove(); says(rule); }
+      if (e.target.closest('.sr-remove')) { rule.remove(); }
+    });
+    says(rule);
+  }
+  document.querySelectorAll('#sr-rules .sr-rule').forEach(wire);
+  document.getElementById('sr-add').addEventListener('click', () => {
+    const key = String(next++);
+    const html = document.getElementById('sr-template').innerHTML.replaceAll('__KEY__', key);
+    const holder = document.createElement('div');
+    holder.innerHTML = html.trim();
+    const rule = holder.firstElementChild;
+    document.getElementById('sr-empty')?.remove();
+    document.getElementById('sr-rules').appendChild(rule);
+    wire(rule);
+    rule.querySelector('select.sr-dest').focus();
+  });
+})();
+</script>
+{% endblock %}

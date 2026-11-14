@@ -81,15 +81,18 @@ def customer_for_order(web_client, price_currency, book=None):
 class WebOrderRefused(Exception):
     """A web order that cannot be placed as sent, said so before anything
     is written. `gone` names picked rolls no longer there as picked;
-    `unknown` the SKUs of lines that name no variant the catalog has."""
+    `unknown` the SKUs of lines that name no variant the catalog has;
+    `blocked` picked rolls whose warehouse may not send to the delivery
+    country (operating.shipping)."""
 
-    def __init__(self, message, gone=None, unknown=None):
+    def __init__(self, message, gone=None, unknown=None, blocked=None):
         super().__init__(message)
         self.gone = gone or []
         self.unknown = unknown or []
+        self.blocked = blocked or []
 
 
-def lines_by_book(lines):
+def lines_by_book(lines, ship_to=""):
     """Where each line of a web order belongs: [(book, [(line, quantity,
     picks)])], the default book's first.
 
@@ -102,13 +105,18 @@ def lines_by_book(lines):
 
     Raises WebOrderRefused, naming them, when picked rolls are no longer
     there as picked: the customer was shown those rolls and is not sold
-    fewer meters, or other rolls, without being asked."""
+    fewer meters, or other rolls, without being asked. Likewise for rolls
+    whose warehouse may not send to `ship_to`, the delivery country: the
+    storefront offered them by a guess at where the customer is.
+    """
     from decimal import Decimal
-    from . import storefront_stock
+    from . import shipping, storefront_stock
 
     default = get_default_book()
     groups = {default.pk: (default, [])}
     gone = []
+    blocked = []
+    known = shipping.rules()
     for data, variant in lines:
         asked = storefront_stock._requests(data.get("stock_items"))
         sku = variant.variant_sku if variant else ""
@@ -123,6 +131,9 @@ def lines_by_book(lines):
                 if item is None or not storefront_stock.can_cut(quantity, available):
                     gone.append(pk)
                     continue
+                if not shipping.can_ship(item.product.warehouse.country, ship_to, known):
+                    blocked.append(pk)
+                    continue
                 book = item.product.warehouse.accounting_book
                 by_book.setdefault(book.pk, (book, []))[1].append((item, quantity))
             for book, rolls in by_book.values():
@@ -135,6 +146,9 @@ def lines_by_book(lines):
         groups.setdefault(book.pk, (book, []))[1].append((data, None, []))
     if gone:
         raise WebOrderRefused("Some of the rolls in the cart are no longer available.", gone)
+    if blocked:
+        raise WebOrderRefused("Some of the rolls in the cart can't be sent to the delivery country.",
+                              blocked=blocked)
     lead = groups.pop(default.pk)
     rest = sorted(groups.values(), key=lambda pair: (pair[0].name or "", pair[0].pk))
     return ([lead] if lead[1] or not rest else []) + rest

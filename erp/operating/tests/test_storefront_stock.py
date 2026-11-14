@@ -88,11 +88,13 @@ class StorefrontStock(TestCase):
             [(self.rolls["R1"].pk, 48.5, "4471", "Istanbul", "TR", "Istanbul, TR"),
              (self.rolls["R2"].pk, 52.0, "4471", "", "", "Ergene Fabrika"),
              (self.rolls["R3"].pk, 30.0, "4502", "", "", "Ergene Fabrika")])
+        # No country known for the buyer: most held first.
+        self.assertEqual(data["ship_to"], "")
         self.assertEqual(data["locations"],
-                         [{"location": "Istanbul, TR", "city": "Istanbul", "country": "TR",
-                           "available": 48.5},
-                          {"location": "Ergene Fabrika", "city": "", "country": "",
-                           "available": 82.0}])
+                         [{"location": "Ergene Fabrika", "city": "", "country": "",
+                           "available": 82.0, "ships": True},
+                          {"location": "Istanbul, TR", "city": "Istanbul", "country": "TR",
+                           "available": 48.5, "ships": True}])
 
     def test_a_blank_city_and_country_fall_back_to_the_warehouse_name(self):
         self.assertEqual(self.factory.shown_as, "Ergene Fabrika")

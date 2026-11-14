@@ -1,0 +1,46 @@
+{% load i18n %}
+{# One destination country's rule on the shipping page; `key` names its fields, `row` is empty for a new one. #}
+<div class="sr-rule" data-key="{{ key }}">
+  <input type="hidden" name="row" value="{{ key }}">
+  <div class="sr-rule-head">
+    <label for="sr-dest-{{ key }}">{% trans "Deliveries to" %}</label>
+    <select class="sr-dest" name="dest_{{ key }}" id="sr-dest-{{ key }}" {% if not can_edit %}disabled{% endif %}>
+      <option value="">{% trans "Choose a country" %}</option>
+      {% for code, name in countries %}<option value="{{ code }}" {% if row.destination == code %}selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    {% if can_edit %}<button type="button" class="sr-remove">{% trans "Remove" %}</button>{% endif %}
+  </div>
+
+  <div class="sr-modes">
+    <label><input type="radio" name="mode_{{ key }}" value="anywhere" {% if not row or row.mode == "anywhere" %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> {% trans "Can come from any country" %}</label>
+    <label><input type="radio" name="mode_{{ key }}" value="inside" {% if row.mode == "inside" %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> {% trans "Only from warehouses in that country" %}</label>
+    <label><input type="radio" name="mode_{{ key }}" value="except" {% if row.mode == "except" %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> {% trans "From any country except…" %}</label>
+    <div class="sr-sub sr-sub-except">
+      <div class="sr-chips" data-field="not_from">
+        {% for code, name in row.not_from_named %}<span class="sr-chip"><input type="hidden" name="not_from_{{ key }}" data-field="not_from" value="{{ code }}"><span>{{ name }}</span>{% if can_edit %}<button type="button" aria-label="{% trans 'Remove' %}">×</button>{% endif %}</span>{% endfor %}
+        {% if can_edit %}
+        <select data-add="not_from" aria-label="{% trans 'Add a country it can not come from' %}">
+          <option value="">+ {% trans "Add a country" %}</option>
+          {% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+        </select>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="sr-best">
+    <div class="sr-field-label">{% trans "Ships best from" %}</div>
+    <div class="sr-chips" data-field="best_from">
+      {% for code, name in row.best_from_named %}<span class="sr-chip"><input type="hidden" name="best_from_{{ key }}" data-field="best_from" value="{{ code }}"><span>{{ name }}</span>{% if can_edit %}<button type="button" aria-label="{% trans 'Remove' %}">×</button>{% endif %}</span>{% endfor %}
+      {% if can_edit %}
+      <select data-add="best_from" aria-label="{% trans 'Add a country that ships here best' %}">
+        <option value="">+ {% trans "Add a country" %}</option>
+        {% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+      </select>
+      {% endif %}
+    </div>
+    <div class="sr-hint">{% trans "Optional. Offered before nearer countries, in this order — for a customs union or a cheap route." %}</div>
+  </div>
+
+  <div class="sr-says"></div>
+</div>

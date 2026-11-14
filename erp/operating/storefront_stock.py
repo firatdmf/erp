@@ -57,14 +57,24 @@ def tracked_by_item(sku):
 @answers_in_storefront_language
 @require_GET
 def stock_items(request):
-    """GET ?sku=<variant SKU>, with the customer's Bearer token."""
+    """GET ?sku=<variant SKU>[&to=<country code>], with the customer's
+    Bearer token. `to` is the country of the shopper's connection, used
+    when they have no address of their own (shipping.buyer_country).
+
+    Places are listed in the order to offer them (shipping.preference),
+    each saying whether it may send to the buyer's country (`ships`).
+    Rolls are listed only from places that may."""
+    from . import shipping
     from .views import free_stock_items
 
-    if client_from(request) is None:
+    client = client_from(request)
+    if client is None:
         return JsonResponse({"error": _("Sign in to see the stock.")}, status=401)
     sku = (request.GET.get("sku") or "").strip()
     if not sku:
         return JsonResponse({"error": _("The product is missing.")}, status=400)
+    ship_to = shipping.buyer_country(client, request.GET.get("to"))
+    known = shipping.rules()
 
     free = free_stock_items(sku, Book.objects.all(), limit=ITEM_LIMIT, on_storefront=True)
     product = free[0][0].product if free else None
@@ -74,23 +84,28 @@ def stock_items(request):
     items = []
     for item, available in free:
         place = place_of(item.product.warehouse)
-        total = places.setdefault(place["location"], {**place, "available": 0})
+        ships = shipping.can_ship(place["country"], ship_to, known)
+        total = places.setdefault(place["location"], {**place, "available": 0, "ships": ships})
         total["available"] += available
-        if not by_variant:
+        if not by_variant and ships:
             items.append({
                 "id": item.pk,
                 "available": float(available),
                 "lot": item.lot_number or "",
                 **place,
             })
+    # Most held first among equals, so with no country known the plan
+    # starts where most of it is.
+    ordered = sorted(places.values(), key=lambda p: (
+        not p["ships"], shipping.preference(p["country"], ship_to, known), -p["available"]))
     return JsonResponse({
         "sku": sku,
         "tracking": "variant" if by_variant else "item",
         # The code ("m", "piece"), not a label: the storefront words it in
         # the shopper's own language.
         "unit": product.unit if product else "",
-        "locations": [{**place, "available": float(place["available"])}
-                      for place in places.values()],
+        "ship_to": ship_to,
+        "locations": [{**place, "available": float(place["available"])} for place in ordered],
         "items": items,
     })
 

@@ -16336,3 +16336,80 @@ msgstr "Yalnızca bunu atla"
 #: erp/templates/base.html
 msgid "Delete and stop repeating"
 msgstr "Sil ve tekrarı durdur"
+
+msgid "Shipping between countries"
+msgstr "Ülkeler arası gönderim"
+
+msgid "The storefront offers a buyer stock from their own country first, then from the nearest country that may send to them. A warehouse always ships inside its own country. Add a country here only when it can't take goods from somewhere, or when another country ships there best."
+msgstr "Web sitesi alıcıya stoğu önce kendi ülkesinden, sonra ona gönderebilen en yakın ülkeden sunar. Bir depo kendi ülkesi içine her zaman gönderir. Buraya bir ülkeyi yalnızca bir yerden mal alamıyorsa ya da oraya en iyi başka bir ülke gönderiyorsa ekleyin."
+
+msgid "Stock on the storefront stands in:"
+msgstr "Web sitesindeki stoğun bulunduğu yerler:"
+
+#, python-format
+msgid "No country typed in, so no rule applies to it: %(names)s. Set its country on the warehouse."
+msgstr "Ülkesi girilmemiş, bu yüzden hiçbir kural uygulanmıyor: %(names)s. Ülkesini depo sayfasından girin."
+
+msgid "No rules: every country takes goods from anywhere."
+msgstr "Kural yok: her ülke her yerden mal alır."
+
+msgid "Add a country"
+msgstr "Ülke ekle"
+
+msgid "Only an admin can change where goods may be sent."
+msgstr "Malların nereye gönderilebileceğini yalnızca bir yönetici değiştirebilir."
+
+msgid "{c} takes goods from any country."
+msgstr "{c} her ülkeden mal alır."
+
+msgid "{c} takes goods only from its own warehouses."
+msgstr "{c} yalnızca kendi depolarından mal alır."
+
+msgid "{c} takes goods from any country except {list}."
+msgstr "{c} şu ülkeler dışında her ülkeden mal alır: {list}."
+
+msgid "Offered first from {list}, then from the nearest country."
+msgstr "Önce şuradan sunulur: {list}; sonra en yakın ülkeden."
+
+msgid "This country"
+msgstr "Bu ülke"
+
+msgid "Deliveries to"
+msgstr "Teslimat ülkesi"
+
+msgid "Choose a country"
+msgstr "Bir ülke seçin"
+
+msgid "Can come from any country"
+msgstr "Her ülkeden gelebilir"
+
+msgid "Only from warehouses in that country"
+msgstr "Yalnızca o ülkedeki depolardan"
+
+msgid "From any country except…"
+msgstr "Şu ülkeler dışında her ülkeden…"
+
+msgid "Add a country it can not come from"
+msgstr "Gelemeyeceği bir ülke ekle"
+
+msgid "Ships best from"
+msgstr "En iyi gönderen ülkeler"
+
+msgid "Add a country that ships here best"
+msgstr "Buraya en iyi gönderen bir ülke ekle"
+
+msgid "Optional. Offered before nearer countries, in this order — for a customs union or a cheap route."
+msgstr "İsteğe bağlı. Daha yakın ülkelerden önce, bu sırayla sunulur — gümrük birliği ya da ucuz bir güzergâh için."
+
+msgid "Choose the country each row is about."
+msgstr "Her satırın hangi ülke için olduğunu seçin."
+
+#, python-format
+msgid "Each country can have one row only: %(countries)s."
+msgstr "Her ülkenin yalnızca bir satırı olabilir: %(countries)s."
+
+msgid "Saved. The storefront offers stock by these rules from now on."
+msgstr "Kaydedildi. Web sitesi stoğu bundan sonra bu kurallara göre sunar."
+
+msgid "Which countries it may be sent to"
+msgstr "Hangi ülkelere gönderilebilir"

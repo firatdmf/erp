@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Team, TeamMember, TeamRole, TeamTask, TeamMessage, TeamMeeting
+from .models import Team, TeamMember, TeamRole, TeamMessage, TeamMeeting
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
@@ -17,13 +17,6 @@ class TeamMemberAdmin(admin.ModelAdmin):
 class TeamRoleAdmin(admin.ModelAdmin):
     list_display = ('name', 'team')
     search_fields = ('name', 'team__name')
-
-@admin.register(TeamTask)
-class TeamTaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'assigned_to', 'status', 'priority', 'due_date')
-    list_filter = ('status', 'priority', 'team')
-    search_fields = ('title', 'assigned_to__username')
-    readonly_fields = ('created_at', 'updated_at')
 
 @admin.register(TeamMessage)
 class TeamMessageAdmin(admin.ModelAdmin):

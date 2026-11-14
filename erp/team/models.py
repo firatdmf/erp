@@ -98,78 +98,6 @@ class TeamBoardColumn(models.Model):
         return f"{self.team.name} - {self.title}"
 
 
-class TeamTask(models.Model):
-    """Retired: team tasks are todo.Task rows with a team since todo 0017
-    moved them. Kept, unread, until the move is checked on prod; the
-    tables are dropped in a later release with TeamTaskComment,
-    TeamTaskAttachment and TeamTaskHistory."""
-    STATUS_CHOICES = [
-        ('todo', 'To Do'),
-        ('in_progress', 'In Progress'),
-        ('review', 'Review'),
-        ('done', 'Done'),
-    ]
-    
-    PRIORITY_CHOICES = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('urgent', 'Urgent'),
-    ]
-    
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='legacy_tasks')
-    column = models.ForeignKey(TeamBoardColumn, on_delete=models.SET_NULL, null=True, blank=True, related_name='legacy_tasks')
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_team_tasks')
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='received_team_tasks_legacy')
-    assignees = models.ManyToManyField(User, related_name='team_tasks', blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='todo')
-    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
-    due_date = models.DateTimeField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    google_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the task in Google Tasks")
-    
-    class Meta:
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return f"{self.title} - {self.assigned_to.get_full_name()}"
-
-
-class TeamTaskAttachment(models.Model):
-    """Files attached to team tasks (stored in Google Drive)"""
-    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='attachments')
-    file_name = models.CharField(max_length=255)
-    drive_file_id = models.CharField(max_length=255)
-    drive_link = models.URLField(max_length=500)
-    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.file_name
-
-    def get_download_url(self):
-        """Returns direct download link"""
-        return f"https://drive.google.com/uc?export=download&id={self.drive_file_id}"
-
-
-class TeamTaskComment(models.Model):
-    """Comments on team tasks"""
-    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='comments')
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_task_comments')
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['-created_at']
-        
-    def __str__(self):
-        return f"Comment by {self.author.get_full_name()} on {self.task.title}"
-
-
 class TeamMessage(models.Model):
     """Direct messaging between team members"""
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_team_messages')
@@ -390,25 +318,3 @@ class ChatReadMarker(models.Model):
     
     class Meta:
         unique_together = ('room', 'user')
-    
-class TeamTaskHistory(models.Model):
-    """History log for TeamTask"""
-    EVENT_TYPES = [
-        ('status_change', 'Status Change'),
-        ('comment_added', 'Comment Added'),
-        ('priority_change', 'Priority Change'),
-        ('created', 'Task Created'),
-    ]
-
-    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='history')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_history')
-    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
-    old_value = models.TextField(null=True, blank=True)
-    new_value = models.TextField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.user.first_name} - {self.event_type}"

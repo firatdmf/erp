@@ -21,7 +21,6 @@ def dashboard_component(csrf_token,path,member):
     # today = datetime.datetime.today().strftime('%Y-%m-%d')
 
     from todo.models import Task
-    from team.models import TeamTask
     import json
     from collections import defaultdict
     from django.utils import timezone as django_timezone
@@ -55,15 +54,6 @@ def dashboard_component(csrf_token,path,member):
         pending_tasks_count = task_counts['my_tasks']
         my_tasks_count = task_counts['my_tasks']
         assigned_tasks_count = task_counts['assigned']
-        
-        # Add TeamTask counts - tasks assigned to current user
-        user = member.user if hasattr(member, 'user') else None
-        if user:
-            team_tasks_count = TeamTask.objects.filter(
-                assignees=user
-            ).exclude(status='done').distinct().count()
-            my_tasks_count += team_tasks_count
-            pending_tasks_count += team_tasks_count
     else:
         pending_tasks_count = Task.objects.filter(completed=False).count()
         my_tasks_count = 0
@@ -73,8 +63,7 @@ def dashboard_component(csrf_token,path,member):
     # Show on the calendar EVERY task the current member is involved in:
     #   - personal tasks where they are the member OR in assignees
     #   - personal tasks they created (assigned to others)
-    #   - team tasks assigned to them
-    #   - team tasks they assigned to someone else
+    #   (team tasks are tasks: the same three cover them)
     #   - team meetings on their teams (added below)
     base_calendar_query = Task.objects.filter(completed=False)
     if member:
@@ -93,36 +82,11 @@ def dashboard_component(csrf_token,path,member):
         for item in tasks_by_date_query if item['date']
     }
 
-    # Add TeamTask to calendar data: assigned-to-me OR assigned-by-me
-    if member and hasattr(member, 'user'):
-        user = member.user
-        # TeamTask.due_date is a DateTimeField — TruncDate would bucket
-        # by UTC date and shift evening tasks to the next day. Pull the
-        # rows and bucket in Python under the active local timezone so
-        # the calendar matches what the user actually sees.
-        from collections import Counter as _DateCounter
-        _tz = django_timezone.get_current_timezone()
-        team_task_due_dates = TeamTask.objects.filter(
-            Q(assignees=user) | Q(assigned_by=user)
-        ).exclude(status='done').values_list('id', 'due_date').distinct()
-
-        _team_counter = _DateCounter()
-        _seen_ids = set()
-        for _id, _due in team_task_due_dates:
-            if not _due or _id in _seen_ids:
-                continue
-            _seen_ids.add(_id)
-            _local_date = django_timezone.localtime(_due, _tz).date()
-            _team_counter[_local_date.strftime('%Y-%m-%d')] += 1
-
-        for date_str, count in _team_counter.items():
-            tasks_by_date[date_str] = tasks_by_date.get(date_str, 0) + count
-
     # Add Team Meetings to calendar data
     from team.models import TeamMeeting
     if member and hasattr(member, 'user'):
         # scheduled_at is DateTimeField — bucket in local TZ for the
-        # same reason as TeamTask above.
+        # same reason.
         _tz_m = django_timezone.get_current_timezone()
         meeting_due = TeamMeeting.objects.filter(
             team__members=member.user,
@@ -171,10 +135,15 @@ def dashboard_component(csrf_token,path,member):
             return text
 
         try:
+            # Mine, and the team tasks I am on or handed out. A team task
+            # is a task: it is listed here with its team's badge.
             qs = (
                 Task.objects
-                .filter(member=member, completed=False)
-                .select_related('company', 'contact', 'supplier', 'member__user')
+                .filter(completed=False)
+                .filter(Q(member=member)
+                        | (Q(team__isnull=False) & (Q(assignees=member) | Q(created_by=member))))
+                .select_related('company', 'contact', 'supplier', 'member__user', 'team', 'created_by__user')
+                .distinct()
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
 
@@ -207,7 +176,7 @@ def dashboard_component(csrf_token,path,member):
                 Task.objects
                 .filter(assignees=member, completed=False)
                 .exclude(member=member)
-                .select_related('company', 'contact', 'supplier', 'member__user')
+                .select_related('company', 'contact', 'supplier', 'member__user', 'team', 'created_by__user')
                 .distinct()
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
@@ -240,10 +209,17 @@ def dashboard_component(csrf_token,path,member):
                         or str(t.supplier)
                     )
                     entity_type = 'supplier'
+                if t.team_id:
+                    # A team task shows its team, and who handed it out.
+                    entity_name, entity_type = t.team.name, 'team'
+                    _by = t.created_by.user if (t.created_by and t.created_by.user) else None
+                    assignee = (_by.first_name or _by.username) if _by else '?'
                 # User can edit the task if they're the creator, assignee,
                 # or a superuser. Tasks with no creator (legacy) are editable.
+                # A team task is edited through the team's own form.
                 _can_edit = bool(
-                    (not t.created_by)
+                    t.team_id
+                    or (not t.created_by)
                     or (member and t.created_by == member)
                     or (member and t.member == member)
                     or (getattr(member, 'user', None) and getattr(member.user, 'is_superuser', False))
@@ -269,7 +245,7 @@ def dashboard_component(csrf_token,path,member):
                     'entity_type': entity_type,
                     'can_edit': _can_edit,
                     'can_delete': _can_delete,
-                    'kind': 'personal',
+                    'kind': 'team' if t.team_id else 'personal',
                 }
                 key = t.due_date.isoformat()  # YYYY-MM-DD
                 all_tasks_by_date.setdefault(key, []).append(payload)
@@ -309,7 +285,7 @@ def dashboard_component(csrf_token,path,member):
                         | _Q_cmpl(assignees=member)
                         | _Q_cmpl(created_by=member)
                     )
-                    .select_related('company', 'contact', 'supplier', 'member__user')
+                    .select_related('company', 'contact', 'supplier', 'member__user', 'team')
                     .distinct()
                     .order_by('-completed_at', '-due_date', 'id')[:100]
                 )
@@ -331,6 +307,8 @@ def dashboard_component(csrf_token,path,member):
                             or str(t.supplier)
                         )
                         c_entity_type = 'supplier'
+                    if t.team_id:
+                        c_entity_name, c_entity_type = t.team.name, 'team'
                     c_assignee = (
                         t.member.user.first_name
                         if (t.member and t.member.user and t.member.user.first_name)
@@ -354,7 +332,7 @@ def dashboard_component(csrf_token,path,member):
                         'entity_name': c_entity_name,
                         'entity_type': c_entity_type,
                         'can_delete': t.can_be_deleted_by(_user_for_can) if _user_for_can else False,
-                        'kind': 'personal',
+                        'kind': 'team' if t.team_id else 'personal',
                     })
             except Exception as _cmpl_err:
                 import traceback as _tb_c
@@ -392,8 +370,11 @@ def dashboard_component(csrf_token,path,member):
                         or str(t.supplier)
                     )
                     entity_type = 'supplier'
+                if t.team_id:
+                    entity_name, entity_type = t.team.name, 'team'
                 _can_edit_d = bool(
-                    (not t.created_by)
+                    t.team_id
+                    or (not t.created_by)
                     or (member and t.created_by == member)
                     or (member and t.member == member)
                     or (getattr(member, 'user', None) and getattr(member.user, 'is_superuser', False))
@@ -416,110 +397,13 @@ def dashboard_component(csrf_token,path,member):
                     'completed': bool(t.completed),
                     'entity_name': entity_name,
                     'entity_type': entity_type,
-                    'kind': 'personal',
+                    'kind': 'team' if t.team_id else 'personal',
                 }
                 delegated_tasks_data.append(_payload_d)
-                if t.due_date > today_date:
+                # A team task I am on is in the main list already.
+                if t.due_date > today_date and not t.team_id:
                     future_tasks_data.append(_payload_d)
-            # ─── Team tasks ────────────────────────────────────────────
-            # The Nejum dashboard cards must show team tasks alongside
-            # personal ones. We include team tasks where the user is in
-            # `assignees` OR is the one who `assigned_by` it. Each gets
-            # marked `kind: 'team'` so the card renders the team badge
-            # and the JS routes delete to /team/task/<id>/delete/.
-            try:
-                _user = getattr(member, 'user', None)
-                if _user:
-                    team_qs = (
-                        TeamTask.objects
-                        .filter(Q(assignees=_user) | Q(assigned_by=_user))
-                        .exclude(status='done')
-                        .select_related('team', 'assigned_by')
-                        .distinct()
-                        .order_by('-due_date', 'priority', 'id')[:200]
-                    )
-                    # Which teams does the user have admin/manager/owner role in?
-                    # Used to gate the trash icon — matches team.views.delete_task.
-                    from team.access import managed_team_ids
-                    _mgmt_team_ids = managed_team_ids(_user)
-                    for tt in team_qs:
-                        # TeamTask.due_date is a DateTimeField stored in
-                        # UTC. Convert to local time before calling
-                        # .date() — otherwise an evening-hours task in
-                        # Istanbul slips to the next UTC day and lands
-                        # on the wrong calendar cell.
-                        if tt.due_date:
-                            tt_date = django_timezone.localtime(tt.due_date).date()
-                        else:
-                            tt_date = today_date
-                        age_days = (today_date - tt_date).days
-                        if age_days >= 14:
-                            tt_aging = {'label': f'{age_days}d', 'tone': 'red'}
-                        elif age_days >= 1:
-                            tt_aging = {'label': f'{age_days}d', 'tone': 'amber'}
-                        elif age_days == 0:
-                            tt_aging = {'label': 'Today', 'tone': 'green'}
-                        elif age_days == -1:
-                            tt_aging = {'label': 'Tomorrow', 'tone': 'green'}
-                        else:
-                            tt_aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
-                        # "Assignee" line shows who assigned the task to
-                        # me, or the user's own name if I'm the delegator.
-                        if tt.assigned_by_id == _user.id:
-                            tt_assignee = (
-                                _user.first_name
-                                or _user.username
-                                or '?'
-                            )
-                        elif tt.assigned_by:
-                            tt_assignee = (
-                                tt.assigned_by.first_name
-                                or tt.assigned_by.username
-                                or '?'
-                            )
-                        else:
-                            tt_assignee = '?'
-                        tt_can_delete = bool(
-                            tt.assigned_by_id == _user.id
-                            or _user.is_superuser
-                            or _user.is_staff
-                            or tt.team_id in _mgmt_team_ids
-                        )
-                        tt_payload = {
-                            'id': tt.id,
-                            'name': tt.title,
-                            'description': _desc_preview(tt.description),
-                            'priority': (tt.priority or 'medium'),
-                            'date_label': tt_date.strftime('%d.%m.%Y'),
-                            'date_iso': tt_date.isoformat(),
-                            'aging_label': tt_aging['label'],
-                            'aging_tone': tt_aging['tone'],
-                            'assignee': tt_assignee,
-                            'avatar_letter': (tt_assignee[:1] or '?').upper(),
-                            'completed': (tt.status == 'done'),
-                            'entity_name': tt.team.name if tt.team else '',
-                            'entity_type': 'team',
-                            'can_edit': True,   # team-task edit goes through team UI
-                            'can_delete': tt_can_delete,
-                            'kind': 'team',     # routes delete URL on the client
-                        }
-                        key = tt_date.isoformat()
-                        all_tasks_by_date.setdefault(key, []).append(tt_payload)
-                        if tt_date <= today_date:
-                            today_tasks_data.append(tt_payload)
-                        else:
-                            future_tasks_data.append(tt_payload)
-                        # Tasks others assigned to me also show on the
-                        # "Assigned Tasks" tab — only if I'm not the
-                        # delegator.
-                        if tt.assigned_by_id != _user.id:
-                            delegated_tasks_data.append(tt_payload)
-            except Exception as _team_err:
-                import traceback as _tb2
-                print(f"[dashboard_component] team-task fetch failed: {_team_err}")
-                _tb2.print_exc()
-
-            # Re-sort the merged list now that team tasks are in it.
+            # Re-sort the list.
             _prio2 = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3}
             _today_iso2 = today_date.isoformat()
             today_tasks_data.sort(key=lambda p: (
@@ -557,7 +441,7 @@ def dashboard_component(csrf_token,path,member):
         # JSON dict { 'YYYY-MM-DD': [ {task...}, ... ] } consumed by
         # the Nejum dashboard JS for day-by-day filtering.
         'tasks_by_date_json': json.dumps(all_tasks_by_date),
-        # Tasks assigned TO me by others (TeamTask-lite via Task.assignees)
+        # Tasks assigned TO me by others (via Task.assignees)
         'delegated_tasks_json': json.dumps(delegated_tasks_data),
         'assigned_tasks_count': len(delegated_tasks_data),
         # Tasks the user has completed (or were completed under them),

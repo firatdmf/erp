@@ -315,36 +315,22 @@ def complete_task(request, task_id):
         
     old_status = task.status
     
-    # Update task based on status
-    task.status = status
-    
-    # Sync legacy fields
+    if status not in ('done', 'review', 'in_progress'):
+        status = 'todo'
+    task.set_status(status)
     if status == 'done':
-        task.completed = True
-        task.on_hold = False
-        if not task.completed_at:
-            task.completed_at = timezone.now()
         new_status_display = 'Done'
         activity_type = 'completed'
     elif status == 'review':
-        task.completed = False
-        task.on_hold = False # Review is active state
-        task.completed_at = None
         new_status_display = 'Review'
         activity_type = 'status_changed'
     elif status == 'in_progress':
-        task.completed = False
-        task.on_hold = False
-        task.completed_at = None
         new_status_display = 'In Progress'
         activity_type = 'reopened' if old_status == 'done' else 'status_changed'
-    else:  # todo
-        task.completed = False
-        task.on_hold = False
-        task.completed_at = None
+    else:
         new_status_display = 'To Do'
         activity_type = 'status_changed'
-    
+
     task.save()
     
     # Track activity

@@ -29,7 +29,8 @@ class Team(models.Model):
         return self.name
     
     def get_task_count(self):
-        return self.tasks.exclude(status='completed').count()
+        """The team's open tasks."""
+        return self.tasks.filter(completed=False).count()
     
     def get_message_count(self):
         return self.chat_rooms.aggregate(models.Sum('messages__id'))['messages__id__sum'] or 0
@@ -98,7 +99,10 @@ class TeamBoardColumn(models.Model):
 
 
 class TeamTask(models.Model):
-    """Task assignment model for team members"""
+    """Retired: team tasks are todo.Task rows with a team since todo 0017
+    moved them. Kept, unread, until the move is checked on prod; the
+    tables are dropped in a later release with TeamTaskComment,
+    TeamTaskAttachment and TeamTaskHistory."""
     STATUS_CHOICES = [
         ('todo', 'To Do'),
         ('in_progress', 'In Progress'),
@@ -113,8 +117,8 @@ class TeamTask(models.Model):
         ('urgent', 'Urgent'),
     ]
     
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='tasks')
-    column = models.ForeignKey(TeamBoardColumn, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks')
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='legacy_tasks')
+    column = models.ForeignKey(TeamBoardColumn, on_delete=models.SET_NULL, null=True, blank=True, related_name='legacy_tasks')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_team_tasks')

@@ -69,6 +69,18 @@ class Task(models.Model):
     supplier = models.ForeignKey(
         Supplier, on_delete=models.CASCADE, blank=True, null=True, related_name="tasks"
     )
+    # A team task is a task with a team: it shows on that team's board, in
+    # the column it sits in. There is one kind of task — personal and team
+    # tasks repeat, sync to Google and keep history the same way — and
+    # these two fields are all that sets a team's tasks apart.
+    team = models.ForeignKey(
+        'team.Team', on_delete=models.CASCADE, blank=True, null=True,
+        related_name='tasks',
+    )
+    column = models.ForeignKey(
+        'team.TeamBoardColumn', on_delete=models.SET_NULL, blank=True, null=True,
+        related_name='tasks',
+    )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True, related_name='assigned_tasks')
     assignees = models.ManyToManyField(Member, related_name='tasks', blank=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_tasks')
@@ -93,6 +105,28 @@ class Task(models.Model):
     #  You can use the reverse function to generate this URL.
     def get_delete_url(self):
         return reverse("complete_task", args=[str(self.id)])
+
+    def get_absolute_url(self):
+        """A team task opens on its team's pages, any other on To-do's."""
+        if self.team_id:
+            return reverse("team:task_detail", args=[self.pk])
+        return reverse("todo:task_detail", kwargs={"task_id": self.pk})
+
+    def set_status(self, status):
+        """Move the task to `status` and keep `completed` / `completed_at`
+        in step with it. Every place that finishes or reopens a task goes
+        through here, so done means the same thing on every screen.
+        The caller saves."""
+        self.status = status
+        if status == 'done':
+            self.completed = True
+            self.on_hold = False
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        else:
+            self.completed = False
+            self.on_hold = False
+            self.completed_at = None
 
     class Meta:
         indexes = [
@@ -154,6 +188,11 @@ class Task(models.Model):
             return True
         if self.member_id == member.id:
             return True
+        if self.team_id:
+            # A team's admins and managers look after its board.
+            from team.access import has_team_role
+            if has_team_role(user, self.team):
+                return True
         # m2m check
         return self.assignees.filter(pk=member.id).exists()
 
@@ -185,6 +224,7 @@ class TaskActivity(models.Model):
         ('due_date_changed', 'Due Date Changed'),
         ('description_updated', 'Description Updated'),
         ('name_updated', 'Name Updated'),
+        ('comment_added', 'Comment Added'),
     ]
     
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='activities')
@@ -216,6 +256,7 @@ class TaskActivity(models.Model):
             'due_date_changed': 'fa-calendar-alt',
             'description_updated': 'fa-align-left',
             'name_updated': 'fa-edit',
+            'comment_added': 'fa-comment',
         }
         return icons.get(self.activity_type, 'fa-circle')
     

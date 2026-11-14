@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load static %}
-{% block title %}{% trans "Task" %} · {{ task.title }} | Nejum ERP{% endblock %}
+{% block title %}{% trans "Task" %} · {{ task.name }} | Nejum ERP{% endblock %}
 
 {% block css %}
 <style>
@@ -315,7 +315,7 @@
         </div>
 
         <!-- Title -->
-        <h1 class="page-title">{{ task.title }}</h1>
+        <h1 class="page-title">{{ task.name }}</h1>
 
         <!-- Meta -->
         <div class="meta-info">
@@ -323,7 +323,7 @@
                 <i class="far fa-clock"></i> Due {{ task.due_date|date:"F j, Y" }}
             </div>
             <div class="meta-item">
-                <i class="far fa-user"></i> {{ task.assigned_to.get_full_name }}
+                <i class="far fa-user"></i> {{ task.member.user.get_full_name }}
             </div>
             <!-- Helper Actions: Removed as per request -->
 
@@ -452,9 +452,9 @@
                         <!-- Icon Box -->
                         <div
                             style="width:36px; height:36px; background:#F3F4F6; color:#6B7280; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                            {% if event.event_type == 'status_change' %}
+                            {% if event.activity_type == 'status_changed' %}
                             <i class="fas fa-sync-alt" style="font-size:0.9rem;"></i>
-                            {% elif event.event_type == 'comment_added' %}
+                            {% elif event.activity_type == 'comment_added' %}
                             <i class="far fa-comment-alt" style="font-size:0.9rem;"></i>
                             {% else %}
                             <i class="fas fa-info" style="font-size:0.9rem;"></i>
@@ -464,11 +464,11 @@
                         <!-- Content -->
                         <div>
                             <div style="font-size:0.95rem; color:#374151; line-height:1.4;">
-                                <span style="font-weight:600; color:#111827;">{{ event.user.get_full_name }}</span>
-                                {% if event.event_type == 'status_change' %}
+                                <span style="font-weight:600; color:#111827;">{{ event.user.user.get_full_name }}</span>
+                                {% if event.activity_type == 'status_changed' %}
                                 changed status to <span style="font-weight:600; color:#4F46E5;">{{
                                     event.new_value}}</span>
-                                {% elif event.event_type == 'comment_added' %}
+                                {% elif event.activity_type == 'comment_added' %}
                                 <span style="color:#6B7280;">added a comment</span>
                                 {% else %}
                                 updated the task
@@ -524,12 +524,12 @@
                 <label class="form-label">{% trans "Assignees" %}</label>
                 <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap;">
                     {% if task.assignees.all %}
-                    {% for u in task.assignees.all|slice:":4" %}
+                    {% for m in task.assignees.all|slice:":4" %}{% with u=m.user %}
                     <div class="avatar-circle" title="{{ u.get_full_name }}"
                         style="background:#E0E7FF; color:var(--brand-color); width:32px; height:32px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; border-radius:50%;">
                         {{ u.first_name|first|upper }}{{ u.last_name|first|upper }}
                     </div>
-                    {% endfor %}
+                    {% endwith %}{% endfor %}
 
                     {% if task.assignees.count > 4 %}
                     <div class="avatar-circle" title="{{ task.assignees.count|add:'-4' }} more"
@@ -555,10 +555,10 @@
             <!-- Reporter Divider -->
             <div class="reporter-row">
                 <div class="avatar-circle" style="background:#1F2937; color:white;">
-                    {{ task.assigned_by.first_name.0 }}{{ task.assigned_by.last_name.0 }}
+                    {{ task.created_by.user.first_name.0 }}{{ task.created_by.user.last_name.0 }}
                 </div>
                 <div>
-                    <div style="font-size:0.9rem; font-weight:600;">{{ task.assigned_by.get_full_name }}</div>
+                    <div style="font-size:0.9rem; font-weight:600;">{{ task.created_by.user.get_full_name }}</div>
                     <div style="font-size:0.75rem; color:var(--text-secondary);">Assigner</div>
                 </div>
             </div>

@@ -2,7 +2,6 @@ from googleapiclient.discovery import build
 from django.utils import timezone
 from authentication.models import GoogleChatCredentials
 from todo.models import Task
-from team.models import TeamTask
 from datetime import datetime
 import json
 
@@ -26,30 +25,35 @@ def get_tasks_service(user):
         print(f"Error building Tasks service: {e}")
         return None
 
+def _google_body(task):
+    """What Google Tasks holds for a task. A team task's notes say which
+    team it is from, since Google has no teams."""
+    notes = task.description or ''
+    if task.team_id:
+        notes = f"[ERP Team Task from {task.team.name}]\n\n" + notes
+    body = {
+        'title': task.name,
+        'notes': notes,
+        'status': 'completed' if task.completed else 'needsAction',
+    }
+    if task.due_date:
+        # Google Tasks expects an RFC 3339 timestamp; it keeps only the day.
+        dt = datetime.combine(task.due_date, datetime.min.time())
+        body['due'] = dt.isoformat() + 'Z'
+    return body
+
+
 def push_task_to_google(user, task):
     """
-    Creates a new task in the user's default Google Tasks list based on a personal ERP task.
-    Saves the google_task_id to the task model.
+    Creates a new task in the user's default Google Tasks list from an ERP
+    task, personal or team. Saves the google_task_id to the task.
     """
     service = get_tasks_service(user)
     if not service:
         return False
-        
+
     try:
-        body = {
-            'title': task.name,
-            'notes': task.description or '',
-            'status': 'completed' if task.completed else 'needsAction',
-        }
-        
-        if task.due_date:
-            # Google Tasks expects RFC 3339 timestamp string
-            dt = datetime.combine(task.due_date, datetime.min.time())
-            body['due'] = dt.isoformat() + 'Z'
-            
-        result = service.tasks().insert(tasklist='@default', body=body).execute()
-        
-        # Save the ID back to our DB
+        result = service.tasks().insert(tasklist='@default', body=_google_body(task)).execute()
         task.google_task_id = result.get('id')
         task.save(update_fields=['google_task_id'])
         return True
@@ -57,79 +61,22 @@ def push_task_to_google(user, task):
         print(f"Error pushing task to Google: {e}")
         return False
 
-def push_team_task_to_google(user, team_task):
-    """
-    Creates a new task in the user's default Google Tasks list based on an ERP Team task.
-    Saves the google_task_id to the team_task model. Appends team info to the notes.
-    """
-    service = get_tasks_service(user)
-    if not service:
-        return False
-        
-    try:
-        notes = f"[ERP Team Task from {team_task.team.name}]\n\n"
-        if team_task.description:
-            notes += team_task.description
-            
-        body = {
-            'title': team_task.title,
-            'notes': notes,
-            'status': 'completed' if team_task.status == 'done' else 'needsAction',
-        }
-        
-        if team_task.due_date:
-            # Google Tasks expects RFC 3339 timestamp string for due dates (needs to be converted properly)
-            body['due'] = team_task.due_date.isoformat()
-            
-        result = service.tasks().insert(tasklist='@default', body=body).execute()
-        
-        team_task.google_task_id = result.get('id')
-        team_task.save(update_fields=['google_task_id'])
-        return True
-    except Exception as e:
-        print(f"Error pushing team task to Google: {e}")
-        return False
 
-def update_task_in_google(user, task_obj, is_team=False):
+def update_task_in_google(user, task_obj):
     """
-    Updates an existing task in Google Tasks.
-    task_obj can be either a todo.Task or team.TeamTask.
+    Updates an existing task in Google Tasks, or pushes it if Google has
+    not got it yet.
     """
     if not task_obj.google_task_id:
-        # If it doesn't exist in Google yet, just push it now
-        if is_team:
-            return push_team_task_to_google(user, task_obj)
-        else:
-            return push_task_to_google(user, task_obj)
-            
+        return push_task_to_google(user, task_obj)
+
     service = get_tasks_service(user)
     if not service:
         return False
-        
+
     try:
-        if is_team:
-            notes = f"[ERP Team Task from {task_obj.team.name}]\n\n"
-            if task_obj.description:
-                notes += task_obj.description
-            body = {
-                'id': task_obj.google_task_id,
-                'title': task_obj.title,
-                'notes': notes,
-                'status': 'completed' if task_obj.status == 'done' else 'needsAction',
-            }
-            if task_obj.due_date:
-                 body['due'] = task_obj.due_date.isoformat()
-        else:
-            body = {
-                'id': task_obj.google_task_id,
-                'title': task_obj.name,
-                'notes': task_obj.description or '',
-                'status': 'completed' if task_obj.completed else 'needsAction',
-            }
-            if task_obj.due_date:
-                dt = datetime.combine(task_obj.due_date, datetime.min.time())
-                body['due'] = dt.isoformat() + 'Z'
-                
+        body = _google_body(task_obj)
+        body['id'] = task_obj.google_task_id
         service.tasks().update(tasklist='@default', task=task_obj.google_task_id, body=body).execute()
         return True
     except Exception as e:
@@ -167,31 +114,17 @@ def sync_from_google(user):
             g_status = item.get('status') # 'needsAction' or 'completed'
             g_due = item.get('due')
             
-            # Check if this task exists in either Personal or Team tasks
-            personal_exists = Task.objects.filter(google_task_id=g_id).first()
-            team_exists = TeamTask.objects.filter(google_task_id=g_id).first()
-            
-            if team_exists:
-                # If it's a team task, we can update our local status based on Google
-                if g_status == 'completed' and team_exists.status != 'done':
-                    team_exists.status = 'done'
-                    team_exists.completed_at = timezone.now()
-                    team_exists.save(update_fields=['status', 'completed_at'])
-                elif g_status == 'needsAction' and team_exists.status == 'done':
-                    team_exists.status = 'todo'
-                    team_exists.save(update_fields=['status'])
-                continue
-                
+            # Personal and team tasks are one kind of task
+            personal_exists = Task.everywhere.filter(google_task_id=g_id).first()
+
             if personal_exists:
-                # Update existing personal task from Google
+                # Finished or reopened in Google: the same as on our screens
                 if g_status == 'completed' and not personal_exists.completed:
-                    personal_exists.completed = True
-                    personal_exists.completed_at = timezone.now()
-                    personal_exists.save(update_fields=['completed', 'completed_at'])
+                    personal_exists.set_status('done')
+                    personal_exists.save()
                 elif g_status == 'needsAction' and personal_exists.completed:
-                    personal_exists.completed = False
-                    personal_exists.completed_at = None
-                    personal_exists.save(update_fields=['completed', 'completed_at'])
+                    personal_exists.set_status('todo')
+                    personal_exists.save()
                 continue
                 
             # If we get here, this is a NEW task from Google

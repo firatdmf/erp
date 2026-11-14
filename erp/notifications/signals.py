@@ -128,7 +128,7 @@ def create_task_notification_handler(sender, instance, created, **kwargs):
                     notification_type='task_assigned',
                     title=f'Task assigned: {instance.name}',
                     message=f'Assigned by {instance.created_by}',
-                    link=reverse('todo:task_detail', kwargs={'task_id': instance.pk}),
+                    link=instance.get_absolute_url(),
                     icon='fa-tasks',
                     content_object=instance,
                 )
@@ -182,7 +182,7 @@ def create_task_activity_notification_handler(sender, instance, created, **kwarg
                 notification_type='task_updated',
                 title=f'{title}: {task.name}',
                 message=f'Updated by {actor}' if actor else 'Task was updated',
-                link=reverse('todo:task_detail', kwargs={'task_id': task.pk}),
+                link=task.get_absolute_url(),
                 icon='fa-edit',
                 content_object=task,
             )
@@ -197,7 +197,7 @@ def create_task_activity_notification_handler(sender, instance, created, **kwarg
                 notification_type='task_updated',
                 title=f'{title}: {task.name}',
                 message=f'Updated by {actor}' if actor else 'Task was updated',
-                link=reverse('todo:task_detail', kwargs={'task_id': task.pk}),
+                link=task.get_absolute_url(),
                 icon='fa-edit',
                 content_object=task,
             )
@@ -237,7 +237,7 @@ def create_task_comment_notification_handler(sender, instance, created, **kwargs
             notification_type='task_comment',
             title=f'New comment: {task.name}',
             message=f'{commenter} commented on your task',
-            link=reverse('todo:task_detail', kwargs={'task_id': task.pk}),
+            link=task.get_absolute_url(),
             icon='fa-comment',
             content_object=task,
         )
@@ -256,7 +256,7 @@ def create_task_comment_notification_handler(sender, instance, created, **kwargs
             notification_type='task_comment',
             title=f'New comment: {task.name}',
             message=f'{commenter} commented on task you created',
-            link=reverse('todo:task_detail', kwargs={'task_id': task.pk}),
+            link=task.get_absolute_url(),
             icon='fa-comment',
             content_object=task,
         )

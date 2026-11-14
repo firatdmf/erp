@@ -9,7 +9,8 @@ from django.db import models
 from django.db import transaction
 import json
 
-from .models import Team, TeamMember, TeamTask, TeamMessage, TeamMeeting, FavoriteTeam, ChatRoom, TeamBoardColumn, TeamTaskHistory
+from .models import Team, TeamMember, TeamMessage, TeamMeeting, FavoriteTeam, ChatRoom, TeamBoardColumn
+from todo.models import Task, TaskActivity, TaskAttachment, TaskComment
 from .access import has_team_role, is_team_member, team_role, teams_for
 
 def get_user_team(user):
@@ -59,6 +60,136 @@ def team_list(request):
     }
     return render(request, 'team_list.html', context)
 
+def _member(user):
+    """The Member behind a login, or None."""
+    return getattr(user, 'member', None)
+
+
+def _members_of(users):
+    """The Members behind these logins — a team task's people are members."""
+    from authentication.models import Member
+    return list(Member.objects.filter(user__in=list(users)))
+
+
+def _team_task(task_id):
+    """A team task by id: a Task that belongs to a team."""
+    return get_object_or_404(Task.objects.exclude(team=None), id=task_id)
+
+
+def _is_creator(task, user):
+    member = _member(user)
+    return bool(member and task.created_by_id == member.id)
+
+
+def _log(task, user, activity_type, new_value, old_value=None):
+    TaskActivity.objects.create(
+        task=task, user=_member(user), activity_type=activity_type,
+        old_value=old_value, new_value=new_value)
+
+
+def _parse_due(value):
+    """A posted due date, as a date; None when blank or unreadable."""
+    from datetime import date
+    try:
+        return date.fromisoformat((value or '').strip()[:10])
+    except ValueError:
+        return None
+
+
+def _target_users(request, team):
+    """Who a new or edited team task goes to, from the posted form:
+    the whole team, the listed users, the one legacy user, or (for a new
+    task) nobody — the caller falls back to the author."""
+    if request.POST.get('assign_to_team') == 'on':
+        return [tm.user for tm in TeamMember.objects.filter(team=team).select_related('user')]
+    assigned_users_str = request.POST.get('assigned_users', '')
+    if assigned_users_str:
+        user_ids = [int(x) for x in assigned_users_str.split(',') if x.strip().isdigit()]
+        return list(User.objects.filter(id__in=user_ids))
+    if request.POST.get('assigned_to'):
+        return list(User.objects.filter(id=request.POST.get('assigned_to')))
+    return []
+
+
+def _attach_uploads(request, task):
+    """Upload the posted files to Drive and attach them to the task."""
+    files = request.FILES.getlist('task_files')
+    if not files:
+        return
+    from erp.google_drive import upload_file_to_drive
+    uploader = _member(request.user)
+    if uploader is None:
+        return
+    for file_item in files:
+        result = upload_file_to_drive(request.user, file_item, folder_name="ERP Team Tasks")
+        if result.get('success'):
+            TaskAttachment.objects.create(
+                task=task,
+                file_name=result.get('name'),
+                drive_file_id=result.get('file_id'),
+                drive_link=result.get('drive_link'),
+                uploaded_by=uploader,
+            )
+        else:
+            print(f"Failed to upload attachment {file_item.name}: {result.get('error')}")
+
+
+def _notify_assigned(request, task, users, title_prefix):
+    """Tell each newly assigned person, except the one assigning. The
+    task's own member is told by the Task signal when it is created."""
+    from notifications.models import Notification
+    for user in users:
+        member = _member(user)
+        if member is None or user.id == request.user.id:
+            continue
+        Notification.create_notification(
+            recipient=member,
+            notification_type='task_assigned',
+            title=f'{title_prefix}: {task.name}',
+            message=f'You have been assigned to "{task.name}" by {request.user.get_full_name() or request.user.username}',
+            link=task.get_absolute_url(),
+            icon='fa-tasks',
+            content_object=task,
+        )
+
+
+def _create_team_task(request, team):
+    """Create a team task from the posted form; returns it."""
+    name = request.POST.get('name') or request.POST.get('title')
+    target_users = _target_users(request, team) or [request.user]
+
+    col_todo = TeamBoardColumn.objects.filter(team=team, title='To Do').first()
+    if not col_todo:
+        col_todo = TeamBoardColumn.objects.create(team=team, title='To Do', color='blue', order=0)
+
+    task = Task(
+        team=team,
+        column=col_todo,
+        name=name,
+        description=request.POST.get('description', ''),
+        due_date=_parse_due(request.POST.get('due_date')) or timezone.localdate(),
+        priority=request.POST.get('priority', 'medium'),
+        created_by=_member(request.user),
+        member=_member(target_users[0]),
+    )
+    task.set_status(request.POST.get('status', 'todo'))
+    task.save()
+    task.assignees.set(_members_of(target_users))
+    _log(task, request.user, 'created', name)
+
+    primary = task.member.user_id if task.member else None
+    _notify_assigned(request, task, [u for u in target_users if u.id != primary], 'New Task')
+
+    try:
+        from todo.google_tasks import push_task_to_google
+        push_task_to_google(request.user, task)
+    except Exception as e:
+        print(f"Error pushing team task to Google Tasks: {e}")
+
+    _attach_uploads(request, task)
+    return task
+
+
 @login_required
 def team_tasks(request):
     """Kanban task board with columns"""
@@ -67,129 +198,22 @@ def team_tasks(request):
         team = get_object_or_404(teams_for(request.user), id=team_id)
     else:
         team = get_user_team(request.user)
-    
+
     if request.method == 'POST':
         try:
-            # Support both 'title' (local modal) and 'name' (sidebar)
-            title = request.POST.get('title') or request.POST.get('name')
-            if not title:
-                return JsonResponse({'success': False, 'error': 'Task title is required'})
-
-            description = request.POST.get('description', '')
-            due_date = request.POST.get('due_date') or None
-            priority = request.POST.get('priority', 'medium')
-            status = request.POST.get('status', 'todo')
-
-            # Handle Team ID override from sidebar
+            if not (request.POST.get('title') or request.POST.get('name')):
+                return JsonResponse({'success': False, 'error': 'Task name is required'})
             form_team_id = request.POST.get('team_id')
             if form_team_id:
-                 team = get_object_or_404(Team, id=form_team_id)
-
-            # Determine Target Users
-            target_users = []
-            assign_to_team = request.POST.get('assign_to_team') == 'on'
-            assigned_users_str = request.POST.get('assigned_users', '')
-
-            if assign_to_team:
-                # All team members
-                target_users = [tm.user for tm in TeamMember.objects.filter(team=team)]
-            elif assigned_users_str:
-                # Specific users
-                user_ids = [uid for uid in assigned_users_str.split(',') if uid.strip()]
-                target_users = User.objects.filter(id__in=user_ids)
-            elif request.POST.get('assigned_to'):
-                # Legacy/Single support
-                try:
-                    target_users = [User.objects.get(id=request.POST.get('assigned_to'))]
-                except User.DoesNotExist:
-                    pass
-            
-            if not target_users:
-                 # Default to creator if no one assigned
-                 target_users = [request.user]
-
-            # Create Tasks
-            # 1. Handle Attachments (Upload once)
-            attachments_data = []
-            if request.FILES.getlist('task_files'):
-                from erp.google_drive import upload_file_to_drive
-                
-                for file_item in request.FILES.getlist('task_files'):
-                    upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Team Tasks")
-                    if upload_result.get('success'):
-                        attachments_data.append({
-                            'name': upload_result.get('name'),
-                            'file_id': upload_result.get('file_id'),
-                            'drive_link': upload_result.get('drive_link')
-                        })
-                    else:
-                        print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
-
-            # Get default 'To Do' column
-            col_todo = TeamBoardColumn.objects.filter(team=team, title='To Do').first()
-            if not col_todo:
-                 col_todo = TeamBoardColumn.objects.create(team=team, title='To Do', color='blue', order=0)
-
-            # 2. Create Task and Link Attachments
-            # Create ONE task for all users (Shared Task)
-            primary_assignee = target_users[0] if target_users else None
-            
-            task = TeamTask.objects.create(
-                team=team,
-                title=title,
-                description=description,
-                assigned_by=request.user,
-                assigned_to=primary_assignee, # Legacy support
-                due_date=due_date,
-                priority=priority,
-                status=status,
-                column=col_todo
-            )
-            
-            # Add all targets to ManyToMany field
-            if target_users:
-                task.assignees.set(target_users)
-                
-                # Send notifications to assignees
-                from notifications.models import Notification
-                for user in target_users:
-                    if user.id != request.user.id and hasattr(user, 'member'):
-                        Notification.create_notification(
-                            recipient=user.member,
-                            notification_type='task_assigned',
-                            title=f'New Task: {task.title}',
-                            message=f'You have been assigned to "{task.title}" by {request.user.get_full_name() or request.user.username}',
-                            link=f'/team/task/{task.id}/',
-                            icon='fa-tasks',
-                            content_object=task
-                        )
-
-            # Sync to Google Tasks
-            try:
-                from todo.google_tasks import push_team_task_to_google
-                push_team_task_to_google(request.user, task)
-            except Exception as e:
-                print(f"Error pushing team task to Google Tasks: {e}")
-
-            from .models import TeamTaskAttachment
-            for att_data in attachments_data:
-                TeamTaskAttachment.objects.create(
-                    task=task,
-                    file_name=att_data['name'],
-                    drive_file_id=att_data['file_id'],
-                    drive_link=att_data['drive_link'],
-                    uploaded_by=request.user
-                )
-            
+                team = get_object_or_404(Team, id=form_team_id)
+            _create_team_task(request, team)
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'success': True, 'message': 'Tasks created successfully'})
-            
             return redirect('team:team_tasks')
-
         except Exception as e:
             print(f"Error creating team task: {e}")
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
-    
+
     # Ensure default columns exist
     columns = TeamBoardColumn.objects.filter(team=team).order_by('order')
     if not columns.exists():
@@ -198,62 +222,32 @@ def team_tasks(request):
         col_rev = TeamBoardColumn.objects.create(team=team, title='Review', color='purple', order=2)
         col_done = TeamBoardColumn.objects.create(team=team, title='Done', color='green', order=3)
         columns = [col_todo, col_inp, col_rev, col_done]
-        
-        # Migrate existing tasks
-        TeamTask.objects.filter(team=team, status='todo').update(column=col_todo)
-        TeamTask.objects.filter(team=team, status='in_progress').update(column=col_inp)
-        TeamTask.objects.filter(team=team, status='review').update(column=col_rev)
-        TeamTask.objects.filter(team=team, status='done').update(column=col_done)
-        TeamTask.objects.filter(team=team, status='completed').update(column=col_done)
 
-    # Fetch tasks with columns
-    # We will pass 'columns' to template, each column object will have a .tasks list attached
-    
-    # Fix for orphaned tasks (tasks with no column assigned)
-    # This ensures older tasks appear on the board
-    orphaned_tasks = TeamTask.objects.filter(team=team, column__isnull=True)
-    if orphaned_tasks.exists():
-        # Get columns (we know they exist by now)
-        col_map = {c.title: c for c in columns}
-        
-        # Map status to column title
-        status_map = {
-            'todo': 'To Do',
-            'in_progress': 'In Progress',
-            'review': 'Review',
-            'done': 'Done'
-        }
-        
-        for status_code, col_title in status_map.items():
-            if col_title in col_map:
-                TeamTask.objects.filter(
-                    team=team, 
-                    column__isnull=True, 
-                    status=status_code
-                ).update(column=col_map[col_title])
+    columns = list(columns)
 
-    # Efficiently fetch all tasks and group them by column in python to avoid N+1
-    # Efficiently fetch all tasks and group them by column in python to avoid N+1
-    all_tasks = TeamTask.objects.filter(team=team).select_related('assigned_to', 'assigned_by', 'column').prefetch_related('assignees', 'attachments')
-    
-    # Attach tasks to columns
-    # Re-query columns to be safe or use the list
-    if isinstance(columns, list):
-         pass # already list
-    else:
-         columns = list(columns)
-         
+    # A task with no column (its column was deleted, say) goes back to
+    # the column named for its status, so nothing falls off the board.
+    col_map = {c.title: c for c in columns}
+    status_map = {'todo': 'To Do', 'in_progress': 'In Progress', 'review': 'Review', 'done': 'Done'}
+    for status_code, col_title in status_map.items():
+        if col_title in col_map:
+            Task.objects.filter(team=team, column__isnull=True, status=status_code).update(
+                column=col_map[col_title])
+
+    all_tasks = (Task.objects.filter(team=team)
+                 .select_related('member__user', 'created_by__user', 'column')
+                 .prefetch_related('assignees__user', 'attachments'))
+
     for col in columns:
         col.task_list = [t for t in all_tasks if t.column_id == col.id]
 
-    # Get current user role
     user_role = team_role(request.user, team) or 'member'
 
     context = {
         'team': team,
-        'user_teams': teams_for(request.user).filter(is_archived=False), # Valid teams for switcher
+        'user_teams': teams_for(request.user).filter(is_archived=False),
         'members': TeamMember.objects.filter(team=team).select_related('user'),
-        'columns': columns, # Pass columns instead of separate task lists
+        'columns': columns,
         'page_title': f'{team.name} Tasks',
         'user_role': user_role,
     }
@@ -263,62 +257,46 @@ def team_tasks(request):
 @require_http_methods(["POST"])
 def complete_task(request, task_id):
     """Mark task as completed"""
-    task = get_object_or_404(TeamTask, id=task_id)
-    
-    # Check permission
-    if task.assigned_to != request.user and request.user != task.assigned_by:
+    task = _team_task(task_id)
+    member = _member(request.user)
+
+    is_assignee = bool(member and task.member_id == member.id)
+    if not (is_assignee or _is_creator(task, request.user)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-    
-    task.status = 'done'
-    task.completed_at = timezone.now()
+
+    task.set_status('done')
     task.save()
-    
+
     return JsonResponse({'success': True, 'message': 'Task marked as completed'})
 
 @login_required
 @require_http_methods(["POST"])
 def update_task_status(request, task_id):
     """Update task status (for Kanban drag-and-drop)"""
-    task = get_object_or_404(TeamTask, id=task_id)
-    
-    # Check if user is team member
-    # Check strict permissions for moving tasks
-    # Allowed: Assignees, Creator, or Admin/Manager/Owner
-    is_assignee = task.assignees.filter(id=request.user.id).exists()
-    is_creator = task.assigned_by == request.user
+    task = _team_task(task_id)
+
+    # Allowed: assignees, the creator, or the team's admins and managers
+    member = _member(request.user)
+    is_assignee = bool(member and task.assignees.filter(id=member.id).exists())
     is_admin = has_team_role(request.user, task.team)
 
-    if not (is_assignee or is_creator or is_admin):
+    if not (is_assignee or _is_creator(task, request.user) or is_admin):
         return JsonResponse({'success': False, 'error': 'You can only move your own tasks'}, status=403)
-    
+
     new_status = request.POST.get('status')
-    column_id = request.POST.get('column_id') # If client sends column_id
-    
+    column_id = request.POST.get('column_id')
+
     if column_id:
         column = get_object_or_404(TeamBoardColumn, id=column_id, team=task.team)
         task.column = column
-        # Map column to status for backwards compatibility if needed, or just keep status loosely active
-        # For now, let's infer status from known titles or just leave it
-        if column.title.lower() == 'done':
-             task.status = 'done'
-             task.completed_at = timezone.now()
-        else:
-             task.status = 'todo' # Default or map others
+        task.set_status('done' if column.title.lower() == 'done' else 'todo')
         task.save()
 
-        # Log History
-        TeamTaskHistory.objects.create(
-            task=task,
-            user=request.user,
-            event_type='status_change',
-            old_value='(Drag & Drop)',
-            new_value=column.title
-        )
+        _log(task, request.user, 'status_changed', column.title, old_value='(Drag & Drop)')
 
-        # Sync to Google Tasks
         try:
             from todo.google_tasks import update_task_in_google
-            update_task_in_google(request.user, task, is_team=True)
+            update_task_in_google(request.user, task)
         except Exception as e:
             print(f"Error updating team task in Google Tasks: {e}")
 
@@ -326,37 +304,19 @@ def update_task_status(request, task_id):
 
     # Legacy status update support (drag drop via data-status)
     valid_statuses = ['todo', 'in_progress', 'review', 'done']
-    
+
     if new_status and new_status in valid_statuses:
-        task.status = new_status
-        # Try to find a column with this title
-        # Map status to title mapping
-        title_map = {
-            'todo': 'To Do',
-            'in_progress': 'In Progress',
-            'review': 'Review',
-            'done': 'Done'
-        }
-        target_title = title_map.get(new_status)
-        if target_title:
-             col = TeamBoardColumn.objects.filter(team=task.team, title=target_title).first()
-             if col:
-                 task.column = col
-        
-        if new_status == 'done':
-            task.completed_at = timezone.now()
+        title_map = {'todo': 'To Do', 'in_progress': 'In Progress', 'review': 'Review', 'done': 'Done'}
+        col = TeamBoardColumn.objects.filter(team=task.team, title=title_map[new_status]).first()
+        if col:
+            task.column = col
+        task.set_status(new_status)
         task.save()
 
-        # Log History
-        TeamTaskHistory.objects.create(
-            task=task,
-            user=request.user,
-            event_type='status_change',
-            new_value=new_status
-        )
+        _log(task, request.user, 'status_changed', new_status)
 
         return JsonResponse({'success': True, 'message': f'Task status updated to {new_status}'})
-    
+
     return JsonResponse({'success': False, 'error': 'Invalid status or column'}, status=400)
 
 
@@ -367,27 +327,27 @@ def create_section(request):
     team_id = request.POST.get('team_id')
     title = request.POST.get('title')
     color = request.POST.get('color', 'blue')
-    
+
     team = get_object_or_404(Team, id=team_id)
-    
+
     # Check permission
     if not is_team_member(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-        
+
     if not title:
          return JsonResponse({'success': False, 'error': 'Title required'}, status=400)
-         
+
     # Get max order
     max_order = TeamBoardColumn.objects.filter(team=team).aggregate(models.Max('order'))['order__max']
     order = 0 if max_order is None else max_order + 1
-    
+
     TeamBoardColumn.objects.create(
         team=team,
         title=title,
         color=color,
         order=order
     )
-    
+
     return JsonResponse({'success': True, 'message': 'Section created'})
 
 @login_required
@@ -396,18 +356,18 @@ def edit_section(request, column_id):
     """Edit an existing Kanban section"""
     title = request.POST.get('title')
     color = request.POST.get('color')
-    
+
     column = get_object_or_404(TeamBoardColumn, id=column_id)
-    
+
     # Check permission
     if not is_team_member(request.user, column.team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-        
+
     if title:
         column.title = title
     if color:
         column.color = color
-        
+
     column.save()
     return JsonResponse({'success': True, 'message': 'Section updated'})
 
@@ -415,21 +375,21 @@ def reorder_section(request):
     """Reorder Kanban sections"""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
-        
+
     import json
     try:
         data = json.loads(request.body)
         column_ids = data.get('column_ids', [])
-        
+
         if not column_ids:
             return JsonResponse({'success': False, 'error': 'No data provided'}, status=400)
 
         # Update order for each column
         for index, col_id in enumerate(column_ids):
             TeamBoardColumn.objects.filter(id=col_id).update(order=index)
-            
+
         return JsonResponse({'success': True, 'message': 'Order updated'})
-        
+
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -437,111 +397,21 @@ def reorder_section(request):
 @require_http_methods(["POST"])
 def create_task(request):
     """Create a new team task"""
-    # Support both 'title' (local modal) and 'name' (sidebar)
-    title = request.POST.get('title') or request.POST.get('name')
-    if not title:
-        return JsonResponse({'success': False, 'error': 'Task title is required'})
+    if not (request.POST.get('title') or request.POST.get('name')):
+        return JsonResponse({'success': False, 'error': 'Task name is required'})
 
     try:
-        description = request.POST.get('description', '')
-        due_date = request.POST.get('due_date') or None
-        priority = request.POST.get('priority', 'medium')
-        status = request.POST.get('status', 'todo')
-
-        # Handle Team ID override from sidebar
         form_team_id = request.POST.get('team_id')
-        team = None
         if form_team_id:
             team = get_object_or_404(Team, id=form_team_id)
         else:
-            # Fallback to user's team if not provided (though form should provide it)
             team = get_user_team(request.user)
 
-        # Determine Target Users
-        target_users = []
-        assign_to_team = request.POST.get('assign_to_team') == 'on'
-        assigned_users_str = request.POST.get('assigned_users', '')
+        _create_team_task(request, team)
 
-        if assign_to_team:
-            # All team members
-            target_users = [tm.user for tm in TeamMember.objects.filter(team=team)]
-        elif assigned_users_str:
-            # Specific users
-            user_ids = [uid for uid in assigned_users_str.split(',') if uid.strip()]
-            target_users = User.objects.filter(id__in=user_ids)
-        elif request.POST.get('assigned_to'):
-            # Legacy/Single support
-            try:
-                target_users = [User.objects.get(id=request.POST.get('assigned_to'))]
-            except User.DoesNotExist:
-                pass
-        
-        if not target_users:
-             # Default to creator if no one assigned
-             target_users = [request.user]
-
-        # Create Tasks
-        # 1. Handle Attachments (Upload once)
-        attachments_data = []
-        if request.FILES.getlist('task_files'):
-            from erp.google_drive import upload_file_to_drive
-            
-            for file_item in request.FILES.getlist('task_files'):
-                upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Team Tasks")
-                if upload_result.get('success'):
-                    attachments_data.append({
-                        'name': upload_result.get('name'),
-                        'file_id': upload_result.get('file_id'),
-                        'drive_link': upload_result.get('drive_link')
-                    })
-                else:
-                    print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
-
-        # Get default 'To Do' column
-        col_todo = TeamBoardColumn.objects.filter(team=team, title='To Do').first()
-        if not col_todo:
-             # Fallback if no column exists (though view ensures it)
-             col_todo = TeamBoardColumn.objects.create(team=team, title='To Do', color='blue', order=0)
-
-        # 2. Create Tasks and Link Attachments
-        # Create ONE task and add all assignees
-        primary_assignee = target_users[0] if target_users else None
-        
-        task = TeamTask.objects.create(
-            team=team,
-            title=title,
-            description=description,
-            assigned_by=request.user,
-            assigned_to=primary_assignee, # Legacy support
-            due_date=due_date,
-            status=status,
-            column=col_todo  # Ensure it shows up on board
-        )
-        
-        # Add all targets to ManyToMany field
-        task.assignees.set(target_users)
-
-        # Sync to Google Tasks
-        try:
-            from todo.google_tasks import push_team_task_to_google
-            push_team_task_to_google(request.user, task)
-        except Exception as e:
-            print(f"Error pushing team task to Google Tasks: {e}")
-
-        from .models import TeamTaskAttachment
-        for att_data in attachments_data:
-            TeamTaskAttachment.objects.create(
-                task=task,
-                file_name=att_data['name'],
-                drive_file_id=att_data['file_id'],
-                drive_link=att_data['drive_link'],
-                uploaded_by=request.user
-            )
-        
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': True, 'message': 'Tasks created successfully'})
-        
-        # Redirect back to team tasks
+
         return redirect(f'/team/tasks/?team_id={team.id}')
 
     except Exception as e:
@@ -552,29 +422,23 @@ def create_task(request):
 def task_detail(request, task_id):
     """Detail view for a specific task"""
     task = get_object_or_404(
-        TeamTask.objects.select_related(
-            'team', 'column', 'assigned_to', 'assigned_by'
+        Task.objects.exclude(team=None).select_related(
+            'team', 'column', 'member__user', 'created_by__user'
         ).prefetch_related(
-            'assignees', 'team__columns'
-        ), 
+            'assignees__user', 'team__columns'
+        ),
         id=task_id
     )
-    # Check permissions (basic: user must be in the team)
-    if not task.team.members.filter(id=request.user.id).exists():
-         # Or handle via TeamMember check
-         pass 
 
-    comments = task.comments.all().select_related('author')
-    history = task.history.all().select_related('user')
-    # Prefetch attachments
-    task_attachments = task.attachments.all()
+    comments = task.comments.all().select_related('author__user')
+    history = task.activities.all().select_related('user__user')
 
     context = {
         'task': task,
         'team': task.team,
         'comments': comments,
         'history': history,
-        'can_edit': task.assigned_by == request.user or request.user == task.team.creator or has_team_role(request.user, task.team, ('admin',))
+        'can_edit': _is_creator(task, request.user) or request.user == task.team.creator or has_team_role(request.user, task.team, ('admin',))
     }
     return render(request, 'team_task_detail.html', context)
 
@@ -582,7 +446,7 @@ def task_detail(request, task_id):
 @require_http_methods(["POST"])
 def add_task_comment(request, task_id):
     """Add a comment to a task"""
-    task = get_object_or_404(TeamTask, id=task_id)
+    task = _team_task(task_id)
     if not is_team_member(request.user, task.team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
@@ -590,25 +454,16 @@ def add_task_comment(request, task_id):
     if not content:
         return JsonResponse({'success': False, 'error': 'Content required'}, status=400)
 
-    from .models import TeamTaskComment
-    comment = TeamTaskComment.objects.create(
-        task=task,
-        author=request.user,
-        content=content
-    )
+    author = _member(request.user)
+    if author is None:
+        return JsonResponse({'success': False, 'error': 'Only members can comment'}, status=403)
 
-    # Log History
-    TeamTaskHistory.objects.create(
-        task=task,
-        user=request.user,
-        event_type='comment_added',
-        new_value='Added a comment'
-    )
-    
-    # If HTMX request, render the single comment
-    # If HTMX request, render the single comment
+    comment = TaskComment.objects.create(task=task, author=author, content=content)
+
+    _log(task, request.user, 'comment_added', 'Added a comment')
+
     if request.headers.get('HX-Request') == 'true' or request.META.get('HTTP_HX_REQUEST') == 'true':
-         return render(request, 'team/components/single_comment.html', {'comment': comment})
+        return render(request, 'team/components/single_comment.html', {'comment': comment})
 
     return redirect('team:task_detail', task_id=task.id)
 
@@ -618,16 +473,16 @@ def delete_section(request, column_id):
     """Delete a Kanban section"""
     column = get_object_or_404(TeamBoardColumn, id=column_id)
     team = column.team
-    
+
     # Check permission
     if not is_team_member(request.user, team):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-    
+
     # Move tasks to fallback column if any
     fallback = TeamBoardColumn.objects.filter(team=team).exclude(id=column.id).order_by('order').first()
     if fallback:
-        TeamTask.objects.filter(column=column).update(column=fallback)
-        
+        Task.objects.filter(column=column).update(column=fallback)
+
     column.delete()
     return JsonResponse({'success': True, 'message': 'Section deleted'})
 
@@ -635,17 +490,12 @@ def delete_section(request, column_id):
 @require_http_methods(["POST"])
 def delete_task(request, task_id):
     """Delete a task"""
-    task = get_object_or_404(TeamTask, id=task_id)
-    
-    # Check permission - assigned_by, or team admin/manager/owner can delete
-    can_delete = (
-        task.assigned_by == request.user or 
-        has_team_role(request.user, task.team)
-    )
-    
-    if not can_delete:
+    task = _team_task(task_id)
+
+    # The creator, or the team's admins and managers
+    if not (_is_creator(task, request.user) or has_team_role(request.user, task.team)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-    
+
     task.delete()
     return JsonResponse({'success': True, 'message': 'Task deleted'})
 
@@ -653,17 +503,10 @@ def delete_task(request, task_id):
 @require_http_methods(["POST"])
 def delete_task_attachment(request, attachment_id):
     """Delete a task attachment"""
-     # Handle circular import
-    from .models import TeamTaskAttachment
-    
-    attachment = get_object_or_404(TeamTaskAttachment, id=attachment_id)
-    
-    # Check permission
-    can_delete = (
-        attachment.task.assigned_by == request.user or 
-        has_team_role(request.user, attachment.task.team)
-    )
-    if not can_delete:
+    attachment = get_object_or_404(TaskAttachment.objects.exclude(task__team=None), id=attachment_id)
+    task = attachment.task
+
+    if not (_is_creator(task, request.user) or has_team_role(request.user, task.team)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
     attachment.delete()
@@ -673,115 +516,63 @@ def delete_task_attachment(request, attachment_id):
 @require_http_methods(["POST"])
 def edit_task(request, task_id):
     """Edit a team task"""
-    task = get_object_or_404(TeamTask, id=task_id)
-    
-    # Check permissions
-    can_edit = (
-        task.assigned_by == request.user or 
-        has_team_role(request.user, task.team)
-    )
-    if not can_edit:
+    task = _team_task(task_id)
+
+    if not (_is_creator(task, request.user) or has_team_role(request.user, task.team)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-    
-    # Update fields
-    title = request.POST.get('name')
-    if title:
-        task.title = title
-        
+
+    before = (task.name, task.description, task.priority, task.due_date)
+
+    name = request.POST.get('name')
+    if name:
+        task.name = name
+
     priority = request.POST.get('priority')
     if priority:
         task.priority = priority
-        
-    due_date = request.POST.get('due_date')
+
+    # A task always has a due date; a blank field leaves it as it was.
+    due_date = _parse_due(request.POST.get('due_date'))
     if due_date:
         task.due_date = due_date
-    else:
-        task.due_date = None
 
     description = request.POST.get('description')
     if description is not None:
         task.description = description
-    
-    # Store old assignees before updating
+
     old_assignees = set(task.assignees.all())
-        
+
     task.save()
-    
-    # Handle assignee updates
-    assign_to_team = request.POST.get('assign_to_team') == 'on'
-    assigned_users_str = request.POST.get('assigned_users')
-    
+
     # Only update assignees if one of the fields is present
-    if assign_to_team or assigned_users_str is not None:
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        new_assignee_users = []
+    if request.POST.get('assign_to_team') == 'on' or request.POST.get('assigned_users') is not None:
+        new_users = _target_users(request, task.team)
+        new_members = _members_of(new_users)
+        task.assignees.set(new_members)
+        added = {m.user_id for m in set(new_members) - old_assignees}
+        _notify_assigned(request, task, [u for u in new_users if u.id in added], 'Task Assigned')
 
-        if assign_to_team:
-            # Assign to all team members
-            team_member_ids = TeamMember.objects.filter(team=task.team).values_list('user_id', flat=True)
-            new_assignee_users = User.objects.filter(id__in=team_member_ids)
-        elif assigned_users_str:
-            # Parse specific users
-            user_ids = [int(x.strip()) for x in assigned_users_str.split(',') if x.strip().isdigit()]
-            new_assignee_users = User.objects.filter(id__in=user_ids)
-        
-        # Set new assignees
-        task.assignees.set(new_assignee_users)
+    _attach_uploads(request, task)
 
-        # Detect newly added assignees and send notifications
-        new_assignees_set = set(new_assignee_users)
-        added_assignees = new_assignees_set - old_assignees
-        
-        if added_assignees:
-            from notifications.models import Notification
-            for user in added_assignees:
-                # Don't notify the user making the change
-                if user.id != request.user.id and hasattr(user, 'member'):
-                    Notification.create_notification(
-                        recipient=user.member,
-                        notification_type='task_assigned',
-                        title=f'Task Assigned: {task.title}',
-                        message=f'You have been assigned to "{task.title}" by {request.user.get_full_name() or request.user.username}',
-                        link=f'/team/task/{task.id}/',
-                        icon='fa-tasks',
-                        content_object=task
-                    )
+    # What changed, the way a personal task's edit records it.
+    old_name, old_description, old_priority, old_due = before
+    if task.name != old_name:
+        _log(task, request.user, 'name_updated', task.name, old_value=old_name)
+    if (task.description or '') != (old_description or ''):
+        _log(task, request.user, 'description_updated', (task.description or '')[:100] or None,
+             old_value=(old_description or '')[:100] or None)
+    if task.priority != old_priority:
+        _log(task, request.user, 'priority_changed', task.priority, old_value=old_priority)
+    if task.due_date != old_due:
+        _log(task, request.user, 'due_date_changed', task.due_date.isoformat(),
+             old_value=old_due.isoformat() if old_due else None)
 
-    # Handle Attachments (Upload)
-    if request.FILES.getlist('task_files'):
-        from erp.google_drive import upload_file_to_drive
-        from .models import TeamTaskAttachment
-        
-        for file_item in request.FILES.getlist('task_files'):
-            upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Team Tasks")
-            
-            if upload_result.get('success'):
-                TeamTaskAttachment.objects.create(
-                    task=task,
-                    file_name=upload_result.get('name'),
-                    drive_file_id=upload_result.get('file_id'),
-                    drive_link=upload_result.get('drive_link'),
-                    uploaded_by=request.user
-                )
-            else:
-                print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
-    
-    # Log history
-    TeamTaskHistory.objects.create(
-        task=task,
-        user=request.user,
-        event_type='status_change', # Using status_change as generic update for now or just log it
-        new_value="Task details updated"
-    )
-    
-    # Sync to Google Tasks
     try:
         from todo.google_tasks import update_task_in_google
-        update_task_in_google(request.user, task, is_team=True)
+        update_task_in_google(request.user, task)
     except Exception as e:
         print(f"Error updating team task in Google Tasks: {e}")
-    
+
     return JsonResponse({'success': True, 'message': 'Task updated successfully'})
 
 @login_required
@@ -2104,7 +1895,7 @@ def send_google_message(request):
 def get_team_task_edit_form(request, task_id):
     """Get the team task edit form partial for sidebar"""
     task = get_object_or_404(
-        TeamTask.objects.select_related('team', 'assigned_by').prefetch_related('assignees', 'attachments'),
+        Task.objects.exclude(team=None).select_related('team', 'created_by').prefetch_related('assignees__user', 'attachments'),
         id=task_id
     )
     
@@ -2117,7 +1908,7 @@ def get_team_task_edit_form(request, task_id):
     # Editable if:
     # 1. User is the creator/assigner of the task
     # 2. User is an Admin or Manager of the team
-    is_assigner = task.assigned_by == request.user
+    is_assigner = _is_creator(task, request.user)
     is_admin_or_manager = role in ['admin', 'manager']
     
     can_edit = is_assigner or is_admin_or_manager

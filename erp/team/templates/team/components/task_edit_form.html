@@ -5,7 +5,7 @@
 
     <div class="form-group">
         <label for="id_name">{% trans "Task name" %}</label>
-        <input type="text" name="name" id="id_name" class="form-input" value="{{ task.title }}" {% if not can_edit
+        <input type="text" name="name" id="id_name" class="form-input" value="{{ task.name }}" {% if not can_edit
             %}disabled{% else %}required{% endif %}>
     </div>
 
@@ -46,7 +46,7 @@
 
         <!-- Selected Users -->
         <div id="editSelectedUsersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-            {% for member in task.assignees.all %}
+            {% for m in task.assignees.all %}{% with member=m.user %}
             <div class="user-chip" data-user-id="{{ member.id }}"
                 style="background: #e2e8f0; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; color: #334155;">
                 <div class="avatar-circle"
@@ -59,12 +59,12 @@
                     onclick="removeEditUser({{ member.id }})"><i class="fas fa-times"></i></button>
                 {% endif %}
             </div>
-            {% endfor %}
+            {% endwith %}{% endfor %}
         </div>
 
         <!-- Hidden Input -->
         <input type="hidden" name="assigned_users" id="edit_assigned_users"
-            value="{% for u in task.assignees.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+            value="{% for m in task.assignees.all %}{{ m.user_id }}{% if not forloop.last %},{% endif %}{% endfor %}">
 
         {% if can_edit %}
         <!-- Add User Search -->

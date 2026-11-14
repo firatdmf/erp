@@ -129,13 +129,13 @@
       <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
         {% for task in column.task_list %}
         <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}"
-          data-title="{{ task.title|escapejs }}" data-description="{{ task.description|escapejs|default:'' }}"
+          data-title="{{ task.name|escapejs }}" data-description="{{ task.description|escapejs|default:'' }}"
           data-priority="{{ task.priority }}" data-priority-display="{{ task.get_priority_display }}"
           data-due-date="{{ task.due_date|date:'Y-m-d'|default:'' }}"
           data-due-date-display="{{ task.due_date|date:'M d, Y'|default:'No date' }}"
-          data-assignees='[{% for u in task.assignees.all %}{"name": "{{ u.get_full_name|escapejs }}", "initials": "{{ u.first_name|first|upper }}{{ u.last_name|first|upper }}"}{% if not forloop.last %}, {% endif %}{% endfor %}]'
-          data-creator-id="{{ task.assigned_by.id }}"
-          data-assignee-ids="[{% for u in task.assignees.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
+          data-assignees='[{% for m in task.assignees.all %}{% with u=m.user %}{"name": "{{ u.get_full_name|escapejs }}", "initials": "{{ u.first_name|first|upper }}{{ u.last_name|first|upper }}"}{% endwith %}{% if not forloop.last %}, {% endif %}{% endfor %}]'
+          data-creator-id="{{ task.created_by.user_id }}"
+          data-assignee-ids="[{% for m in task.assignees.all %}{{ m.user_id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
           data-column-id="{{ column.id }}">
           <div class="task-card-header">
             <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
@@ -153,7 +153,7 @@
               {% endif %}
             </div>
           </div>
-          <div class="task-title">{{ task.title }}</div>
+          <div class="task-title">{{ task.name }}</div>
           <div class="task-footer">
             <div class="due-date {% if task.is_overdue %}overdue{% endif %}">
               <i class="fas fa-calendar"></i>
@@ -163,13 +163,13 @@
             <i class="fas fa-check-circle task-done-icon"></i>
             {% else %}
             <div class="user-stack" style="justify-content: flex-end;">
-              {% for u in task.assignees.all|slice:":3" %}
+              {% for m in task.assignees.all|slice:":3" %}{% with u=m.user %}
               <div class="task-avatar"
                 style="background: #e2e8f0; color: #475569; margin-left: -8px; border: 2px solid white;"
                 title="{{ u.get_full_name }}">
                 {{ u.first_name|first|upper }}{{ u.last_name|first|upper }}
               </div>
-              {% endfor %}
+              {% endwith %}{% endfor %}
               {% if task.assignees.count > 3 %}
               <div class="task-avatar"
                 style="background: #f1f5f9; color: #64748b; margin-left: -8px; border: 2px solid white; font-size: 0.7rem;">

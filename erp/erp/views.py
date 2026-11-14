@@ -321,7 +321,7 @@ class Dashboard(View):
         from django.template.loader import render_to_string
         from datetime import datetime, timedelta, time
         from django.utils import timezone
-        from team.models import TeamTask, TeamMeeting
+        from team.models import TeamMeeting
         from team.models import TeamMember
         from django.db.models import Q, Subquery, OuterRef, Value
         from django.utils.timezone import make_aware
@@ -355,7 +355,6 @@ class Dashboard(View):
                     base_query = Task.objects.filter(completed=False, due_date__lte=today)
                 else:
                     # For other dates, show range of that day
-                    # Note: Task.due_date is distinct from TeamTask.due_date (date vs datetime)
                     # Task.due_date is DateField, so exact match is fine and indexed
                     base_query = Task.objects.filter(completed=False, due_date=date_obj)
                 
@@ -391,32 +390,6 @@ class Dashboard(View):
                         print(f"   • Task#{t.id} {t.name!r} | contact_id={t.contact_id}({cname!r}) company_id={t.company_id}({coname!r})")
                     print(f"{'='*60}\n")
                     
-                    # Subquery to get current user's role in the task's team
-                    user_role_subquery = TeamMember.objects.filter(
-                        team=OuterRef('team'),
-                        user=current_user
-                    ).values('role')[:1]
-
-                    # TeamTask filtering using Range for DatetimeField.
-                    # Show tasks assigned TO me OR ones I assigned myself,
-                    # so the calendar/list reflects what I'm involved in.
-                    if date_obj == today:
-                        team_tasks_query = TeamTask.objects.filter(
-                            Q(assignees=current_user) | Q(assigned_by=current_user),
-                            due_date__lte=day_end
-                        ).exclude(status='done')
-                    else:
-                        team_tasks_query = TeamTask.objects.filter(
-                            Q(assignees=current_user) | Q(assigned_by=current_user),
-                            due_date__range=(day_start, day_end)
-                        ).exclude(status='done')
-                    
-                    # Annotate with user role for permission check without N+1
-                    team_tasks = list(team_tasks_query.annotate(
-                        current_user_role=user_role_subquery
-                    ).distinct().select_related('team', 'assigned_to', 'assigned_by').prefetch_related('assignees').order_by('-due_date'))
-                    print(f"Team Tasks count: {len(team_tasks)}")
-
                     # Fetch Team Meetings using Range for DatetimeField (Index Optimized)
                     meetings_query = TeamMeeting.objects.filter(
                         Q(team__members=current_user) | 
@@ -432,7 +405,6 @@ class Dashboard(View):
                     tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
                     for _t in tasks:
                         _t.can_be_deleted_by_user = _t.can_be_deleted_by(current_user)
-                    team_tasks = []
                     meetings = []
                     print(f"Assigned Tasks count: {len(tasks)}")
                     for t in tasks:
@@ -442,7 +414,6 @@ class Dashboard(View):
                 # Render tasks using the same template
                 html = render_to_string('todo/components/tasks.html', {
                     'tasks': tasks,
-                    'team_tasks': team_tasks if task_tab == 'myTasks' else [],
                     'meetings': meetings,
                     'sort_type': 'dictsortreversed',
                     'page_type': 'dashboard_calendar',

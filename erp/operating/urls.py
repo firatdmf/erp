@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from . import views_warehouse
+from . import bought_items
 from . import views_samples
 from . import views_partial_shipment
 from . import views_transfer
@@ -64,6 +65,7 @@ urlpatterns = [
     path("warehouses/<int:pk>/catalog-variants/<int:product_id>/", in_reach(views_warehouse.catalog_product_variants), name="catalog_product_variants"),
     path("warehouses/<int:pk>/customer-currency/", in_reach(views_warehouse.warehouse_customer_currency), name="warehouse_customer_currency"),
     path("customer-currency/", views_warehouse.customer_currency, name="customer_currency"),
+    path("customer-last-prices/", bought_items.customer_last_prices, name="customer_last_prices"),
     path("warehouses/<int:pk>/catalog-variant-match/<int:product_id>/", in_reach(views_warehouse.catalog_variant_match), name="catalog_variant_match"),
     path("warehouses/<int:pk>/supplier-codes/", in_reach(views_warehouse.supplier_codes), name="supplier_codes"),
     path("warehouses/<int:pk>/barcode-lookup/", in_reach(views_warehouse.warehouse_barcode_lookup), name="warehouse_barcode_lookup"),

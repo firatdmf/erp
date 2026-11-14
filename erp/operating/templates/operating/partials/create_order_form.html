@@ -177,6 +177,12 @@
 .co-stockline.short{color:#B45309;}
 .co-stockline .sep{color:#CBD5E1;margin:0 5px;}
 .co-stockline .cost{font-weight:500;}
+/* What this customer paid for the variant last time (coLastPaidHtml). */
+.co-lastpaid{display:block;margin-top:3px;font-size:11px;font-weight:600;color:#0B5F60;}
+.co-lastpaid .sep{color:#CBD5E1;margin:0 5px;}
+.co-lastpaid .num{font-family:monospace;font-weight:500;color:#64748B;}
+/* Not this variant: another of the same product. */
+.co-lastpaid.other{color:#92400E;}
 .co-price-from{font-weight:500;font-size:10.5px;color:#64748B;margin-left:4px;white-space:nowrap;}
 /* The price field while it still holds the purchase cost nobody has
    confirmed as a price. */
@@ -1186,6 +1192,14 @@
 
   function coPriceFromHtml(item) {
     var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
+    // Priced at what they paid last: the catalogue's figure beside it, so
+    // an old price well under today's is seen.
+    if (item.priceFromBase && item.priceFromLast) {
+      return ' <span class="co-price-from">' +
+        (item.is_cost_price ? '{% filter escapejs %}{% trans "Purchase cost" %}{% endfilter %}'
+                            : '{% filter escapejs %}{% trans "list price" %}{% endfilter %}') +
+        ' ' + esc(CO_CUR.symbol) + fmtNum(coFromBase(item.basePrice)) + '</span>';
+    }
     if (!item.priceFromBase || !code || code === CO_CATALOG.code) return '';
     if (!CO_RATES[code]) return '';
     return ' <span class="co-price-from">{% trans "from" %} ' + esc(CO_CATALOG.symbol) +
@@ -1194,9 +1208,16 @@
 
   // Re-price every line still holding a converted catalogue price, after
   // the order's currency changed. A price somebody typed is theirs.
+  //
+  // A price nobody typed follows what this customer last paid for the
+  // same variant, in the same currency (coOwnLastPrice) — else the
+  // catalogue's, converted.
   function coRepriceFromBase() {
     orderItems.forEach(function (it) {
-      if (it.priceFromBase) it.price = coFromBase(it.basePrice);
+      if (!it.priceFromBase) return;
+      var last = coOwnLastPrice(it);
+      it.priceFromLast = !!last;
+      it.price = last ? parseFloat(last.price) : coFromBase(it.basePrice);
     });
   }
 
@@ -1257,6 +1278,7 @@
 
   function coCurrencyFor(type, pk, name, keepChargeTo) {
     if (!keepChargeTo) coResetChargeTo();
+    coLoadLastPrices(type, pk);
     if (type === 'retail' || !pk) {
       // Nobody's account to follow: back to the book's own currency,
       // otherwise a retail sale after a euro customer stayed in euros.
@@ -1291,6 +1313,61 @@
   }
 
   // Every figure the form prints follows the customer's currency.
+  // What the chosen customer last paid for the variant on each card, by
+  // SKU in lower case (operating.bought_items.last_prices) — or, for one
+  // they never bought, what they paid for another variant of the product,
+  // named. Shown on the card so a price is quoted knowing what they were
+  // charged before. Not this order's own lines on an edit.
+  var CO_LAST_URL = "{% url 'operating:customer_last_prices' %}";
+  var CO_LAST = {}, CO_LAST_KEY = '';
+  function coFetchLastPrices(skus) {
+    var parts = CO_LAST_KEY.split(':'), type = parts[0], pk = parts[1];
+    if (!skus.length || type === 'retail' || !pk) return;
+    var key = CO_LAST_KEY;
+    fetch(CO_LAST_URL + '?type=' + encodeURIComponent(type) + '&pk=' + encodeURIComponent(pk) +
+          skus.map(function (s) { return '&sku=' + encodeURIComponent(s); }).join('') +
+          (CO_ORDER_ID ? '&order=' + CO_ORDER_ID : ''))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (key !== CO_LAST_KEY) return;  // the customer changed meanwhile
+        Object.assign(CO_LAST, d.prices || {});
+        coRepriceFromBase();
+        if (orderItems.length) renderProducts();
+      }).catch(function () {});
+  }
+  // The customer changed: forget the last one's prices, ask for every card.
+  function coLoadLastPrices(type, pk) {
+    var key = (type || '') + ':' + (pk || '');
+    if (key === CO_LAST_KEY) return;
+    CO_LAST_KEY = key;
+    CO_LAST = {};
+    coRepriceFromBase();
+    if (orderItems.length) renderProducts();
+    coFetchLastPrices(orderItems.map(function (it) { return it.sku; }).filter(Boolean));
+  }
+  // What they paid for this very variant, where it was in the currency
+  // this order is priced in — the one last price the field may take.
+  function coOwnLastPrice(item) {
+    var last = CO_LAST[(item.sku || '').toLowerCase()];
+    var code = CO_CUR && (CO_CUR.code || CO_CUR.currency);
+    return (last && !last.other && code && last.currency === code) ? last : null;
+  }
+  function coLastPaidHtml(item) {
+    var last = CO_LAST[(item.sku || '').toLowerCase()];
+    if (!last) return '';
+    var day = new Date(last.date + 'T00:00:00').toLocaleDateString(
+      document.documentElement.lang || undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+    var price = esc(last.symbol) + fmtNum(parseFloat(last.price));
+    var lead = last.other
+      ? '{% filter escapejs %}{% blocktrans with sku="__SKU__" price="__PRICE__" %}Another variant, {{ sku }}, was bought at {{ price }}{% endblocktrans %}{% endfilter %}'
+          .replace('__SKU__', '<span class="num">' + esc(last.variant_sku) + '</span>')
+          .replace('__PRICE__', price)
+      : '{% filter escapejs %}{% trans "Last paid" %}{% endfilter %} ' + price;
+    return '<span class="co-lastpaid' + (last.other ? ' other' : '') + '">' + lead +
+      '<span class="sep">·</span>' + esc(day) +
+      '<span class="sep">·</span><span class="num">' + esc(last.number) + '</span></span>';
+  }
+
   function coRepriceLabels() {
     coRepriceFromBase();
     document.querySelectorAll('[data-cur-symbol]').forEach(function (el) {
@@ -1647,6 +1724,7 @@
       listEl.firstElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     fetchAvailableRolls(stableIndex, sku);
+    coFetchLastPrices([sku]);
   }
 
   // Claim the global slot the autocomplete's inline onclick calls.
@@ -2020,12 +2098,12 @@
       const justAdded = (newestIdx && item.index === newestIdx) ? ' co-just-added' : '';
       return `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
-          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${item.counted ? coStockLineHtml(item) : ''}${coCardBooksHtml(item, bookRun)}</div>
+          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span>${coLastPaidHtml(item)}${item.counted ? coStockLineHtml(item) : ''}${coCardBooksHtml(item, bookRun)}</div>
           ${coLocked(item) ? '' : `<button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>`}
         </div>
         <div class="co-row${(item.counted || coLocked(item)) ? ' co-row-counted' : ''}">
           ${coLocked(item) ? coLockedQtyHtml(item) : (item.counted ? coCountedQtyHtml(item, i) : '')}
-          <div class="form-group"><label>{% trans "Unit Price" %}${coPriceFromHtml(item)}${(item.is_cost_price && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${(item.is_cost_price && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${(item.is_cost_price && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}${coPriceFromHtml(item)}${((item.is_cost_price && !item.priceFromLast) && !item.counted) ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Purchase cost" %}</span>` : ''}</label><input type="number" class="form-input${((item.is_cost_price && !item.priceFromLast) && item.counted) ? ' co-price-is-cost' : ''}" id="co-pricefield-${i}" value="${item.price}" min="0" step="0.01"${((item.is_cost_price && !item.priceFromLast) && item.counted) ? ` title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}"` : ''} onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">${CO_CUR.symbol}${fmtNum(item.quantity*item.price)}</div></div>
         </div>
         ${coLockedNoteHtml(item)}
@@ -2333,7 +2411,7 @@
     fetch(CO_EDIT_LINES_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        var gone = deletedExistingItemIds.map(String);
+        var gone = deletedExistingItemIds.map(String), asked = [];
         (data.items || []).forEach(function (saved) {
           if (gone.indexOf(String(saved.item_id)) !== -1) return;
           var at = orderItems.findIndex(function (it) {
@@ -2347,7 +2425,9 @@
           syncQtyFromRolls(at);
           fresh._savedSig = coSig(fresh);
           if (fresh.sku) fetchAvailableRolls(fresh.index, fresh.sku);
+          if (fresh.sku) asked.push(fresh.sku);
         });
+        coFetchLastPrices(asked);
         coBuyingIndex = null;
         renderProducts();
         updateTotal();
@@ -3379,7 +3459,7 @@
     if (['quantity','price','custom_width','custom_height','custom_fabric_used_meters'].includes(f)) orderItems[i][f] = parseFloat(v)||0;
     else orderItems[i][f] = v;
     // A price typed by hand is not a converted catalogue price any more.
-    if (f === 'price') orderItems[i].priceFromBase = false;
+    if (f === 'price') { orderItems[i].priceFromBase = false; orderItems[i].priceFromLast = false; }
     if (f === 'price' && orderItems[i].is_cost_price) {
       // Staff has looked at / edited the pre-filled cost — it's now a
       // deliberate value, so drop the "purchase price" warning badge.

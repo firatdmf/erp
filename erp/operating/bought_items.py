@@ -8,6 +8,9 @@ them in the end.
 from collections import OrderedDict
 from decimal import Decimal
 
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+
 from marketing.units import unit_short
 
 from .models import OrderItem
@@ -46,6 +49,7 @@ def bought_items(orders):
             "number": half_number(order),
             "date": order.order_date or order.created_at.date(),
             "symbol": order.currency_symbol,
+            "currency": order.currency_code,
             "price": line.price,
             "quantity": line.quantity,
         })
@@ -94,3 +98,62 @@ def attach_lines(rows):
             line.unit_short = unit_short(line.product.unit)
             line.symbol = line.order.currency_symbol
     return rows
+
+
+def last_prices(customer_type, customer_pk, skus, exclude_order=None):
+    """What this customer last paid for each of `skus` (variant SKUs, the
+    cards on the order form), keyed by SKU in lower case.
+
+    A variant they never bought, of a product they did buy another variant
+    of, answers with that other variant's last price — the newest such —
+    with `other` set and its SKU, so the form can say so. Nothing bought of
+    the product: no entry.
+
+    The same orders their CRM page reads (bought_items), less the order
+    being edited: its own lines are not a previous sale."""
+    from crm.models import of_books_in_reach
+    from marketing.models import ProductVariant
+    from .models import Order
+
+    skus = [s for s in skus if s][:500]
+    if (not skus or customer_type not in ("company", "contact")
+            or not str(customer_pk or "").isdigit()):
+        return {}
+    orders = of_books_in_reach(
+        Order.objects.filter(**{customer_type: int(customer_pk)}), "current_account__book")
+    if str(exclude_order or "").isdigit():
+        # And a split order's other half: one order, not an earlier sale.
+        group = Order.objects.filter(pk=int(exclude_order)).values_list("split_group", flat=True).first()
+        orders = orders.exclude(pk=int(exclude_order))
+        if group:
+            orders = orders.exclude(split_group=group)
+    by_variant, by_product = {}, {}
+    for row in bought_items(orders):  # last bought first
+        by_variant[row["variant"].pk] = row
+        by_product.setdefault(row["product"].pk, row)
+    out = {}
+    for variant in ProductVariant.objects.filter(variant_sku__in=skus):
+        row = by_variant.get(variant.pk) or by_product.get(variant.product_id)
+        if row is None:
+            continue
+        last = row["last"]
+        other = row["variant"].pk != variant.pk
+        out[variant.variant_sku.lower()] = {
+            "price": str(last["price"]),
+            "symbol": last["symbol"],
+            "currency": last["currency"],
+            "date": last["date"].isoformat(),
+            "number": last["number"],
+            "other": other,
+            "variant_sku": row["variant"].variant_sku if other else "",
+        }
+    return out
+
+
+@login_required
+def customer_last_prices(request):
+    """`last_prices` for the order form: ?type=&pk=&sku=…&sku=…, and
+    &order= on an edit."""
+    return JsonResponse({"prices": last_prices(
+        request.GET.get("type"), request.GET.get("pk"),
+        request.GET.getlist("sku"), request.GET.get("order"))})

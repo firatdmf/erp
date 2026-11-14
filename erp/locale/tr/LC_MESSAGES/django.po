@@ -16452,3 +16452,13 @@ msgstr "En iyi gönderdiği ülkeler"
 
 msgid "Optional. Buyers in these countries are offered this warehouse first, before nearer ones — for a customs union or a cheap route."
 msgstr "İsteğe bağlı. Bu ülkelerdeki alıcılara bu depo, daha yakın olanlardan önce sunulur — gümrük birliği ya da ucuz bir güzergâh için."
+
+msgid "Last paid"
+msgstr "Son ödediği"
+
+#, python-format
+msgid "Another variant, %(sku)s, was bought at %(price)s"
+msgstr "Başka bir varyant, %(sku)s, %(price)s fiyatından alındı"
+
+msgid "list price"
+msgstr "liste fiyatı"

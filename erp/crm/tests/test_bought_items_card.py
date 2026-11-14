@@ -21,7 +21,9 @@ from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderItem
 
 
-class BoughtItemsCard(TestCase):
+class ClientWithOrders(TestCase):
+    """A company, its buyer, and two variants of one product."""
+
     def setUp(self):
         self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
         self.book = Book.objects.create(name="Laleli Fabric")
@@ -50,6 +52,9 @@ class BoughtItemsCard(TestCase):
                                      quantity=Decimal(qty), price=Decimal(price))
         return order
 
+
+
+class BoughtItemsCard(ClientWithOrders):
     def _rows(self, url_name, pk):
         page = self.client.get(reverse(url_name, kwargs={"pk": pk}))
         return page.context["bought_items"], page.content.decode()
@@ -75,3 +80,47 @@ class BoughtItemsCard(TestCase):
         self._order("ORD-2", 9, [(self.cream, "30", "4.50")], status="cancelled")
         rows, _html = self._rows("crm:contact_detail", self.anna.pk)
         self.assertEqual([r["variant"] for r in rows], [self.white])
+
+
+class LastPricesForTheOrderForm(ClientWithOrders):
+    """The order form shows what the customer last paid for a variant, or
+    for another variant of the same product, named."""
+
+    def _prices(self, **params):
+        return self.client.get(reverse("operating:customer_last_prices"), params).json()["prices"]
+
+    def test_the_last_price_of_the_variant_asked_for(self):
+        self._order("ORD-1", 1, [(self.white, "100", "4.00")])
+        self._order("ORD-2", 9, [(self.white, "30", "4.50")])
+        prices = self._prices(type="company", pk=self.firm.pk, sku=["LINEN.WHITE"])
+        self.assertEqual(prices, {"linen.white": {
+            "price": "4.50", "symbol": "$", "currency": "USD", "date": "2026-10-09", "number": "ORD-2",
+            "other": False, "variant_sku": ""}})
+
+    def test_a_variant_never_bought_answers_with_another_of_its_product(self):
+        self._order("ORD-1", 1, [(self.white, "100", "4.00")])
+        self._order("ORD-2", 9, [(self.cream, "30", "4.50")])
+        sand = ProductVariant.objects.create(product=self.linen, variant_sku="LINEN.SAND")
+        prices = self._prices(type="company", pk=self.firm.pk, sku=["LINEN.SAND", "LINEN.WHITE"])
+        # The newest of the others.
+        self.assertEqual(prices["linen.sand"]["variant_sku"], "LINEN.CREAM")
+        self.assertTrue(prices["linen.sand"]["other"])
+        self.assertEqual(prices["linen.sand"]["price"], "4.50")
+        # Its own when it has one.
+        self.assertFalse(prices["linen.white"]["other"])
+        self.assertEqual(prices["linen.white"]["price"], "4.00")
+
+    def test_a_product_never_bought_has_no_entry(self):
+        self._order("ORD-1", 1, [(self.white, "100", "4.00")])
+        towel = Product.objects.create(title="Towel", sku="TOWEL", price=1)
+        ProductVariant.objects.create(product=towel, variant_sku="TOWEL.WHITE")
+        self.assertEqual(self._prices(type="company", pk=self.firm.pk, sku=["TOWEL.WHITE"]), {})
+
+    def test_an_edit_leaves_out_its_own_order(self):
+        self._order("ORD-1", 1, [(self.white, "100", "4.00")])
+        editing = self._order("ORD-2", 9, [(self.white, "30", "4.50")])
+        prices = self._prices(type="contact", pk=self.anna.pk, order=editing.pk, sku=["LINEN.WHITE"])
+        self.assertEqual(prices["linen.white"]["number"], "ORD-1")
+
+    def test_no_customer_no_prices(self):
+        self.assertEqual(self._prices(type="retail", pk="", sku=["LINEN.WHITE"]), {})

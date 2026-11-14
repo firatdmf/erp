@@ -548,6 +548,9 @@ class Order(models.Model):
         related_name='orders'
     )
     
+    # Retired: a rollup of the lines' production statuses that nothing
+    # reads or writes any more. order_status is the order's status. The
+    # column goes, and order_status takes the name, in the next release.
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     # Printed on the customer's copy — the order PDF, the emailed PDF, the
     # Excel and the sales invoice all carry it.
@@ -1318,25 +1321,6 @@ class Order(models.Model):
         first = (getattr(self, "guest_first_name", "") or "").strip()
         last = (getattr(self, "guest_last_name", "") or "").strip()
         return f"{first} {last}".strip()
-
-    # below function is used in signals.py
-    def update_status_from_items(self):
-        item_statuses = list(self.items.values_list("status", flat=True))
-
-        if all(s == "completed" for s in item_statuses):
-            self.status = "completed"
-        elif all(s == "ready" for s in item_statuses):
-            self.status = "ready"
-        elif "in_production" in item_statuses:
-            self.status = "in_production"
-        elif "pending" in item_statuses:
-            self.status = "pending"
-        elif any(s == "ready" for s in item_statuses):
-            self.status = "partially_ready"
-        else:
-            self.status = "pending"
-
-        self.save()
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None

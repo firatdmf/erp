@@ -4661,9 +4661,6 @@ class OrderEdit(UpdateView):
         if not (can_edit(request.user, self.object) or is_sales_rep(request.user)):
             messages.error(request, "You can only edit orders you created.")
             return redirect("operating:order_detail", pk=self.object.pk)
-        if self.object.status == "completed":
-            messages.error(request, "Completed orders cannot be edited.")
-            return HttpResponseForbidden("You cannot edit a completed order.")
         # Cancelled is TERMINAL (apply_order_status_change refuses any
         # transition away from it); returned is locked the same way while
         # in that status (it can only be revived through the status panel).
@@ -5543,7 +5540,6 @@ def machine_update_status(request):
             item.save()
             updated_count += 1
 
-        order.update_status_from_items()
         return JsonResponse({"success": True, "updated_items": updated_count})
 
     except Exception as e:
@@ -5571,8 +5567,6 @@ class MachineStatusUpdate(View):
             item = OrderItem.objects.get(pk=item_id)
             item.status = new_status
             item.save()
-
-            item.order.update_status_from_items()
 
             return JsonResponse(
                 {
@@ -7317,10 +7311,8 @@ def get_order_detail_api(request, user_id, order_id):
         order_data = {
             'id': order.pk,
             'order_number': f'ORD-{order.pk}',
-            # `status` is the legacy production rollup, kept so existing
-            # clients keep parsing. `order_status` is the real, customer-
-            # facing state — the one the rest of the API already returns.
-            'status': order.status,
+            # `order_status` goes once the storefront reads `status`.
+            'status': order.order_status,
             'order_status': order.order_status,
             'order_status_display': dict(
                 order._meta.get_field('order_status').choices
@@ -7626,7 +7618,7 @@ def track_order(request):
             'order': {
                 'id': order.pk,
                 'order_number': order.order_number or f"DK{str(order.pk).zfill(7)}",
-                'status': order.status,
+                'status': order.order_status,
                 'order_status': order.order_status,
                 'order_status_display': dict(order._meta.get_field('order_status').choices).get(order.order_status, order.order_status) if order.order_status else None,
                 'created_at': order.created_at.isoformat() if order.created_at else None,

@@ -14,12 +14,6 @@ from django.db import transaction
 # from .models import generate_machine_qr_for_order
 
 
-@receiver([post_save, post_delete], sender=OrderItem)
-def sync_order_status(sender, instance, **kwargs):
-    order = instance.order
-    order.update_status_from_items()
-
-
 # Catalog stock is NOT mirrored into the catalog any more, so the receivers
 # that used to do it are gone: _adjust_catalog_stock, the OrderItem pre/post
 # save + delete pair, and sync_catalog_stock_on_order_status_change.

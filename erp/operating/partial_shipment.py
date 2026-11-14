@@ -358,9 +358,4 @@ def split_off(order, ticked_pack_ids, quantities=None, moving_adjustments=(), us
             log_change(f, "created" if f not in whole else "field", field="continued_from",
                        new=_("The rest of %(n)s after part of it shipped")
                            % {"n": ", ".join(_number(h) for h in shipping)})
-        # Fresh copies: the ones in hand predate the updates above, and a
-        # save from them would put the old split group back.
-        for o in Order.objects.filter(pk__in=ship_ids | follow_ids):
-            o.update_status_from_items()
-
         return sorted(follow_ups, key=lambda o: o.pk)

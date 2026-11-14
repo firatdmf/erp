@@ -1229,11 +1229,6 @@
             {% elif order.order_status == 'returned' %}{% trans "Returned" %}
             {% else %}{{ order.order_status }}{% endif %}
           </span>
-        {% else %}
-          <span class="ord-status {{ order.status }}">
-            <span class="ord-status-dot"></span>
-            {{ order.get_status_display }}
-          </span>
         {% endif %}
       </div>
       {% comment %}An order split across books: one order on this page, two

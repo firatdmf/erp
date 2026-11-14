@@ -1320,7 +1320,7 @@ def get_user_orders(request, user_id):
             )
             orders_list.append({
                 'id': order.id,
-                'status': order.status,
+                'status': order.order_status,
                 'order_status': order.order_status,
                 'order_status_display': order_status_display,
                 'order_number': order.order_number,
@@ -1422,7 +1422,7 @@ def get_order_detail(request, user_id, order_id):
         order_data = {
             'id': order.id,
             'order_number': order.order_number,
-            'status': order.status,
+            'status': order.order_status,
             'order_status': order.order_status,
             'order_status_display': order_status_display,
             'payment_status': order.payment_status,

@@ -326,6 +326,31 @@
    navigate away to that order instead. */
 .od-order-pick { display: flex; align-items: center; gap: 10px; }
 .od-order-pick > .od-order-row { flex: 1; min-width: 0; }
+/* A row opens onto its lines beneath it, past the tick box. */
+.od-order-pick { flex-wrap: wrap; }
+.od-order-more {
+  flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--gray-500); cursor: pointer; font-size: 12px;
+}
+.od-order-more:hover { background: #E6F4F1; color: var(--nejum-teal-700); }
+.od-order-more[aria-expanded="true"] i { transform: rotate(180deg); }
+.od-order-lines {
+  flex-basis: 100%; margin-left: 25px; padding: 2px 12px;
+  border: 1px solid #E2E8EE; border-radius: 10px; background: #FAFBFC;
+}
+.od-order-line {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 8px 0;
+  border-top: 1px solid #EEF1F4; font: 500 12px var(--font-sans); color: var(--gray-600);
+}
+.od-order-line:first-child { border-top: 0; }
+.od-order-line-name { min-width: 0; font-weight: 700; color: #0F1419; overflow-wrap: anywhere; }
+.od-order-line-paid { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.od-order-line-paid b { margin-left: 12px; font-weight: 700; color: #0F1419; }
+/* The whole width of the line, under the name: each SKU in one piece. */
+.od-order-line-sku { grid-column: 1 / -1; font: 500 11px var(--font-mono); }
+/* Breaks between the two SKUs first; inside one only when it is wider than the line. */
+.od-order-line-sku > span { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.od-order-line-sku .sep { color: var(--gray-400); }
 .od-order-check, .od-account-check {
   flex: none; width: 15px; height: 15px; cursor: pointer;
   accent-color: var(--nejum-teal-600);

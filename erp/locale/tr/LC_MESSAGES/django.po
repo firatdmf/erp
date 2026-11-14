@@ -16413,3 +16413,21 @@ msgstr "Kaydedildi. Web sitesi stoğu bundan sonra bu kurallara göre sunar."
 
 msgid "Which countries it may be sent to"
 msgstr "Hangi ülkelere gönderilebilir"
+
+msgid "Bought items"
+msgstr "Satın aldıkları"
+
+msgid "Find by name or SKU"
+msgstr "Ad veya SKU ile bul"
+
+msgid "Nothing bought yet."
+msgstr "Henüz bir şey satın almadı."
+
+#, python-format
+msgid "%(counter)s order"
+msgid_plural "%(counter)s orders"
+msgstr[0] "%(counter)s sipariş"
+msgstr[1] "%(counter)s sipariş"
+
+msgid "Show the items"
+msgstr "Ürünleri göster"

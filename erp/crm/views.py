@@ -503,11 +503,16 @@ class ContactDetail(generic.DetailView):
         # One row per order — a split order's halves on one — each with
         # what it comes to.
         from operating.split_orders import order_rows
-        context["orders"] = order_rows(Order.with_pre_order_flag(
-            of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book")
-            .select_related("currency").prefetch_related("items", "adjustments")
+        orders = of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book")
+        # Each row opens onto its lines (attach_lines).
+        from operating.bought_items import attach_lines, bought_items, items_with_variant
+        context["orders"] = attach_lines(order_rows(Order.with_pre_order_flag(
+            orders.select_related("currency").prefetch_related(items_with_variant(), "adjustments")
             .order_by("-created_at")
-        )[:25])
+        )[:25]))
+        # Every variant they have bought and what they paid for it, so
+        # "have I sold them this before?" needs no order-by-order search.
+        context["bought_items"] = bought_items(orders)
 
         # ── Samples this contact has been given ───────────────
         from operating.samples import sample_card_context
@@ -676,11 +681,16 @@ class CompanyDetail(generic.DetailView):
         # One row per order — a split order's halves on one — each with
         # what it comes to.
         from operating.split_orders import order_rows
-        context["orders"] = order_rows(Order.with_pre_order_flag(
-            of_books_in_reach(Order.objects.filter(company=company), "current_account__book")
-            .select_related("currency").prefetch_related("items", "adjustments")
+        orders = of_books_in_reach(Order.objects.filter(company=company), "current_account__book")
+        # Each row opens onto its lines (attach_lines).
+        from operating.bought_items import attach_lines, bought_items, items_with_variant
+        context["orders"] = attach_lines(order_rows(Order.with_pre_order_flag(
+            orders.select_related("currency").prefetch_related(items_with_variant(), "adjustments")
             .order_by("-created_at")
-        )[:25])
+        )[:25]))
+        # Every variant they have bought and what they paid for it, so
+        # "have I sold them this before?" needs no order-by-order search.
+        context["bought_items"] = bought_items(orders)
 
         # ── Samples this company has been given ───────────────
         # Its own and its people's: a sample handed to the buyer is a

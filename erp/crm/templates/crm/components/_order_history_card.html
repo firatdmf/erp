@@ -71,6 +71,24 @@
         </div>
         <i class="fa fa-chevron-right od-order-chev"></i>
         </a>
+        {% comment %}Outside the anchor, like the tick box: opening the
+        lines must not open the order.{% endcomment %}
+        {% if o.row_lines %}
+          <button type="button" class="od-order-more" aria-expanded="false"
+                  title="{% trans 'Show the items' %}" aria-label="{% trans 'Show the items' %}"
+                  onclick="var open=this.getAttribute('aria-expanded')!=='true';this.setAttribute('aria-expanded',open);this.nextElementSibling.hidden=!open;">
+            <i class="fa fa-chevron-down"></i>
+          </button>
+          <div class="od-order-lines" hidden>
+            {% for line in o.row_lines %}
+              <div class="od-order-line">
+                <span class="od-order-line-name">{{ line.product.title }}</span>
+                <span class="od-order-line-paid">{{ line.quantity|floatformat:"-2g" }} {{ line.unit_short }}<b>{{ line.symbol }}{{ line.price|floatformat:"2g" }}</b></span>
+                <div class="od-order-line-sku"><span>{{ line.product.sku|default:"—" }}</span> <span class="sep">·</span> <span>{{ line.product_variant.variant_sku|default:"—" }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
       </div>
     {% empty %}
       <p class="od-empty-mute empty-state" style="padding: 8px 2px;">

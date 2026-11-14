@@ -1,0 +1,79 @@
+{% load i18n %}
+{% comment %}
+  Everything this client has bought, one row per variant, last bought
+  first: the product, its parent and variant SKU, the last price they paid
+  and how often they have bought it. A row opens onto every sale of it —
+  date, order, amount and price — so a price that changed over time shows.
+  Cancelled and returned orders are left out (operating.bought_items).
+
+  Expects: bought_items.
+{% endcomment %}
+<style>
+  .bgt-find { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; margin-bottom: 10px; border: 1px solid #DDE3EA; border-radius: 9px; font: 500 13.5px var(--font-sans); color: #0F1419; background: #fff; }
+  .bgt-find:focus { outline: none; border-color: #147F74; box-shadow: 0 0 0 3px rgba(20,127,116,.12); }
+  .bgt-list { display: flex; flex-direction: column; gap: 6px; max-height: 520px; overflow-y: auto; }
+  .bgt-row { border: 1px solid #E5E7EB; border-radius: 10px; background: #fff; }
+  .bgt-row[open] { border-color: #BFE0DB; }
+  .bgt-row > summary { list-style: none; display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 4px 12px; padding: 10px 12px; cursor: pointer; }
+  .bgt-row > summary::-webkit-details-marker { display: none; }
+  .bgt-name { min-width: 0; font: 700 13px var(--font-sans); color: #0F1419; overflow-wrap: anywhere; }
+  /* The last line, the whole width of the row: the SKUs, then the date. */
+  .bgt-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+  .bgt-sku { min-width: 0; font: 500 11.5px var(--font-mono); color: var(--gray-600); }
+  /* Last bought: beside the SKU when there is room, else under it — on the right either way. */
+  .bgt-date { margin-left: auto; white-space: nowrap; }
+  /* Breaks between the two SKUs first; inside one only when it is wider than the line. */
+  .bgt-sku > span { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+  .bgt-sku .sep { color: var(--gray-400); }
+  .bgt-paid { text-align: right; white-space: nowrap; display: flex; flex-direction: column; gap: 2px; }
+  .bgt-price { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
+  .bgt-price span, .bgt-meta { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .bgt-sales { display: flex; flex-direction: column; padding: 0 12px 8px; }
+  .bgt-sale { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 6px 0; border-top: 1px solid #F0F2F4; font: 500 12px var(--font-sans); color: var(--gray-600); text-decoration: none; }
+  .bgt-sale:hover .bgt-num { text-decoration: underline; }
+  .bgt-num { font-family: var(--font-mono); color: var(--nejum-teal-700, #147F74); }
+  .bgt-sale .bgt-price { margin-left: auto; font-size: 12px; }
+</style>
+<section class="od-card">
+  <div class="od-card-h">
+    <i class="fa fa-tags card-ico"></i>
+    <h3>{% trans "Bought items" %}</h3>
+    <span class="od-card-sub">{{ bought_items|length }} {% blocktrans count counter=bought_items|length %}variant{% plural %}variants{% endblocktrans %}</span>
+  </div>
+  {% if bought_items %}
+    {% if bought_items|length > 5 %}
+      <input type="search" class="bgt-find" placeholder="{% trans 'Find by name or SKU' %}"
+             aria-label="{% trans 'Find by name or SKU' %}"
+             oninput="var q=this.value.trim().toLowerCase();this.nextElementSibling.querySelectorAll('.bgt-row').forEach(function(r){r.hidden=q&&r.dataset.find.indexOf(q)<0;})">
+    {% endif %}
+    <div class="bgt-list">
+      {% for row in bought_items %}
+        <details class="bgt-row" data-find="{{ row.product.title|lower }} {{ row.product.sku|lower }} {{ row.variant.variant_sku|lower }}">
+          <summary>
+            <span class="bgt-name">{{ row.product.title }}</span>
+            <div class="bgt-paid">
+              <span class="bgt-price">{{ row.last.symbol }}{{ row.last.price|floatformat:"2g" }}<span> / {{ row.unit }}</span></span>
+              <span class="bgt-meta">{% blocktrans count counter=row.order_count %}{{ counter }} order{% plural %}{{ counter }} orders{% endblocktrans %} · {{ row.quantity|floatformat:"-2g" }} {{ row.unit }}</span>
+            </div>
+            <div class="bgt-foot">
+              <span class="bgt-sku"><span>{{ row.product.sku|default:"—" }}</span> <span class="sep">·</span> <span>{{ row.variant.variant_sku|default:"—" }}</span></span>
+              <span class="bgt-meta bgt-date">{{ row.last.date|date:"M d, Y" }}</span>
+            </div>
+          </summary>
+          <div class="bgt-sales">
+            {% for sale in row.sales %}
+              <a class="bgt-sale" href="{% url 'operating:order_detail' sale.order_pk %}">
+                <span>{{ sale.date|date:"M d, Y" }}</span>
+                <span class="bgt-num">{{ sale.number }}</span>
+                <span>{{ sale.quantity|floatformat:"-2g" }} {{ row.unit }}</span>
+                <span class="bgt-price">{{ sale.symbol }}{{ sale.price|floatformat:"2g" }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "Nothing bought yet." %}</p>
+  {% endif %}
+</section>

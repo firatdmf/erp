@@ -316,6 +316,7 @@ follow-up email campaign while it is still a prospect.
         {% if sees_orders %}
         {% trans "No orders yet for this company." as no_orders_text %}
         {% include "crm/components/_order_history_card.html" with empty_text=no_orders_text %}
+        {% include "crm/components/_bought_items_card.html" %}
         {% endif %}
 
         <!-- SAMPLES SENT -->

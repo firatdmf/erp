@@ -480,6 +480,24 @@ class PurchaseForCustomerTest(TestCase):
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
         self.assertContains(page, "Roll(s) SHELF03 are no longer reserved for the order.")
 
+    def test_a_received_purchase_cancel_names_the_order_holding_its_rolls(self):
+        """Its rolls were reserved for the order it was bought for on
+        arrival: the refusal says which rolls and which order, not
+        "another order"."""
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        order = Invoice.objects.get(pk=inv_id).for_order
+        codes = list(WarehouseProductItem.objects
+                     .filter(purchase_invoice_item__invoice_id=inv_id)
+                     .order_by("pk").values_list("barcode", flat=True))
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]),
+                             {"reason": "Wrong supplier"})
+        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.json()["error"],
+                         "Rolls from this purchase are on an order — %s reserved for order %s. "
+                         "Take them off the order first, then cancel."
+                         % (", ".join(codes), order.order_number))
+
     def test_moving_the_draft_to_another_books_warehouse_is_refused(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]
         r = self._save(self._plan(warehouse=self.other_wh, customer=False), pk=inv_id)

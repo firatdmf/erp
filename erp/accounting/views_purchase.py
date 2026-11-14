@@ -1079,9 +1079,11 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
                 order_ids = list(roll.reservations.values_list("order_id", flat=True).distinct())
                 blockers.append({"barcode": roll.barcode, "order_ids": order_ids})
         if blockers:
+            from operating.order_purchases import rolls_on_orders
             raise PurchaseCancelBlocked(
-                _gettext("Some rolls from this purchase are used on another order — the "
-                         "purchase can't be cancelled until that order is corrected."),
+                _gettext("Rolls from this purchase are on an order — %(rolls)s. Take them "
+                         "off the order first, then cancel.")
+                % {"rolls": rolls_on_orders(rolls)},
                 blockers,
             )
 

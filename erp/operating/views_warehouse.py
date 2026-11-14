@@ -5074,10 +5074,12 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
             for r in removed if r.reservations.exists()
         ]
         if blockers:
+            from .order_purchases import rolls_on_orders
             raise IntakeError({
                 "success": False,
-                "error": _gettext("Some rolls are used on another order and could not be "
-                                  "deleted. Correct that order first."),
+                "error": _gettext("Rolls you removed are on an order — %(rolls)s. Take them "
+                                  "off the order first, then delete them.")
+                % {"rolls": rolls_on_orders([r for r in removed if r.reservations.exists()])},
                 "blocked": blockers,
             }, status=422)
 

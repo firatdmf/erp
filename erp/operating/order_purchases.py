@@ -104,6 +104,28 @@ def _figure(value):
     return str(d.quantize(Decimal(1)) if d == d.to_integral() else d.normalize())
 
 
+def rolls_on_orders(rolls):
+    """Which of `rolls` an order holds, said by order: "TLS01, TLS02
+    reserved for order DK-352; TLS03 went out with order DK-360". For a
+    refusal to name what to correct and where, rather than "another
+    order" — usually it is the very order the purchase was bought for."""
+    from .models import OrderStockReservation
+
+    said = {}
+    for r in (OrderStockReservation.objects
+              .filter(stock_item__in=rolls, order__isnull=False)
+              .select_related("stock_item", "order").order_by("order_id", "stock_item_id")):
+        key = (r.order.order_number or str(r.order_id), r.consumed)
+        code = r.stock_item.barcode or "#%s" % r.stock_item_id
+        if code not in said.setdefault(key, []):
+            said[key].append(code)
+    return "; ".join(
+        (_("%(codes)s went out with order %(number)s") if consumed
+         else _("%(codes)s reserved for order %(number)s"))
+        % {"codes": ", ".join(codes), "number": number}
+        for (number, consumed), codes in said.items())
+
+
 def release_line_rolls(item):
     """Free the rolls reserved for `item` — its line is leaving the order.
     They are warehouse stock the order had set aside, free to sell again.

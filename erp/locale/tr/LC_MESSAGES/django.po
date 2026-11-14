@@ -11765,9 +11765,17 @@ msgstr "Stok eklendi ama alış faturası oluşturulamadı: %(error)s"
 msgid "You don't have goods-receipt permission — save the order and ask someone authorised to confirm it."
 msgstr "Mal kabul yetkiniz yok — siparişi kaydedip yetkili birinin onaylamasını isteyin."
 
-#: hardcoded Turkish moved to the catalogue as written
-msgid "Some rolls are used on another order and could not be deleted. Correct that order first."
-msgstr "Bazı toplar başka bir siparişte kullanılmış, silinemedi. Önce o siparişi düzeltin."
+#, python-format
+msgid "Rolls you removed are on an order — %(rolls)s. Take them off the order first, then delete them."
+msgstr "Çıkardığınız toplar bir siparişte — %(rolls)s. Önce siparişten çıkarın, sonra silin."
+
+#, python-format
+msgid "%(codes)s reserved for order %(number)s"
+msgstr "%(codes)s, %(number)s siparişi için rezerve"
+
+#, python-format
+msgid "%(codes)s went out with order %(number)s"
+msgstr "%(codes)s, %(number)s siparişiyle çıktı"
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format
@@ -11789,9 +11797,9 @@ msgstr "Katalog senkron hatası: %(error)s"
 msgid "SKU '%(sku)s' is longer than 20 characters — no catalogue variant was created."
 msgstr "SKU '%(sku)s' 20 karakteri aşıyor — katalog varyantı oluşturulmadı."
 
-#: hardcoded Turkish moved to the catalogue as written
-msgid "Some rolls from this purchase are used on another order — the purchase can't be cancelled until that order is corrected."
-msgstr "Bu alımdaki bazı toplar başka bir siparişte kullanılmış — önce o siparişi düzeltmeden alım iptal edilemez."
+#, python-format
+msgid "Rolls from this purchase are on an order — %(rolls)s. Take them off the order first, then cancel."
+msgstr "Bu alımın topları bir siparişte — %(rolls)s. Önce siparişten çıkarın, sonra iptal edin."
 
 #: hardcoded Turkish moved to the catalogue as written
 #, python-format

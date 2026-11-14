@@ -130,6 +130,10 @@
   .ch-detail { color: var(--gray-700); }
   .ch-detail .lbl { font-weight: 700; color: #0F1419; }
   .ch-detail .item { font-weight: 700; color: #0F1419; }
+  .ch-detail .ch-po { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;
+    padding: 1px 8px; border-radius: 999px; background: #EEF2FF; color: #3730A3;
+    font: 700 11px var(--font-sans); text-decoration: none; white-space: nowrap; }
+  .ch-detail .ch-po:hover { background: #E0E7FF; }
   .ch-vals { margin-top: 3px; }
   .ch-old { color: #B91C1C; text-decoration: line-through; text-decoration-color: rgba(185,28,28,0.5); }
   .ch-arrow { color: var(--gray-400); margin: 0 6px; }
@@ -298,8 +302,9 @@
             </span>
           </td>
           <td class="ch-detail">
+            {% if c.purchase %}<a class="ch-po" href="{% url 'accounts:purchase_order_detail' c.purchase.pk %}" title="{% trans 'Changed on the purchase' %}"><i class="fa fa-truck"></i> {{ c.purchase.number }}</a>{% endif %}
             {% if c.action == 'created' %}
-              {% trans "Order created" %}{% if c.new_display %} · <span class="item">{{ c.new_display }}</span>{% endif %}
+              {% if c.purchase %}{{ c.action_display }}{% else %}{% trans "Order created" %}{% endif %}{% if c.new_display %} · <span class="item">{{ c.new_display }}</span>{% endif %}
             {% elif c.action == 'item_added' %}
               <span class="item">{{ c.item_label|default:"—" }}</span>
               {% if c.new_display %}<div class="ch-vals"><span class="ch-new">{{ c.new_display }}</span></div>{% endif %}

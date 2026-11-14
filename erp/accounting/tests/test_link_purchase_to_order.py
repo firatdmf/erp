@@ -451,8 +451,12 @@ class LinkPurchaseToOrderTest(TestCase):
         plan["in_place"] = True
         r = self._save(plan)
         self.assertEqual(r.status_code, 200, r.content)
-        [notice] = r.json()["notices"]
-        self.assertIn("K24644.G07", notice)
+        notices = r.json()["notices"]
+        # What the save changed on the order, and the price it gave way to.
+        self.assertEqual(len(notices), 2, notices)
+        self.assertTrue(notices[0].startswith("Order %s changed with this purchase:"
+                                              % self.order.order_number), notices)
+        self.assertTrue(all("K24644.G07" in n for n in notices), notices)
         # …and leaves none for the next page.
         page = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertEqual(list(page.context["messages"]), [])

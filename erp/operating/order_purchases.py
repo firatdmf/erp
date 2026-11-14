@@ -83,17 +83,44 @@ def packing_state(order):
 
 
 def held_line_ids(order):
-    """The lines rolls are held for. Those stay as they are; every other
-    line a purchase feeds follows the purchase until the order ships,
-    packaging included — a shelf roll held for one line must not freeze
-    the lines a purchase brings in (order 351 kept 3009 ecru 320 after its
-    purchase turned 330, so the roll that came in matched nothing)."""
+    """The lines rolls are reserved for. The order page leaves their
+    quantity editable (purchase_locked_lines): a roll scanned or
+    re-measured there sets it."""
     return set(order.stock_reservations.filter(consumed=False)
                .values_list("order_item_id", flat=True))
 
 
 def _line_skus(items):
     return ", ".join(sorted(it.product_variant.variant_sku or str(it.pk) for it in items))
+
+
+def _line_sku(item):
+    return (item.product_variant.variant_sku if item.product_variant_id else "") or str(item.pk)
+
+
+def _figure(value):
+    """50.00 → 50, 20.60 → 20.6: a quantity as a sentence says it."""
+    d = _decimal(value)
+    return str(d.quantize(Decimal(1)) if d == d.to_integral() else d.normalize())
+
+
+def release_line_rolls(item):
+    """Put the rolls reserved for `item` back on the shelf — its line is
+    leaving the order, or turning into another variant the rolls aren't.
+    Written in the order's history, roll by roll. Returns the barcodes."""
+    from .audit import _item_label, log_change
+    from .models import OrderStockReservation
+
+    reservations = list(OrderStockReservation.objects
+                        .filter(order_item=item, consumed=False)
+                        .select_related("stock_item").order_by("pk"))
+    if not reservations:
+        return []
+    codes = [r.stock_item.barcode or "#%s" % r.stock_item_id for r in reservations]
+    log_change(item.order_id, "item_updated", field="rolls", item_label=_item_label(item),
+               old=", ".join(codes), new=_("back on the shelf"))
+    OrderStockReservation.objects.filter(pk__in=[r.pk for r in reservations]).delete()
+    return codes
 
 
 def plan_quantities(plan):
@@ -163,36 +190,40 @@ def locked_line_error(item, invoices, *, removing=False):
 def purchase_cancel_warning(invoice):
     """What cancelling `invoice` will do to the customer order it was
     bought for, said before the cancel is confirmed: which of its lines
-    come off, which stay because rolls are held for them, and whether the
-    order is cancelled too. Empty when there is no open order to speak of."""
+    come off, which stay at what other purchases bring, which rolls go back
+    on the shelf, and whether the order is cancelled too. Empty when there
+    is no open order to speak of."""
+    from .models import OrderStockReservation
+
     order = invoice.for_order
     if order is None or invoice.status == "cancelled" or not order_is_open(order):
         return ""
     number = order.order_number or order.pk
     skus = plan_variant_skus(invoice.intake_plan)
     items = list(order.items.select_related("product_variant"))
-    held = held_line_ids(order)
     others = other_purchase_quantities(order, invoice)
     ours = [it for it in items
             if it.product_variant_id and (it.product_variant.variant_sku or "").lower() in skus]
     # A line another purchase also brings stays, at that purchase's share.
-    shared = [it for it in ours if it.pk not in held
-              and others.get((it.product_variant.variant_sku or "").lower(), 0) > 0]
-    going = [it for it in ours if it.pk not in held and it not in shared]
-    staying = [it for it in ours if it.pk in held]
+    shared = [it for it in ours
+              if others.get((it.product_variant.variant_sku or "").lower(), 0) > 0]
+    going = [it for it in ours if it not in shared]
+    codes = [r.stock_item.barcode or "#%s" % r.stock_item_id
+             for r in (OrderStockReservation.objects
+                       .filter(order_item__in=going, consumed=False)
+                       .select_related("stock_item").order_by("pk"))]
+    rolls_note = (" " + _("Roll(s) %(codes)s go back on the shelf.")
+                  % {"codes": ", ".join(codes)}) if codes else ""
     if items and len(going) == len(items):
         return (_("Order %(number)s: all its lines come from this purchase, so the order "
-                  "is cancelled too.") % {"number": number})
+                  "is cancelled too.") % {"number": number}) + rolls_note
     warning = (_("Order %(number)s: its %(count)s line(s) from this purchase are removed; "
                  "the order stays open with the rest.")
                % {"number": number, "count": len(going)})
     if shared:
         warning += " " + (_("%(skus)s stay at what the other purchases bring.")
                           % {"skus": _line_skus(shared)})
-    if staying:
-        warning += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
-                          % {"skus": _line_skus(staying)})
-    return warning
+    return warning + rolls_note
 
 
 def order_is_open(order):
@@ -403,8 +434,9 @@ def plan_expected_rolls(plan, sku):
 
 def sync_customer_order(invoice, customer, lines, *, book, member=None, previous_skus=()):
     """Create the customer order `invoice` is bought for, or bring its
-    lines in step with the purchase. Returns a user-facing warning when the
-    order could not be changed, else None.
+    lines in step with the purchase. Returns what the purchase page says
+    about the order — what this save changed on it, or why it could not —
+    else None.
 
     Lines are matched by variant. A line fed by several purchases comes to
     their sum: this purchase's rows plus what the order's other purchases
@@ -413,9 +445,9 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     purchase still brings it — then it falls back to what the others bring;
     anything added on the order itself is the order's business. The lines
     follow until the order ships, packaging included; a shipped order is
-    left as it is. So, for now, is a line rolls are already held for — the
-    other lines still follow — and the purchase names it rather than
-    rewriting it under the packers.
+    left as it is. Rolls reserved for a line stay with it when its quantity
+    changes, and go back on the shelf when its row leaves the purchase or
+    turns into another variant (release_line_rolls).
     """
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
@@ -453,9 +485,8 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     existing = {it.product_variant_id: it
                 for it in order.items.select_related("product_variant")}
     previous = {s.lower() for s in previous_skus}
-    held = set() if created else held_line_ids(order)
     others = {} if created else other_purchase_quantities(order, invoice)
-    kept = []   # lines this save would have changed, left for their held rolls
+    said = []   # what this save did to the order, for the purchase page to say
     # One entry per variant: two rows of one variant on this purchase are
     # one line on the order, their quantities summed.
     merged = {}
@@ -478,30 +509,42 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                                          product_variant=variant,
                                          quantity=qty, price=price)
                 changed += 1
+                said.append(_("%(sku)s added, %(qty)s") % {"sku": variant.variant_sku,
+                                                            "qty": _figure(qty)})
             elif item.quantity != qty:
                 # Only the quantity: the sale price is the order's, one per
                 # line, and the purchase follows it (align_plan_sale_prices).
-                if item.pk in held:
-                    kept.append(item)
-                    continue
+                # Rolls reserved for the line stay reserved — whole rolls go
+                # with the order.
+                said.append(_("%(sku)s %(old)s → %(new)s")
+                            % {"sku": variant.variant_sku, "old": _figure(item.quantity),
+                               "new": _figure(qty)})
                 item.quantity = qty
                 item.save(update_fields=["quantity"])
                 changed += 1
+        # Rows gone from the purchase — removed, or turned into another
+        # variant (that one was added above): their lines leave the order,
+        # and the rolls reserved for them go back on the shelf.
         for variant_id, item in existing.items():
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if variant_id not in wanted and sku in previous:
                 rest = _as_line_decimal(others.get(sku, Decimal("0")))
                 if rest > 0 and item.quantity == rest:
                     continue
-                if item.pk in held:
-                    kept.append(item)
-                    continue
                 if rest > 0:
                     # Another purchase still brings it: the line is theirs.
+                    said.append(_("%(sku)s %(old)s → %(new)s")
+                                % {"sku": _line_sku(item), "old": _figure(item.quantity),
+                                   "new": _figure(rest)})
                     item.quantity = rest
                     item.save(update_fields=["quantity"])
                 else:
+                    codes = release_line_rolls(item)
                     item.delete()
+                    said.append(_("%(sku)s removed") % {"sku": _line_sku(item)})
+                    if codes:
+                        said.append(_("roll(s) %(codes)s back on the shelf")
+                                    % {"codes": ", ".join(codes)})
                 changed += 1
     if changed and not created:
         # The item rows above are logged by operating.audit as they
@@ -526,10 +569,9 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
             # page can still be printed without it.
             pass
     post_order_movement(order, member=member)
-    if kept:
-        return (_("Order %(number)s: rolls are already held for %(skus)s, so those lines "
-                  "were not changed — edit them on the order.")
-                % {"number": order.order_number or order.pk, "skus": _line_skus(kept)})
+    if said and not created:
+        return (_("Order %(number)s changed with this purchase: %(changes)s.")
+                % {"number": order.order_number or order.pk, "changes": "; ".join(said)})
     return None
 
 
@@ -776,18 +818,14 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         return None
     number = order.order_number or order.pk
     skus = plan_variant_skus(invoice.intake_plan)
-    held = held_line_ids(order)
     others = other_purchase_quantities(order, invoice)
     removed = 0
-    kept = []
     lowered = []    # lines other purchases still bring: down to their share
+    shelved = []    # barcodes of the rolls the removed lines had reserved
     with syncing():
         for item in order.items.select_related("product_variant"):
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if sku in skus:
-                if item.pk in held:
-                    kept.append(item)
-                    continue
                 rest = _as_line_decimal(others.get(sku, Decimal("0")))
                 if rest > 0:
                     if item.quantity != rest:
@@ -795,11 +833,14 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
                         item.save(update_fields=["quantity"])
                     lowered.append(item)
                     continue
+                shelved += release_line_rolls(item)
                 item.delete()
                 removed += 1
         log_change(order, "field", field="purchase",
                    new=_("%(number)s cancelled — %(count)s line(s) removed")
                    % {"number": invoice.number, "count": removed})
+        rolls_note = (_("Roll(s) %(codes)s went back on the shelf.")
+                      % {"codes": ", ".join(shelved)}) if shelved else ""
         if order.items.exists():
             said = (_("Its %(count)s line(s) were removed from order %(number)s, which "
                       "stays open with what else is on it.")
@@ -807,9 +848,8 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
             if lowered:
                 said += " " + (_("%(skus)s stay at what the other purchases bring.")
                                % {"skus": _line_skus(lowered)})
-            if kept:
-                said += " " + (_("Rolls are already held for %(skus)s, so those lines stay.")
-                               % {"skus": _line_skus(kept)})
+            if rolls_note:
+                said += " " + rolls_note
             return said
         # A half of a split order emptied while another half still has goods
         # on it: only this half is called off. The status funnel moves every
@@ -833,7 +873,9 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         created_by=user if getattr(user, "is_authenticated", False) else None,
     )
     if rest_goes_ahead:
-        return (_("Order %(number)s had nothing else on it and was cancelled too. "
+        said = (_("Order %(number)s had nothing else on it and was cancelled too. "
                   "The rest of the split order stays open.") % {"number": number})
-    return (_("Order %(number)s had nothing else on it and was cancelled too.")
-            % {"number": number})
+    else:
+        said = (_("Order %(number)s had nothing else on it and was cancelled too.")
+                % {"number": number})
+    return f"{said} {rolls_note}".strip()

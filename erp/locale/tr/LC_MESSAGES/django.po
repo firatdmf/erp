@@ -12777,6 +12777,37 @@ msgctxt "order change"
 msgid "Field updated"
 msgstr "Bilgi güncellendi"
 
+msgctxt "order change"
+msgid "rolls"
+msgstr "Rezerve toplar"
+
+msgid "back on the shelf"
+msgstr "rafa geri döndü"
+
+msgid "%(sku)s added, %(qty)s"
+msgstr "%(sku)s eklendi, %(qty)s"
+
+msgid "%(sku)s %(old)s → %(new)s"
+msgstr "%(sku)s %(old)s → %(new)s"
+
+msgid "%(sku)s removed"
+msgstr "%(sku)s çıkarıldı"
+
+msgid "roll(s) %(codes)s back on the shelf"
+msgstr "%(codes)s topları rafa geri döndü"
+
+msgid "Order %(number)s changed with this purchase: %(changes)s."
+msgstr "%(number)s siparişi bu alımla değişti: %(changes)s."
+
+msgid "Roll(s) %(codes)s went back on the shelf."
+msgstr "%(codes)s topları rafa geri döndü."
+
+msgid "Roll(s) %(codes)s go back on the shelf."
+msgstr "%(codes)s topları rafa geri döner."
+
+msgid "Changed on the purchase"
+msgstr "Alımda değiştirildi"
+
 msgctxt "stock movement reason"
 msgid "Order edit · reversed"
 msgstr "Sipariş düzenleme iadesi"

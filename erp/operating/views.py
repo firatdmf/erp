@@ -607,10 +607,12 @@ class OrderDetail(DetailView):
         ctx["reservation_count"] = sum(1 for r in reservations if not r.consumed)
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
         # Change history preview (full page at order_changes).
-        ctx["order_changes_preview"] = _decorate_order_changes(list(
+        # The order's purchases' history reads alongside its own.
+        purchase_changes = _purchase_changes_for_order(self.object, self.request.user)
+        ctx["order_changes_preview"] = _newest_first(_decorate_order_changes(list(
             self.object.change_logs.select_related("created_by")[:8]
-        ), self.object)
-        ctx["order_changes_count"] = self.object.change_logs.count()
+        ), self.object), purchase_changes)[:8]
+        ctx["order_changes_count"] = self.object.change_logs.count() + len(purchase_changes)
 
         # An order split across books is one order on this page: its name
         # lists every half, and the other halves' lines and totals show
@@ -3204,6 +3206,36 @@ def _decorate_order_changes(changes, order):
     return changes
 
 
+def _purchase_changes_for_order(order, user, qs=None):
+    """The history of the purchases bought for `order`, as rows its own
+    history shows beside the order's: each one says which purchase it is
+    (c.purchase). Only what was done on the purchase — a change made on
+    the order and passed to the purchase is the order's own row already.
+    Nobody who may not see the order's purchases sees these: a purchase's
+    history carries supplier prices. `qs` narrows it (the history page's
+    filters); rows come back decorated, newest first."""
+    from accounting.models_accounts import PurchaseChange
+    from accounting.purchase_audit import decorate_changes
+    from erp.roles import is_sales_rep
+
+    if is_sales_rep(user):
+        return []
+    if qs is None:
+        qs = PurchaseChange.objects.all()
+    rows = list(qs.filter(invoice__for_order=order, origin="purchase")
+                .select_related("created_by", "invoice").order_by("-created_at", "-id"))
+    decorate_changes(rows)
+    for c in rows:
+        c.purchase = c.invoice
+        c.old_display, c.new_display = c.old_value, c.new_value
+    return rows
+
+
+def _newest_first(*histories):
+    return sorted((c for rows in histories for c in rows),
+                  key=lambda c: c.created_at, reverse=True)
+
+
 @login_required
 def order_changes(request, pk):
     """Dedicated filterable page for an order's full change history.
@@ -3214,36 +3246,53 @@ def order_changes(request, pk):
     from django.db.models import Q as _Q
     from .models import OrderChange
 
+    from accounting.models_accounts import PurchaseChange
+
     order = get_object_or_404(Order, pk=pk)
     qs = (OrderChange.objects.filter(order=order)
           .select_related("created_by"))
+    # The order's purchases' history reads alongside its own, through the
+    # same filters (both logs share their action names).
+    pqs = PurchaseChange.objects.all()
 
     action = (request.GET.get("action") or "").strip()
     if action in {k for k, _ in OrderChange.ACTION_CHOICES}:
         qs = qs.filter(action=action)
+        pqs = pqs.filter(action=action)
 
     date_from = (request.GET.get("from") or "").strip()
     date_to = (request.GET.get("to") or "").strip()
     try:
         if date_from:
-            qs = qs.filter(created_at__date__gte=_dt.strptime(date_from, "%Y-%m-%d").date())
+            day = _dt.strptime(date_from, "%Y-%m-%d").date()
+            qs = qs.filter(created_at__date__gte=day)
+            pqs = pqs.filter(created_at__date__gte=day)
     except ValueError:
         pass
     try:
         if date_to:
-            qs = qs.filter(created_at__date__lte=_dt.strptime(date_to, "%Y-%m-%d").date())
+            day = _dt.strptime(date_to, "%Y-%m-%d").date()
+            qs = qs.filter(created_at__date__lte=day)
+            pqs = pqs.filter(created_at__date__lte=day)
     except ValueError:
         pass
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        qs = qs.filter(_Q(item_label__icontains=q) | _Q(field__icontains=q)
-                       | _Q(old_value__icontains=q) | _Q(new_value__icontains=q)
-                       | _Q(created_by__username__icontains=q))
+        match = (_Q(item_label__icontains=q) | _Q(field__icontains=q)
+                 | _Q(old_value__icontains=q) | _Q(new_value__icontains=q)
+                 | _Q(created_by__username__icontains=q))
+        qs = qs.filter(match)
+        pqs = pqs.filter(match | _Q(invoice__number__icontains=q))
 
     qs = qs.order_by("-created_at", "-id")
+    purchase_rows = _purchase_changes_for_order(order, request.user, pqs)
 
-    paginator = Paginator(qs, 50)
+    if purchase_rows:
+        rows = _newest_first(_decorate_order_changes(list(qs), order), purchase_rows)
+    else:
+        rows = qs
+    paginator = Paginator(rows, 50)
     try:
         page = paginator.page(request.GET.get("page", 1))
     except (EmptyPage, PageNotAnInteger, ValueError):
@@ -3256,7 +3305,8 @@ def order_changes(request, pk):
         "order": order,
         "page_obj": page,
         "paginator": paginator,
-        "changes": _decorate_order_changes(list(page.object_list), order),
+        "changes": (list(page.object_list) if purchase_rows
+                    else _decorate_order_changes(list(page.object_list), order)),
         "filter_qs": qd.urlencode(),
         "filters": {"action": action, "from": date_from, "to": date_to, "q": q},
     })

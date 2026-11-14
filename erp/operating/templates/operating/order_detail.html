@@ -1955,6 +1955,7 @@
               {{ c.action_display }}
             </span>
             <span class="od-chg-txt" style="flex:1; min-width:0; font:500 12.5px var(--font-sans); color:#374151; line-height:1.45;">
+              {% if c.purchase %}<a href="{% url 'accounts:purchase_order_detail' c.purchase.pk %}" title="{% trans 'Changed on the purchase' %}" style="display:inline-flex; align-items:center; gap:4px; margin-right:4px; padding:0 7px; border-radius:999px; background:#EEF2FF; color:#3730A3; font:700 10.5px var(--font-sans); text-decoration:none; white-space:nowrap;"><i class="fa fa-truck"></i> {{ c.purchase.number }}</a>{% endif %}
               {% if c.item_label %}<b style="color:#0F1419;">{{ c.item_label|truncatechars:44 }}</b>{% if c.field_display %} · {{ c.field_display }}{% endif %}{% elif c.field_display %}<b style="color:#0F1419;">{{ c.field_display }}</b>{% endif %}
               {% if c.old_display and c.new_display %}
                 <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_display|truncatechars:26 }}</span>

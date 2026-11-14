@@ -122,6 +122,14 @@
     padding-top: 12px;
     border-top: 1px solid #e0e7ff;
   }
+  .wh-reach-modes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .wh-form-field .wh-reach-modes label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; font-weight: 600; color: #0f172a; text-transform: none; letter-spacing: 0; cursor: pointer; }
+  .wh-form-field .wh-reach-modes input { width: auto; min-height: 0; padding: 0; margin: 0; accent-color: #6366f1; }
+  .wh-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .wh-chip { display: inline-flex; align-items: center; gap: 2px; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 4px 4px 4px 10px; font-size: 12.5px; font-weight: 600; }
+  .wh-chip button { background: none; border: 0; color: #6366f1; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 5px !important; }
+  .wh-form-field .wh-chips select { width: auto; max-width: 100%; padding: 6px 10px; font-size: 13px; }
+  .wh-reach-best { margin-top: 12px; }
   .wh-store-place {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -288,7 +296,35 @@
             </select>
           </div>
           <div class="hint">{% trans "Where the storefront says this stock stands. Left blank, it shows the warehouse name." %}</div>
-          <div class="hint"><a href="{% url 'operating:shipping_rules' %}">{% trans "Which countries it may be sent to" %} →</a></div>
+        </div>
+        {# Shipping reach (operating/shipping.py): where this warehouse's goods may be sent. #}
+        <div class="wh-store-name" id="wh-reach">
+          <label>{% trans "Shipping reach" %}</label>
+          <div class="wh-reach-modes" role="radiogroup">
+            {% for value, label in ships_to_choices %}
+              <label><input type="radio" name="ships_to" value="{{ value }}" {% if warehouse.ships_to|default:"everywhere" == value %}checked{% endif %}> {{ label }}</label>
+            {% endfor %}
+          </div>
+          <div class="wh-chips" data-field="ships_to_countries" id="wh-reach-list">
+            {% for code in warehouse.ships_to_countries %}<span class="wh-chip"><input type="hidden" name="ships_to_countries" value="{{ code }}">{{ code|country_name }}<button type="button" aria-label="{% trans 'Remove' %}">×</button></span>{% endfor %}
+            <select data-add="ships_to_countries" aria-label="{% trans 'Add a country' %}">
+              <option value="">+ {% trans "Add a country" %}</option>
+              {% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="hint">{% trans "It always ships inside its own country. A country that takes no goods from abroad goes in the except list of each warehouse outside it." %}</div>
+
+          <div class="wh-reach-best">
+            <label>{% trans "Ships best to" %}</label>
+            <div class="wh-chips" data-field="ships_best_to">
+              {% for code in warehouse.ships_best_to %}<span class="wh-chip"><input type="hidden" name="ships_best_to" value="{{ code }}">{{ code|country_name }}<button type="button" aria-label="{% trans 'Remove' %}">×</button></span>{% endfor %}
+              <select data-add="ships_best_to" aria-label="{% trans 'Add a country' %}">
+                <option value="">+ {% trans "Add a country" %}</option>
+                {% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="hint">{% trans "Optional. Buyers in these countries are offered this warehouse first, before nearer ones — for a customs union or a cheap route." %}</div>
+          </div>
         </div>
       </div>
 
@@ -375,5 +411,39 @@
     }
   }
   whKindToggle();
+</script>
+<script>
+// Shipping reach: country chips, and the list shown only for "only" / "except".
+(function () {
+  const reach = document.getElementById('wh-reach');
+  if (!reach) return;
+  const list = document.getElementById('wh-reach-list');
+  const sync = () => {
+    const mode = (reach.querySelector('input[name=ships_to]:checked') || {}).value;
+    list.hidden = mode !== 'only' && mode !== 'except';
+  };
+  reach.addEventListener('change', (e) => {
+    const sel = e.target.closest('select[data-add]');
+    if (sel && sel.value) {
+      const field = sel.dataset.add;
+      const box = sel.parentElement;
+      if (![...box.querySelectorAll('input[type=hidden]')].some(i => i.value === sel.value)) {
+        const chip = document.createElement('span');
+        chip.className = 'wh-chip';
+        const input = Object.assign(document.createElement('input'), { type: 'hidden', name: field, value: sel.value });
+        const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: '×' });
+        remove.setAttribute('aria-label', '{{ _("Remove")|escapejs }}');
+        chip.append(input, sel.selectedOptions[0].textContent, remove);
+        box.insertBefore(chip, sel);
+      }
+      sel.value = '';
+    }
+    sync();
+  });
+  reach.addEventListener('click', (e) => {
+    if (e.target.closest('.wh-chip button')) e.target.closest('.wh-chip').remove();
+  });
+  sync();
+})();
 </script>
 {% endblock %}

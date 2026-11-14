@@ -1,15 +1,15 @@
-"""Which warehouses may send goods to a buyer's country, and in what order
-to offer them (the storefront's roll picker, and the web order after it).
+"""Shipping reach: which warehouses may send goods to a buyer's country,
+and in what order to offer them (the storefront's roll picker, and the
+web order after it).
 
-A warehouse always ships inside its own country. To another country it
-ships unless that country's ShippingRule says otherwise: nothing from
-abroad, or not from these countries. Of the warehouse countries that may,
-the buyer's own comes first, then those the rule says ship there best,
-then the rest, nearest first.
+Each warehouse says where its goods may go (Warehouse.ships_to): every
+country, only those listed, or every one but those listed. It always
+ships inside its own country. Of the warehouses that may, the buyer's own
+country's come first, then those that ship there best
+(Warehouse.ships_best_to), then the rest, nearest first.
 
-A warehouse with no country typed in can't be judged, so no rule stops
-it; nor can a buyer whose country isn't known — everything is offered
-and the web order checks again against the delivery address.
+A buyer whose country isn't known is offered everything; the web order
+checks again against the delivery address.
 """
 from math import asin, cos, radians, sin, sqrt
 
@@ -22,21 +22,16 @@ def code(value):
     return value if len(value) == 2 and value.isalpha() else ""
 
 
-def rules():
-    """{destination code: ShippingRule}."""
-    from .models import ShippingRule
-    return {rule.destination: rule for rule in ShippingRule.objects.all()}
-
-
-def can_ship(origin, destination, known=None):
-    """Whether a warehouse in `origin` may send to `destination`."""
-    origin, destination = code(origin), code(destination)
-    if not origin or not destination or origin == destination:
+def can_ship(warehouse, destination):
+    """Whether `warehouse` may send to `destination`."""
+    destination = code(destination)
+    if not destination or destination == code(warehouse.country):
         return True
-    rule = (rules() if known is None else known).get(destination)
-    if rule is None:
-        return True
-    return not rule.only_from_inside and origin not in rule.not_from
+    if warehouse.ships_to == "only":
+        return destination in warehouse.ships_to_countries
+    if warehouse.ships_to == "except":
+        return destination not in warehouse.ships_to_countries
+    return True
 
 
 def distance_km(a, b):
@@ -49,18 +44,15 @@ def distance_km(a, b):
     return round(2 * 6371 * asin(sqrt(h)))
 
 
-def preference(origin, destination, known=None):
+def preference(warehouse, destination):
     """A sort key: lower is offered first. Own country, then "ships best
-    from", then nearest; unknown places last among equals."""
-    origin, destination = code(origin), code(destination)
-    if not destination:
+    to", then nearest; a warehouse with no country last among equals."""
+    destination = code(destination)
+    if not destination or code(warehouse.country) == destination:
         return (0, 0)
-    if origin == destination:
-        return (0, 0)
-    rule = (rules() if known is None else known).get(destination)
-    if rule is not None and origin in rule.best_from:
-        return (1, rule.best_from.index(origin))
-    km = distance_km(origin, destination)
+    if destination in warehouse.ships_best_to:
+        return (1, 0)
+    km = distance_km(warehouse.country, destination)
     return (2, km if km is not None else 10 ** 6)
 
 

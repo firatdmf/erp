@@ -1579,6 +1579,7 @@ def _combined_form_ctx(warehouse=None, request=None):
     ).order_by('name'))
     ctx = {
         'warehouse': warehouse,
+        'ships_to_choices': Warehouse.SHIPS_TO_CHOICES,
         'books': _get_book_choices(request),
         # Only warehouses from books this member works in: MERGING another
         # book's warehouse in is a decision to browse the two together,
@@ -1676,12 +1677,16 @@ class WarehouseCreate(View):
             messages.error(request, book_err)
             return render(request, self.template_name, _combined_form_ctx(request=request))
 
+        ships_to, ships_to_countries, ships_best_to = _warehouse_reach(request)
         wh = Warehouse.objects.create(
             name=name,
             location=location or None,
             city=city,
             country=country,
             on_storefront=on_storefront,
+            ships_to=ships_to,
+            ships_to_countries=ships_to_countries,
+            ships_best_to=ships_best_to,
             description=description or None,
             accounting_book=book,
             kind=kind,
@@ -1690,6 +1695,28 @@ class WarehouseCreate(View):
             wh.combined_sources.set(sources)
         messages.success(request, f"Warehouse '{wh.name}' created")
         return redirect(reverse('operating:warehouse_detail', args=[wh.pk]))
+
+
+def _warehouse_reach(request):
+    """The shipping reach a warehouse form posted (operating.shipping):
+    ships_to, its countries, and the countries it ships best to — codes
+    from the list, each once; "every country" keeps no list."""
+    from .countries import country_choices
+    known = {code for code, _name in country_choices()}
+
+    def codes(field):
+        out = []
+        for value in request.POST.getlist(field):
+            value = (value or '').strip().upper()
+            if value in known and value not in out:
+                out.append(value)
+        return out
+
+    ships_to = request.POST.get('ships_to')
+    countries = codes('ships_to_countries')
+    if ships_to not in ('only', 'except') or not countries:
+        ships_to, countries = 'everywhere', []
+    return ships_to, countries, codes('ships_best_to')
 
 
 def _warehouse_place(request):
@@ -1810,6 +1837,8 @@ class WarehouseEdit(View):
         warehouse.country = country
         switched = warehouse.on_storefront != on_storefront
         warehouse.on_storefront = on_storefront
+        warehouse.ships_to, warehouse.ships_to_countries, warehouse.ships_best_to = \
+            _warehouse_reach(request)
         warehouse.description = description or None
         warehouse.kind = kind
 

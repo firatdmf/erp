@@ -1794,6 +1794,20 @@ class Warehouse(models.Model):
     # warehouse, so publishing stock is somebody's decision. Staff sell
     # from every warehouse either way.
     on_storefront = models.BooleanField(default=False)
+    # Shipping reach: which countries this warehouse's goods may be sent
+    # to (operating.shipping). Always its own country; to others, every
+    # one, only those listed, or every one but those listed — Almaty's
+    # textiles can't go into Türkiye.
+    SHIPS_TO_CHOICES = [
+        ("everywhere", _("Every country")),
+        ("only", _("Only these countries")),
+        ("except", _("Every country except these")),
+    ]
+    ships_to = models.CharField(max_length=10, choices=SHIPS_TO_CHOICES, default="everywhere")
+    ships_to_countries = ArrayField(models.CharField(max_length=2), default=list, blank=True)
+    # Countries it is offered first for, before nearer warehouses — a
+    # customs union, a cheap route (Almaty for Russia).
+    ships_best_to = ArrayField(models.CharField(max_length=2), default=list, blank=True)
     description = models.TextField(blank=True, null=True)
     # "combined" = a VIRTUAL warehouse that merges other warehouses into
     # one browsing/search view (e.g. Laleli Store + Factory Solids). It
@@ -1994,34 +2008,6 @@ class Warehouse(models.Model):
 
     def product_count(self):
         return self.products.count()
-
-
-class ShippingRule(models.Model):
-    """What one country may be sent from warehouses in other countries:
-    what the storefront offers a buyer there, and what their web order may
-    hold (operating.shipping).
-
-    A country with no rule takes goods from anywhere, nearest warehouse
-    country first. A warehouse always ships inside its own country, so a
-    rule only speaks of other countries. Countries are ISO codes ("TR"),
-    the way warehouses and addresses store them (operating/countries.py).
-    """
-    destination = models.CharField(max_length=2, unique=True)
-    # Nothing from abroad: customs keep the goods out (Turkey takes no
-    # textiles from other countries).
-    only_from_inside = models.BooleanField(default=False)
-    # Countries that can't send here (Russia to Ukraine).
-    not_from = ArrayField(models.CharField(max_length=2), default=list, blank=True)
-    # Countries that send here best — a customs union, a cheap lane — so
-    # they come before nearer ones (Kazakhstan to Russia).
-    best_from = ArrayField(models.CharField(max_length=2), default=list, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["destination"]
-
-    def __str__(self):
-        return self.destination
 
 
 class WarehouseProduct(models.Model):

@@ -62,8 +62,9 @@ def stock_items(request):
     when they have no address of their own (shipping.buyer_country).
 
     Places are listed in the order to offer them (shipping.preference),
-    each saying whether it may send to the buyer's country (`ships`).
-    Rolls are listed only from places that may."""
+    each saying whether its warehouses may send to the buyer's country
+    (`ships`, the warehouse's shipping reach). Rolls are listed only from
+    warehouses that may."""
     from . import shipping
     from .views import free_stock_items
 
@@ -74,7 +75,6 @@ def stock_items(request):
     if not sku:
         return JsonResponse({"error": _("The product is missing.")}, status=400)
     ship_to = shipping.buyer_country(client, request.GET.get("to"))
-    known = shipping.rules()
 
     free = free_stock_items(sku, Book.objects.all(), limit=ITEM_LIMIT, on_storefront=True)
     product = free[0][0].product if free else None
@@ -83,10 +83,18 @@ def stock_items(request):
     places = {}
     items = []
     for item, available in free:
-        place = place_of(item.product.warehouse)
-        ships = shipping.can_ship(place["country"], ship_to, known)
-        total = places.setdefault(place["location"], {**place, "available": 0, "ships": ships})
+        warehouse = item.product.warehouse
+        place = place_of(warehouse)
+        ships = shipping.can_ship(warehouse, ship_to)
+        # Warehouses that stand in one place share its line: it ships when
+        # any of them does, and ranks as the best of them.
+        total = places.setdefault(place["location"], {**place, "available": 0, "ships": False,
+                                                      "_rank": None})
         total["available"] += available
+        total["ships"] = total["ships"] or ships
+        rank = shipping.preference(warehouse, ship_to)
+        if ships and (total["_rank"] is None or rank < total["_rank"]):
+            total["_rank"] = rank
         if not by_variant and ships:
             items.append({
                 "id": item.pk,
@@ -97,7 +105,7 @@ def stock_items(request):
     # Most held first among equals, so with no country known the plan
     # starts where most of it is.
     ordered = sorted(places.values(), key=lambda p: (
-        not p["ships"], shipping.preference(p["country"], ship_to, known), -p["available"]))
+        not p["ships"], p.pop("_rank") or (9, 0), -p["available"]))
     return JsonResponse({
         "sku": sku,
         "tracking": "variant" if by_variant else "item",

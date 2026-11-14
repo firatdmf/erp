@@ -16431,3 +16431,24 @@ msgstr[1] "%(counter)s sipariş"
 
 msgid "Show the items"
 msgstr "Ürünleri göster"
+
+msgid "Every country"
+msgstr "Her ülke"
+
+msgid "Only these countries"
+msgstr "Yalnızca bu ülkeler"
+
+msgid "Every country except these"
+msgstr "Bunlar dışında her ülke"
+
+msgid "Shipping reach"
+msgstr "Gönderim alanı"
+
+msgid "It always ships inside its own country. A country that takes no goods from abroad goes in the except list of each warehouse outside it."
+msgstr "Her zaman kendi ülkesi içine gönderir. Yurt dışından mal almayan bir ülke, onun dışındaki her deponun \"dışında\" listesine eklenir."
+
+msgid "Ships best to"
+msgstr "En iyi gönderdiği ülkeler"
+
+msgid "Optional. Buyers in these countries are offered this warehouse first, before nearer ones — for a customs union or a cheap route."
+msgstr "İsteğe bağlı. Bu ülkelerdeki alıcılara bu depo, daha yakın olanlardan önce sunulur — gümrük birliği ya da ucuz bir güzergâh için."

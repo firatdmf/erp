@@ -83,7 +83,7 @@ class WebOrderRefused(Exception):
     is written. `gone` names picked rolls no longer there as picked;
     `unknown` the SKUs of lines that name no variant the catalog has;
     `blocked` picked rolls whose warehouse may not send to the delivery
-    country (operating.shipping)."""
+    country (its shipping reach, operating.shipping)."""
 
     def __init__(self, message, gone=None, unknown=None, blocked=None):
         super().__init__(message)
@@ -116,7 +116,6 @@ def lines_by_book(lines, ship_to=""):
     groups = {default.pk: (default, [])}
     gone = []
     blocked = []
-    known = shipping.rules()
     for data, variant in lines:
         asked = storefront_stock._requests(data.get("stock_items"))
         sku = variant.variant_sku if variant else ""
@@ -131,7 +130,7 @@ def lines_by_book(lines, ship_to=""):
                 if item is None or not storefront_stock.can_cut(quantity, available):
                     gone.append(pk)
                     continue
-                if not shipping.can_ship(item.product.warehouse.country, ship_to, known):
+                if not shipping.can_ship(item.product.warehouse, ship_to):
                     blocked.append(pk)
                     continue
                 book = item.product.warehouse.accounting_book

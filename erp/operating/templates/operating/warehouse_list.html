@@ -487,9 +487,6 @@
       <a href="{% url 'operating:warehouse_movements_all' %}" class="ord-btn ghost">
         <i class="fa fa-clock-rotate-left"></i>{% trans "Recent activity" %}
       </a>
-      <a href="{% url 'operating:shipping_rules' %}" class="ord-btn ghost">
-        <i class="fa fa-earth-europe"></i>{% trans "Shipping between countries" %}
-      </a>
       {% if is_brand_admin %}
       <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
         <i class="fa fa-plus"></i>{% trans "Add warehouse" %}

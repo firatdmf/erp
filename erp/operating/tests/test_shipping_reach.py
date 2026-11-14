@@ -1,6 +1,6 @@
-"""Shipping between countries: which warehouses may send to a buyer's
-country, in what order the storefront offers them, the web order's check
-against the delivery address, and the page where the rules are set.
+"""Shipping reach: which warehouses may send to a buyer's country, in what
+order the storefront offers them, the web order's check against the
+delivery address, and the warehouse form that sets it.
 See operating/shipping.py."""
 import json
 from decimal import Decimal
@@ -15,39 +15,44 @@ from authentication.client_tokens import issue
 from authentication.models import ClientAddress, WebClient
 from marketing.models import Product, ProductVariant
 from operating import shipping
-from operating.models import (Order, ShippingRule, Warehouse, WarehouseProduct,
-                              WarehouseProductItem)
+from operating.models import Order, Warehouse, WarehouseProduct, WarehouseProductItem
 
 STOCK_URL = reverse("operating:storefront_stock_items")
 
 
-class Rules(TestCase):
-    def test_a_country_with_no_rule_takes_goods_from_anywhere(self):
-        self.assertTrue(shipping.can_ship("KZ", "DE"))
+def warehouse(country, ships_to="everywhere", countries=(), best=()):
+    return Warehouse(name=country, country=country, ships_to=ships_to,
+                     ships_to_countries=list(countries), ships_best_to=list(best))
+
+
+class Reach(TestCase):
+    def test_a_warehouse_ships_everywhere_unless_told(self):
+        self.assertTrue(shipping.can_ship(warehouse("KZ"), "DE"))
+
+    def test_every_country_except_these(self):
+        almaty = warehouse("KZ", "except", ["TR"])
+        self.assertFalse(shipping.can_ship(almaty, "TR"))
+        self.assertTrue(shipping.can_ship(almaty, "UA"))
+
+    def test_only_these_countries(self):
+        shop = warehouse("TR", "only", ["GR", "BG"])
+        self.assertTrue(shipping.can_ship(shop, "GR"))
+        self.assertFalse(shipping.can_ship(shop, "DE"))
 
     def test_a_warehouse_always_ships_inside_its_own_country(self):
-        ShippingRule.objects.create(destination="TR", only_from_inside=True)
-        self.assertTrue(shipping.can_ship("TR", "TR"))
-        self.assertFalse(shipping.can_ship("KZ", "TR"))
+        self.assertTrue(shipping.can_ship(warehouse("TR", "only", ["GR"]), "TR"))
+        self.assertTrue(shipping.can_ship(warehouse("TR", "except", ["TR"]), "TR"))
 
-    def test_named_countries_can_not_send(self):
-        ShippingRule.objects.create(destination="UA", not_from=["RU"])
-        self.assertFalse(shipping.can_ship("RU", "UA"))
-        self.assertTrue(shipping.can_ship("TR", "UA"))
+    def test_an_unknown_buyer_is_not_stopped(self):
+        self.assertTrue(shipping.can_ship(warehouse("KZ", "except", ["TR"]), ""))
 
-    def test_an_unknown_place_or_buyer_is_not_stopped(self):
-        ShippingRule.objects.create(destination="TR", only_from_inside=True)
-        self.assertTrue(shipping.can_ship("", "TR"))
-        self.assertTrue(shipping.can_ship("KZ", ""))
-
-    def test_own_country_then_ships_best_from_then_nearest(self):
-        ShippingRule.objects.create(destination="RU", best_from=["KZ"])
-        known = shipping.rules()
-        self.assertEqual(sorted(["TR", "KZ", "RU"], key=lambda c: shipping.preference(c, "RU", known)),
+    def test_own_country_then_ships_best_to_then_nearest(self):
+        places = [warehouse("TR"), warehouse("KZ", best=["RU"]), warehouse("RU")]
+        self.assertEqual([w.country for w in sorted(places, key=lambda w: shipping.preference(w, "RU"))],
                          ["RU", "KZ", "TR"])
         # Nearest: Uzbekistan is nearer Kazakhstan than Turkey; Greece nearer Turkey.
-        self.assertLess(shipping.preference("KZ", "UZ"), shipping.preference("TR", "UZ"))
-        self.assertLess(shipping.preference("TR", "GR"), shipping.preference("KZ", "GR"))
+        self.assertLess(shipping.preference(warehouse("KZ"), "UZ"), shipping.preference(warehouse("TR"), "UZ"))
+        self.assertLess(shipping.preference(warehouse("TR"), "GR"), shipping.preference(warehouse("KZ"), "GR"))
 
     def test_buyer_country_is_their_address_else_their_connection(self):
         buyer = WebClient.objects.create(username="b", email="b@example.com", name="B",
@@ -70,12 +75,13 @@ class StockByCountry(TestCase):
         shop = Warehouse.objects.create(name="Laleli", city="Istanbul", country="TR",
                                         accounting_book=self.laleli, on_storefront=True)
         abroad = Warehouse.objects.create(name="Almaty", city="Almaty", country="KZ",
-                                          accounting_book=self.almaty, on_storefront=True)
+                                          accounting_book=self.almaty, on_storefront=True,
+                                          ships_to="except", ships_to_countries=["TR"])
         cloth = Product.objects.create(title="2086", sku="2086", featured=False)
         variant = ProductVariant.objects.create(product=cloth, variant_sku="2086.WHITE")
         self.rolls = {}
-        for warehouse, key, meters in [(shop, "TR", "40"), (abroad, "KZ", "60")]:
-            row = WarehouseProduct.objects.create(warehouse=warehouse, sku="2086.WHITE",
+        for place, key, meters in [(shop, "TR", "40"), (abroad, "KZ", "60")]:
+            row = WarehouseProduct.objects.create(warehouse=place, sku="2086.WHITE",
                                                   name="2086 white", catalog_variant=variant)
             self.rolls[key] = WarehouseProductItem.objects.create(
                 product=row, barcode=f"R-{key}", quantity=Decimal(meters),
@@ -84,7 +90,6 @@ class StockByCountry(TestCase):
                                               name="Buyer", password=make_password("pw"),
                                               is_active=True)
         self.auth = {"HTTP_AUTHORIZATION": f"Bearer {issue(self.buyer)}"}
-        ShippingRule.objects.create(destination="TR", only_from_inside=True)
 
     def stock(self, to=""):
         response = self.client.get(STOCK_URL, {"sku": "2086.WHITE", "to": to}, **self.auth)
@@ -116,47 +121,34 @@ class StockByCountry(TestCase):
         self.assertEqual(refused.status_code, 409)
         self.assertEqual(refused.json()["blocked"], [self.rolls["KZ"].pk])
         self.assertFalse(Order.objects.exists())
-        self.assertEqual(order("DE").status_code, 201)
+        self.assertEqual(order("UA").status_code, 201)
 
 
-class Page(TestCase):
-    URL = reverse("operating:shipping_rules")
-
+class WarehouseForm(TestCase):
     def setUp(self):
-        self.admin = get_user_model().objects.create_superuser("boss", "b@t.com", "pw")
+        self.book = Book.objects.create(name="Almaty")
+        self.almaty = Warehouse.objects.create(name="Almaty", country="KZ", accounting_book=self.book)
+        self.client.force_login(get_user_model().objects.create_superuser("boss", "b@t.com", "pw"))
 
-    def test_an_admin_sets_the_rules(self):
-        self.client.force_login(self.admin)
-        self.assertEqual(self.client.get(self.URL).status_code, 200)
-        response = self.client.post(self.URL, {
-            "row": ["1", "2", "3"],
-            "dest_1": "TR", "mode_1": "inside", "best_from_1": ["KZ"],
-            "dest_2": "ua", "mode_2": "except", "not_from_2": ["RU", "UA", "XX"],
-            "dest_3": "RU", "mode_3": "anywhere", "best_from_3": ["KZ"],
-        })
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            [(r.destination, r.only_from_inside, r.not_from, r.best_from)
-             for r in ShippingRule.objects.all()],
-            [("RU", False, [], ["KZ"]), ("TR", True, [], []), ("UA", False, ["RU"], [])])
-        page = self.client.get(self.URL)
-        self.assertContains(page, 'name="not_from_3" data-field="not_from" value="RU"')
-        # Rows left out are removed.
-        self.client.post(self.URL, {"row": ["1"], "dest_1": "TR", "mode_1": "inside"})
-        self.assertEqual(list(ShippingRule.objects.values_list("destination", flat=True)), ["TR"])
+    def post(self, **reach):
+        return self.client.post(reverse("operating:warehouse_edit", args=[self.almaty.pk]), {
+            "name": "Almaty", "kind": "normal", "accounting_book": str(self.book.pk),
+            "country": "KZ", "on_storefront": "on", **reach})
 
-    def test_a_country_twice_or_none_is_refused(self):
-        self.client.force_login(self.admin)
-        response = self.client.post(self.URL, {"row": ["1", "2"], "dest_1": "TR", "dest_2": "TR",
-                                               "mode_1": "inside", "mode_2": "anywhere"})
-        self.assertEqual(response.status_code, 400)
-        response = self.client.post(self.URL, {"row": ["1"], "dest_1": "", "best_from_1": ["KZ"]})
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(ShippingRule.objects.exists())
+    def test_the_form_saves_the_reach(self):
+        self.assertContains(self.client.get(reverse("operating:warehouse_edit", args=[self.almaty.pk])),
+                            'name="ships_to"')
+        self.post(ships_to="except", ships_to_countries=["tr", "TR", "XX"], ships_best_to=["RU"])
+        self.almaty.refresh_from_db()
+        self.assertEqual((self.almaty.ships_to, self.almaty.ships_to_countries, self.almaty.ships_best_to),
+                         ("except", ["TR"], ["RU"]))
+        self.assertContains(self.client.get(reverse("operating:warehouse_edit", args=[self.almaty.pk])),
+                            'name="ships_to_countries" value="TR"')
 
-    def test_only_an_admin_changes_them(self):
-        clerk = get_user_model().objects.create_user("clerk", "c@t.com", "pw")
-        self.client.force_login(clerk)
-        self.assertEqual(self.client.get(self.URL).status_code, 200)
-        self.client.post(self.URL, {"row": ["1"], "dest_1": "TR", "mode_1": "inside"})
-        self.assertFalse(ShippingRule.objects.exists())
+    def test_a_list_without_countries_is_every_country(self):
+        self.post(ships_to="only")
+        self.almaty.refresh_from_db()
+        self.assertEqual((self.almaty.ships_to, self.almaty.ships_to_countries), ("everywhere", []))
+        self.post(ships_to="everywhere", ships_to_countries=["TR"])
+        self.almaty.refresh_from_db()
+        self.assertEqual((self.almaty.ships_to, self.almaty.ships_to_countries), ("everywhere", []))

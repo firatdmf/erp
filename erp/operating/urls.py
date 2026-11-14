@@ -1,6 +1,6 @@
 from django.urls import path, include
 from . import views
-from . import views_shipping, views_warehouse
+from . import views_warehouse
 from . import views_samples
 from . import views_partial_shipment
 from . import views_transfer
@@ -52,7 +52,6 @@ urlpatterns = [
     # Global activity feed ("Son Hareketler") — all warehouses. Must sit
     # above warehouses/<int:pk>/ patterns (won't collide: int ≠ "movements").
     path("warehouses/movements/", views_warehouse.WarehouseMovementsAll.as_view(), name="warehouse_movements_all"),
-    path("warehouses/shipping/", views_shipping.shipping_rules, name="shipping_rules"),
     path("warehouses/create/", views_warehouse.WarehouseCreate.as_view(), name="create_warehouse"),
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/account-create/", views_warehouse.warehouse_account_create, name="warehouse_account_create"),

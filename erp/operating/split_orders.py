@@ -39,6 +39,108 @@ def split_halves(order):
                 .order_by("pk"))
 
 
+# What the halves of a split order share: everything about the request
+# itself, which is one — its date, notes, addresses, the customer's notices,
+# the cargo it goes out in. A change to any of these on one half is a change
+# to all of them (keep_halves_alike). What stays each half's own: its number,
+# status (moved together by apply_order_status_change), account, currency
+# rate, invoice and payment details — each book's business.
+SHARED_FIELDS = (
+    "order_date", "notes", "internal_notes", "notify_customer",
+    "delivery_address_title", "delivery_address", "delivery_city",
+    "delivery_country", "delivery_phone",
+    "billing_address_title", "billing_address", "billing_city",
+    "billing_country", "billing_phone",
+    "is_guest_order", "guest_email", "guest_phone", "guest_first_name",
+    "guest_last_name",
+    "carrier", "tracking_number", "shipped_at", "delivered_at",
+)
+# Shared too, but who the customer is decides which account each half bills
+# in its own book, so a change also moves every half onto that account.
+CUSTOMER_FIELDS = ("contact", "company", "web_client", "charge_contact_personally",
+                   "is_retail_order")
+
+
+def _attnames(names):
+    return {name: Order._meta.get_field(name).attname for name in names}
+
+
+def shared_values_in_db(order):
+    """The shared fields as `order`'s row holds them, before a save — so the
+    save can tell which ones it really changes. None for an order that is
+    not split, or not saved yet."""
+    if not order.pk or not order.split_group:
+        return None
+    names = _attnames(SHARED_FIELDS + CUSTOMER_FIELDS)
+    return Order.objects.filter(pk=order.pk).values(*names.values()).first()
+
+
+def keep_halves_alike(order, before, fields=None):
+    """After `order` is saved: give its other halves what the save changed
+    in the shared fields, so the halves never read differently.
+
+    `before` is shared_values_in_db from just before the save. Only what
+    the save changed is copied — a half saved from a copy that was loaded
+    before another half changed something does not undo that change on the
+    rest. `fields` is the save's update_fields, when it named them.
+
+    A changed customer moves every half onto that customer's account in
+    its own book (settle_half_account); SplitCurrencyClash, raised when one
+    of those accounts cannot be in the order's currency, rolls the caller's
+    transaction back."""
+    if not order.split_group or before is None:
+        return
+    from django.utils import timezone
+
+    names = _attnames(SHARED_FIELDS + CUSTOMER_FIELDS)
+    changed = [name for name, attname in names.items()
+               if (fields is None or name in fields)
+               and getattr(order, attname) != before.get(attname)]
+    if not changed:
+        return
+    others = Order.objects.filter(split_group=order.split_group).exclude(pk=order.pk)
+    plain = {names[n]: getattr(order, names[n]) for n in changed if n in SHARED_FIELDS}
+    if plain:
+        others.update(**plain, updated_at=timezone.now())
+    customer = [n for n in changed if n in CUSTOMER_FIELDS]
+    if not customer:
+        return
+    for half in others.select_related("current_account__book", "currency"):
+        for name in customer:
+            setattr(half, names[name], getattr(order, names[name]))
+        half._keeping_alike = True
+        half.save(update_fields=customer + ["updated_at"])
+        settle_half_account(half)
+
+
+def settle_half_account(half, member=None):
+    """Bill `half` to its customer's account in the half's OWN book, in the
+    order's currency, and re-post it there. A customer cleared off the
+    order leaves the half where it is: its book is known only through its
+    account."""
+    from accounting.services_accounts import (
+        align_split_account_currency, check_split_currency,
+        get_or_create_current_account_for_order,
+        get_or_create_retail_current_account, post_order_movement,
+    )
+    book = order_book(half)
+    if book is None:
+        return
+    if half.is_retail_order:
+        account = get_or_create_retail_current_account(member=member, book=book)
+    else:
+        account = get_or_create_current_account_for_order(half, member=member, book=book)
+    if account is None:
+        return
+    check_split_currency(account, half.currency)
+    align_split_account_currency(account, half.currency)
+    if half.current_account_id != account.pk:
+        half.current_account = account
+        half._keeping_alike = True
+        half.save(update_fields=["current_account", "updated_at"])
+    post_order_movement(half, member=member)
+
+
 def page_line_prefetches():
     """What an order page reads off every line, fetched in a few queries
     for all of them rather than a few per line: product and variant, the

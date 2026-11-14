@@ -46,6 +46,30 @@ def _capture_order_old_status(sender, instance, **kwargs):
         instance._old_status = None
 
 
+@receiver(pre_save, sender=Order)
+def _capture_split_shared_fields(sender, instance, raw=False, **kwargs):
+    """What a split order's shared fields held before this save, so the
+    save can pass on to the other halves just what it changes."""
+    if raw or getattr(instance, "_keeping_alike", False):
+        instance._split_shared_before = None
+        return
+    from .split_orders import shared_values_in_db
+    instance._split_shared_before = shared_values_in_db(instance)
+
+
+@receiver(post_save, sender=Order)
+def keep_split_halves_alike(sender, instance, created, raw=False, update_fields=None, **kwargs):
+    """A split order is one order: whatever a save changes in its shared
+    fields (split_orders.SHARED_FIELDS) changes on every half — whichever
+    page or path did the save. The halves' own saves made here are not
+    passed on again."""
+    if created or raw or getattr(instance, "_keeping_alike", False):
+        return
+    from .split_orders import keep_halves_alike
+    keep_halves_alike(instance, getattr(instance, "_split_shared_before", None),
+                      fields=update_fields)
+
+
 # Statuses a customer is told about. "pending" is the initial state, not
 # a notification trigger; the first email goes out at create time.
 NOTIFY_EVENTS = frozenset({

@@ -1015,14 +1015,27 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Bad customer"}, status=400)
             order.charge_contact_personally = _charge_contact_personally(
                 request, order.contact)
-            order.save(update_fields=["contact", "company",
-                                      "charge_contact_personally", "updated_at"])
+            # A split order's other halves take the new customer too, each
+            # on that customer's account in its own book — refused, with
+            # nothing changed, when one of those cannot be in the order's
+            # currency.
+            from accounting.services_accounts import SplitCurrencyClash
+            try:
+                with transaction.atomic():
+                    order.save(update_fields=["contact", "company",
+                                              "charge_contact_personally", "updated_at"])
+            except SplitCurrencyClash as exc:
+                return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
             # Customer changed → re-resolve the current account; posting
             # moves the order's rows onto it with their dates kept
             # (post_order_movement), so no month gains or loses the sale.
+            # In the order's own book: left to the member's default book, a
+            # split order's half moved onto an account in the wrong one.
             try:
-                new_current_account = get_or_create_current_account_for_order(order, member=member)
+                from .split_orders import order_book
+                new_current_account = get_or_create_current_account_for_order(
+                    order, member=member, book=order_book(order))
                 if new_current_account and order.current_account_id != new_current_account.pk:
                     order.current_account = new_current_account
                     order.save(update_fields=["current_account", "updated_at"])
@@ -2447,24 +2460,19 @@ def _sibling_order_for_book(order, book, member):
         order.split_group = uuid4()
         order.save(update_fields=["split_group"])
 
-    sibling = Order.objects.create(
-        contact=order.contact,
-        company=order.company,
-        charge_contact_personally=order.charge_contact_personally,
-        is_retail_order=order.is_retail_order,
-        is_guest_order=order.is_guest_order,
-        guest_first_name=order.guest_first_name,
-        guest_phone=order.guest_phone,
-        notes=order.notes,
-        internal_notes=order.internal_notes,
-        notify_customer=order.notify_customer,
-        delivery_address_title=order.delivery_address_title,
-        delivery_address=order.delivery_address,
-        delivery_city=order.delivery_city,
-        delivery_country=order.delivery_country,
-        delivery_phone=order.delivery_phone,
+    # Everything the halves share (split_orders.SHARED_FIELDS), and where
+    # the order stands: a half added on a later day, to an order already
+    # being packed, is still that order — not a new one opened today.
+    from .split_orders import CUSTOMER_FIELDS, SHARED_FIELDS
+    sibling = Order(
+        **{name: getattr(order, name) for name in SHARED_FIELDS + CUSTOMER_FIELDS},
+        order_status=order.order_status,
         split_group=order.split_group,
     )
+    # The customer was told where the order stands already; a new half
+    # standing there too is no news.
+    sibling._one_notice_for_split = True
+    sibling.save()
     return sibling, True
 
 
@@ -3144,8 +3152,13 @@ def order_pack_complete(request, pk):
         return JsonResponse({"ok": False,
                              "error": _gettext("Scan at least one stock item to finish packing.")}, status=400)
     if order.order_status != "packaging":
-        order.order_status = "packaging"
-        order.save(update_fields=["order_status", "updated_at"])
+        # Through the status funnel, so a split order's halves are packed
+        # together. As the system's own step (no user), as the plain save
+        # this replaces was: finishing the scan is what packs the order.
+        from .views_warehouse import apply_order_status_change
+        ok, code = apply_order_status_change(order, "packaging")
+        if not ok:
+            return JsonResponse({"ok": False, "error": code}, status=400)
     return JsonResponse({"ok": True, "status": "packaging",
                          "redirect": reverse("operating:order_detail", args=[order.pk])})
 

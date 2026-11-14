@@ -16462,3 +16462,6 @@ msgstr "Başka bir varyant, %(sku)s, %(price)s fiyatından alındı"
 
 msgid "list price"
 msgstr "liste fiyatı"
+
+msgid "Order updated, but %(number)s's current account could not be updated: %(error)s"
+msgstr "Sipariş güncellendi, ancak %(number)s siparişinin cari hesabı güncellenemedi: %(error)s"

@@ -44,7 +44,7 @@
   <!-- Priority -->
   <div class="form-group">
     <label for="id_priority"><i class="fa fa-flag"></i> Priority *</label>
-    <select name="priority" id="id_priority" class="form-control" required>
+    <select name="priority" id="id_priority" class="form-input" required>
       <option value="low" {% if task.priority == 'low' %}selected{% endif %}>{% trans "Low" %}</option>
       <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
       <option value="high" {% if task.priority == 'high' %}selected{% endif %}>{% trans "High" %}</option>

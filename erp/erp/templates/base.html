@@ -43,7 +43,7 @@
   <title>{% block title %}Nejum ERP{% endblock %}</title>
 
   <!-- CSS Files -->
-  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=5.1" />
+  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=5.2" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=12" />
@@ -1656,7 +1656,7 @@
       document.body.style.overflow = '';
       // Reset form
       document.getElementById('taskForm').reset();
-      document.querySelectorAll('#taskForm .repeat-every').forEach(function (el) { el.style.display = 'none'; });
+      document.querySelectorAll('#taskForm .repeat-fields').forEach(function (el) { toggleRepeatFields(el, false); });
 
       // Reset Team UI
       document.getElementById('id_task_team_id').value = '';
@@ -4865,6 +4865,18 @@
       // place that deletes a task asks this first when the task's element,
       // or one around it, carries data-repeat="Every month". Resolves
       // 'skip', 'stop', or null for cancel.
+      // The Repeat button of a task form (todo/components/_repeat_fields.html):
+      // opens or closes "every [N] [unit]". Closed posts repeat_unit="" from
+      // the hidden input; open posts the select's unit. `open` forces a state.
+      window.toggleRepeatFields = function (el, open) {
+        var box = el.closest('.repeat-fields');
+        if (!box) return;
+        if (open === undefined) open = !box.classList.contains('is-open');
+        box.classList.toggle('is-open', open);
+        box.querySelector('.repeat-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+        box.querySelector('input[type=hidden][name=repeat_unit]').disabled = open;
+        box.querySelectorAll('.repeat-body input, .repeat-body select').forEach(function (f) { f.disabled = !open; });
+      };
       window.taskSeriesLabel = function (el) {
         var holder = el && el.closest ? el.closest('[data-repeat]') : null;
         return holder ? holder.getAttribute('data-repeat') : '';

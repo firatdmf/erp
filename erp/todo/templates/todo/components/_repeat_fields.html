@@ -1,26 +1,30 @@
 {% load i18n %}
 {% comment %}
-  The Repeat field of every task form: "Repeat every [N] [weeks / months /
-  years]", or "Doesn't repeat". Pass `unit` and `every` to show a task's
-  current schedule. The number shows only once a unit is picked; the
-  handler is inline because forms loaded into the sidebar by fetch() do not
-  run their <script> tags.
+  The Repeat control of every task form: a "Repeat" button that opens
+  "every [N] [weeks / months / years]". Closed, the form posts
+  repeat_unit="" (no repeat) from the hidden input; open, the select's unit.
+  Pass `unit` and `every` to show a task's current schedule, open.
+  toggleRepeatFields lives in base.html, because forms loaded into the
+  sidebar by fetch() do not run their own <script> tags.
 {% endcomment %}
-<div class="form-group repeat-fields">
-  <label>{% trans "Repeat" %}</label>
-  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-    <span class="repeat-every" style="display:{% if unit %}flex{% else %}none{% endif %}; align-items:center; gap:0.4rem; white-space:nowrap;">
-      {% trans "every" %}
-      <input type="number" name="repeat_every" min="1" max="99" value="{{ every|default:1 }}"
-        class="form-input" style="width:4.5rem;" aria-label="{% trans 'Repeat every' %}">
-    </span>
-    <select name="repeat_unit" class="form-input" style="flex:1; min-width:9rem;"
-      aria-label="{% trans 'Repeat' %}"
-      onchange="this.parentNode.querySelector('.repeat-every').style.display = this.value ? 'flex' : 'none'">
-      <option value="">{% trans "Doesn't repeat" %}</option>
+<div class="form-group repeat-fields{% if unit %} is-open{% endif %}">
+  <button type="button" class="repeat-toggle" onclick="toggleRepeatFields(this)"
+    aria-expanded="{% if unit %}true{% else %}false{% endif %}">
+    <i class="fa fa-redo" aria-hidden="true"></i> {% trans "Repeat" %}
+  </button>
+  <input type="hidden" name="repeat_unit" value="" {% if unit %}disabled{% endif %}>
+  <div class="repeat-body">
+    <span class="repeat-word">{% trans "every" %}</span>
+    <input type="number" name="repeat_every" min="1" max="99" value="{{ every|default:1 }}"
+      class="form-input repeat-every-input" aria-label="{% trans 'Repeat every' %}" {% if not unit %}disabled{% endif %}>
+    <select name="repeat_unit" class="form-input repeat-unit-select" aria-label="{% trans 'Repeat' %}" {% if not unit %}disabled{% endif %}>
       <option value="week" {% if unit == 'week' %}selected{% endif %}>{% trans "week(s)" %}</option>
-      <option value="month" {% if unit == 'month' %}selected{% endif %}>{% trans "month(s)" %}</option>
+      <option value="month" {% if unit == 'month' or not unit %}selected{% endif %}>{% trans "month(s)" %}</option>
       <option value="year" {% if unit == 'year' %}selected{% endif %}>{% trans "year(s)" %}</option>
     </select>
+    <button type="button" class="repeat-clear" onclick="toggleRepeatFields(this, false)"
+      title="{% trans "Doesn't repeat" %}" aria-label="{% trans "Doesn't repeat" %}">
+      <i class="fa fa-times" aria-hidden="true"></i>
+    </button>
   </div>
 </div>

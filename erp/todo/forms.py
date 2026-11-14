@@ -18,7 +18,8 @@ class MultipleFileInput(forms.ClearableFileInput):
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['name', 'due_date', 'priority', 'contact','company','description', 'member']  # Specify the fields you want to include in the form
+        fields = ['name', 'due_date', 'priority', 'contact','company','description', 'member',
+                  'repeat_unit', 'repeat_every']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Enter task name'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-input'}),
@@ -75,7 +76,28 @@ class TaskForm(forms.ModelForm):
         else:
             self.fields['company'].widget = forms.HiddenInput()
         
+        # A form that does not show Repeat (the CRM's quick task, say)
+        # posts no repeat_every; clean() keeps what the task had.
+        self.fields['repeat_every'].required = False
+        self.fields['repeat_unit'].label = "Repeat"
+        self.fields['repeat_every'].label = "Repeat every"
+
         # Force required=False for task_files and debug
         self.fields['task_files'].required = False
         print(f"DEBUG: TaskForm instantiated. task_files required={self.fields['task_files'].required}")
+
+    def clean(self):
+        cleaned = super().clean()
+        if 'repeat_unit' not in self.data:
+            # A form without the Repeat field leaves the schedule alone.
+            cleaned['repeat_unit'] = self.instance.repeat_unit
+            cleaned['repeat_every'] = self.instance.repeat_every
+        if not cleaned.get('repeat_every'):
+            cleaned['repeat_every'] = 1
+        # A new due date, or a new schedule, sets the series' day afresh.
+        if self.instance.pk and (
+                cleaned.get('due_date') != self.instance.due_date
+                or cleaned.get('repeat_unit') != self.instance.repeat_unit):
+            self.instance.repeat_day = None
+        return cleaned
     # -----------------------------------------------------------------------

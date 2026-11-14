@@ -246,6 +246,8 @@ def dashboard_component(csrf_token,path,member):
                     'can_edit': _can_edit,
                     'can_delete': _can_delete,
                     'kind': 'team' if t.team_id else 'personal',
+                    'repeat_label': t.repeat_label,
+                    'carries_series': t.carries_series,
                 }
                 key = t.due_date.isoformat()  # YYYY-MM-DD
                 all_tasks_by_date.setdefault(key, []).append(payload)
@@ -398,6 +400,8 @@ def dashboard_component(csrf_token,path,member):
                     'entity_name': entity_name,
                     'entity_type': entity_type,
                     'kind': 'team' if t.team_id else 'personal',
+                    'repeat_label': t.repeat_label,
+                    'carries_series': t.carries_series,
                 }
                 delegated_tasks_data.append(_payload_d)
                 # A team task I am on is in the main list already.

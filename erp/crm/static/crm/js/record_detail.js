@@ -399,6 +399,26 @@ function removeRow(el, after) {
 function confirmDelete(action, id) {
   const completing = action === 'complete_task';
 
+  // A repeating task asks whether its series goes on (base.html).
+  if (action === 'delete_task' && window.askRepeatingDelete) {
+    const series = window.taskSeriesLabel(document.getElementById(`task-${id}`));
+    if (series) {
+      window.askRepeatingDelete(series).then(choice => {
+        if (!choice) return;
+        fetch(`/todo/tasks/${id}/delete_task`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': RD.csrf,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: `${RD.kind}_id=${RD.pk}` + (choice === 'skip' ? '&keep_series=1' : '')
+        }).then(() => removeRow(document.getElementById(`task-${id}`), syncAttachedCounts));
+      });
+      return;
+    }
+  }
+
   showConfirmDialog({
     question: completing ? RD.i18n.markComplete : RD.i18n.areYouSure,
     detail: RD.i18n.cannotUndo,

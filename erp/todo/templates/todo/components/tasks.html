@@ -130,10 +130,10 @@
     {% if 'dashboard_calendar' in page_type or not task.completed and task.due_date|is_past_due %}
     {% if 'dashboard_calendar' in page_type or not task.member or task.member == member %}
     {% with can_edit=task|can_edit:member %}
-    <li class="taskComponent{% if task.team_id %} team-task-card{% endif %}" data-task-id="{{ task.id }}" {% if task.team_id %}onclick="openTeamTaskEditSidebar('{{ task.id }}')"{% elif can_edit %}onclick="openTaskEditSidebar('{{ task.id }}')" {% else %}style="cursor: default;" {% endif %}>
+    <li class="taskComponent{% if task.team_id %} team-task-card{% endif %}" data-task-id="{{ task.id }}"{% if task.carries_series %} data-repeat="{{ task.repeat_label }}"{% endif %} {% if task.team_id %}onclick="openTeamTaskEditSidebar('{{ task.id }}')"{% elif can_edit %}onclick="openTaskEditSidebar('{{ task.id }}')" {% else %}style="cursor: default;" {% endif %}>
       <!-- Compact Card Header -->
       <div class="task-card-header">
-        <h3 class="taskName">{% if task.team_id %}<span style="color: #7c3aed; font-size: 0.75rem; margin-right: 0.5rem;"><i class="fas fa-users"></i></span>{% endif %}{{ task.name }}</h3>
+        <h3 class="taskName">{% if task.team_id %}<span style="color: #7c3aed; font-size: 0.75rem; margin-right: 0.5rem;"><i class="fas fa-users"></i></span>{% endif %}{{ task.name }}{% if task.repeat_unit %} <i class="fa fa-redo" style="font-size:0.7rem; color:#64748b;" title="{{ task.repeat_label }}"></i>{% endif %}</h3>
         <div class="task-date-badges">
           <span class="taskDueDate">
             <i class="fa fa-calendar-alt"></i> {{ task.due_date|date:"M. d, Y" }}
@@ -227,6 +227,15 @@
   function confirmDeleteTask(taskId, button) {
     const taskComponent = button.closest('.taskComponent');
 
+    // A repeating task asks whether its series goes on.
+    const series = window.taskSeriesLabel(button);
+    if (series) {
+      window.askRepeatingDelete(series).then(choice => {
+        if (choice) deleteTaskHTMX(taskId, button, choice === 'skip');
+      });
+      return;
+    }
+
     // Create modern confirmation modal
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -265,13 +274,13 @@
     });
   }
 
-  function deleteTaskHTMX(taskId, button) {
+  function deleteTaskHTMX(taskId, button, keepSeries) {
     const overlay = button.closest('.modal-overlay');
     const taskComponent = document.querySelector(`[data-task-id="${taskId}"]`)?.closest('.taskComponent');
 
     if (!taskComponent) {
       console.error('Task component not found');
-      overlay.remove();
+      overlay?.remove();
       return;
     }
 
@@ -289,12 +298,13 @@
         'X-CSRFToken': csrfToken,
         'X-Requested-With': 'XMLHttpRequest',
         'HX-Request': 'true'
-      }
+      },
+      body: keepSeries ? new URLSearchParams({ keep_series: '1' }) : null
     })
       .then(response => {
         if (response.ok) {
           // Remove modal
-          overlay.remove();
+          overlay?.remove();
 
           // Smooth fade out animation
           taskComponent.style.transition = 'all 0.3s ease';
@@ -317,13 +327,13 @@
           // Show success toast
           showToast('Task deleted successfully', 'success');
         } else {
-          overlay.remove();
+          overlay?.remove();
           showToast('Failed to delete task. Please try again.', 'error');
         }
       })
       .catch(error => {
         console.error('Error:', error);
-        overlay.remove();
+        overlay?.remove();
         showToast('An error occurred. Please try again.', 'error');
       });
   }

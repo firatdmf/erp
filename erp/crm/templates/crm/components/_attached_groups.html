@@ -19,7 +19,7 @@
   <div class="od-group-body">
     <div id="tasksList" class="od-task-list">
       {% for task in open_tasks|dictsortreversed:'due_date' %}
-        <div class="od-task" id="task-{{ task.id }}">
+        <div class="od-task" id="task-{{ task.id }}"{% if task.carries_series %} data-repeat="{{ task.repeat_label }}"{% endif %}>
           <div class="task-content" id="task-content-{{ task.id }}" style="flex:1; min-width:0;">
             <div class="od-task-body">
               <h3 class="od-task-name task-name">{{ task.name }}</h3>

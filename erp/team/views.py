@@ -11,6 +11,7 @@ import json
 
 from .models import Team, TeamMember, TeamMessage, TeamMeeting, FavoriteTeam, ChatRoom, TeamBoardColumn
 from todo.models import Task, TaskActivity, TaskAttachment, TaskComment
+from todo.repeat import from_form as repeat_from_form
 from .access import has_team_role, is_team_member, team_role, teams_for
 
 def get_user_team(user):
@@ -172,6 +173,7 @@ def _create_team_task(request, team):
         created_by=_member(request.user),
         member=_member(target_users[0]),
     )
+    task.set_repeat(*repeat_from_form(request.POST))
     task.set_status(request.POST.get('status', 'todo'))
     task.save()
     task.assignees.set(_members_of(target_users))
@@ -496,7 +498,7 @@ def delete_task(request, task_id):
     if not (_is_creator(task, request.user) or has_team_role(request.user, task.team)):
         return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
 
-    task.delete()
+    task.delete_from_series(keep_series=request.POST.get('keep_series') == '1')
     return JsonResponse({'success': True, 'message': 'Task deleted'})
 
 @login_required
@@ -534,7 +536,10 @@ def edit_task(request, task_id):
     # A task always has a due date; a blank field leaves it as it was.
     due_date = _parse_due(request.POST.get('due_date'))
     if due_date:
-        task.due_date = due_date
+        task.set_due_date(due_date)
+
+    if 'repeat_unit' in request.POST:
+        task.set_repeat(*repeat_from_form(request.POST))
 
     description = request.POST.get('description')
     if description is not None:

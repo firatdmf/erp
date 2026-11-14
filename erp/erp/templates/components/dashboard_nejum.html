@@ -127,13 +127,13 @@
       <div class="task-list" id="njTaskList">
         {% if today_tasks %}
           {% for t in today_tasks %}
-            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}{% if t.kind == 'team' %} team-card{% endif %}" data-task-id="{{ t.id }}" data-kind="{{ t.kind|default:'personal' }}"{% if t.can_edit %} onclick="openTaskEditSidebar('{{ t.id }}', '{{ t.kind|default:'personal' }}')" style="cursor: pointer;"{% endif %}>
+            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}{% if t.kind == 'team' %} team-card{% endif %}" data-task-id="{{ t.id }}" data-kind="{{ t.kind|default:'personal' }}"{% if t.carries_series %} data-repeat="{{ t.repeat_label }}"{% endif %}{% if t.can_edit %} onclick="openTaskEditSidebar('{{ t.id }}', '{{ t.kind|default:'personal' }}')" style="cursor: pointer;"{% endif %}>
               <div class="task-stripe"></div>
               <div class="task-body">
                 <div class="task-top">
                   <div class="task-text">
                     {% if t.kind == 'team' %}<span class="kind-pill kind-team" title="Team task"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</span>{% endif %}
-                    {{ t.name }}
+                    <span>{{ t.name }}{% if t.repeat_label %} <span class="task-repeat" title="{{ t.repeat_label }}">↻</span>{% endif %}</span>
                   </div>
                   <span class="task-aging aging-{{ t.aging_tone }}">{{ t.aging_label }}</span>
                 </div>
@@ -538,11 +538,11 @@
       } else {
         entityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
       }
-      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + kindCls + '" data-task-id="' + t.id + '" data-kind="' + kind + '"' + editAttrs + '>' +
+      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + kindCls + '" data-task-id="' + t.id + '" data-kind="' + kind + '"' + (t.carries_series ? ' data-repeat="' + escapeHtml(t.repeat_label) + '"' : '') + editAttrs + '>' +
         '<div class="task-stripe"></div>' +
         '<div class="task-body">' +
         '<div class="task-top">' +
-        '<div class="task-text">' + teamPill + escapeHtml(t.name) + '</div>' +
+        '<div class="task-text">' + teamPill + '<span>' + escapeHtml(t.name) + (t.repeat_label ? ' <span class="task-repeat" title="' + escapeHtml(t.repeat_label) + '">↻</span>' : '') + '</span></div>' +
         '<span class="task-aging aging-' + escapeHtml(t.aging_tone) + '">' + escapeHtml(t.aging_label) + '</span>' +
         '</div>' +
         (t.description ? '<div class="task-desc">' + escapeHtml(t.description) + '</div>' : '') +
@@ -988,6 +988,14 @@
           if (!taskId) return;
           var card = btn.closest('.task-card');
           var kind = (card && card.getAttribute('data-kind')) || 'personal';
+          // A repeating task asks whether its series goes on.
+          var series = window.taskSeriesLabel(card);
+          if (series) {
+            window.askRepeatingDelete(series).then(function(choice) {
+              if (choice) performDelete(taskId, kind, card, null, choice === 'skip');
+            });
+            return;
+          }
           openDeleteConfirmModal(taskId, kind, btn, card);
         });
       });
@@ -1130,7 +1138,7 @@
       });
     }
 
-    function performDelete(taskId, kind, card, overlay) {
+    function performDelete(taskId, kind, card, overlay, keepSeries) {
       var url = (kind === 'team')
         ? ('/team/task/' + taskId + '/delete/')
         : ('/todo/tasks/' + taskId + '/delete_task');
@@ -1140,7 +1148,8 @@
         headers: {
           'X-CSRFToken': getCsrf(),
           'X-Requested-With': 'XMLHttpRequest'
-        }
+        },
+        body: keepSeries ? new URLSearchParams({ keep_series: '1' }) : null
       }).then(function(res) {
         // Team endpoint returns JSON, personal returns empty 200
         if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Permission denied'); }).catch(function() { throw new Error('Failed'); });

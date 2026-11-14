@@ -39,6 +39,8 @@
     {{ form.due_date }}
   </div>
 
+  {% include "todo/components/_repeat_fields.html" with unit=task.repeat_unit every=task.repeat_every %}
+
   <!-- Priority -->
   <div class="form-group">
     <label for="id_priority"><i class="fa fa-flag"></i> Priority *</label>

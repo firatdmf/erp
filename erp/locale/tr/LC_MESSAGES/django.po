@@ -16267,3 +16267,72 @@ msgstr ""
 
 msgid "Empty: we make one to print"
 msgstr "Boşsa yazdırmak için biz oluştururuz"
+
+#: todo/repeat.py
+msgid "Every week"
+msgid_plural "Every %(n)d weeks"
+msgstr[0] "Her hafta"
+msgstr[1] "%(n)d haftada bir"
+
+#: todo/repeat.py
+msgid "Every month"
+msgid_plural "Every %(n)d months"
+msgstr[0] "Her ay"
+msgstr[1] "%(n)d ayda bir"
+
+#: todo/repeat.py
+msgid "Every year"
+msgid_plural "Every %(n)d years"
+msgstr[0] "Her yıl"
+msgstr[1] "%(n)d yılda bir"
+
+#: todo/templates/todo/components/_repeat_fields.html
+#: team/templates/team/components/task_edit_form.html
+msgid "Repeat"
+msgstr "Tekrarla"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "every"
+msgstr "her"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "Repeat every"
+msgstr "Tekrar sıklığı"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "Doesn't repeat"
+msgstr "Tekrarlanmaz"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "week(s)"
+msgstr "hafta"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "month(s)"
+msgstr "ay"
+
+#: todo/templates/todo/components/_repeat_fields.html
+msgid "year(s)"
+msgstr "yıl"
+
+#: todo/templates/todo/task_detail_page.html
+#: team/templates/team_task_detail.html
+#, python-format
+msgid "Repeats: %(schedule)s"
+msgstr "Tekrar: %(schedule)s"
+
+#: erp/templates/base.html
+msgid "Delete a repeating task"
+msgstr "Tekrarlanan görevi sil"
+
+#: erp/templates/base.html
+msgid "Deleting it stops the series, unless you only skip this one."
+msgstr "Silerseniz tekrar durur; isterseniz yalnızca bu seferkini atlayın."
+
+#: erp/templates/base.html
+msgid "Skip just this one"
+msgstr "Yalnızca bunu atla"
+
+#: erp/templates/base.html
+msgid "Delete and stop repeating"
+msgstr "Sil ve tekrarı durdur"

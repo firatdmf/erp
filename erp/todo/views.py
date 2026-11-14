@@ -388,7 +388,7 @@ def delete_task(request, task_id):
             return JsonResponse({'success': False, 'error': msg}, status=403)
         return HttpResponse(msg, status=403)
 
-    task.delete()
+    task.delete_from_series(keep_series=request.POST.get('keep_series') == '1')
 
     if is_ajax:
         # Empty 200 — HTMX swap with hx-swap="outerHTML" removes the row.
@@ -477,8 +477,11 @@ def update_task_ajax(request, task_id):
             # Update task
             task.name = name
             task.description = description
-            task.due_date = due_date
+            task.set_due_date(due_date)
             task.priority = priority  # Update priority
+            if 'repeat_unit' in request.POST:
+                from .repeat import from_form
+                task.set_repeat(*from_form(request.POST))
             task.save()
             
             # Track activities

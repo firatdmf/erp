@@ -63,7 +63,7 @@
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=49" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=17" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=31" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=32" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=13" />
@@ -639,6 +639,8 @@
             <label for="id_due_date">{% trans "Due date" %}</label>
             <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ today }}">
           </div>
+
+          {% include "todo/components/_repeat_fields.html" %}
 
           <!-- Attach an item section -->
           <div class="attach-section">
@@ -1654,6 +1656,7 @@
       document.body.style.overflow = '';
       // Reset form
       document.getElementById('taskForm').reset();
+      document.querySelectorAll('#taskForm .repeat-every').forEach(function (el) { el.style.display = 'none'; });
 
       // Reset Team UI
       document.getElementById('id_task_team_id').value = '';
@@ -4854,6 +4857,54 @@
           el.blur();
         }
       }, { passive: true });
+    </script>
+    <script>
+      // Deleting a repeating task whose series hangs on it: the series
+      // either goes on without this one ("skip just this one" — the next
+      // task is made, as if this one were done) or stops with it. Every
+      // place that deletes a task asks this first when the task's element,
+      // or one around it, carries data-repeat="Every month". Resolves
+      // 'skip', 'stop', or null for cancel.
+      window.taskSeriesLabel = function (el) {
+        var holder = el && el.closest ? el.closest('[data-repeat]') : null;
+        return holder ? holder.getAttribute('data-repeat') : '';
+      };
+      // The plain confirm for most tasks, the series question for one a
+      // series hangs on. Resolves {keepSeries} to go ahead, or null.
+      window.confirmTaskDelete = function (el, message) {
+        var series = window.taskSeriesLabel(el);
+        if (series) {
+          return window.askRepeatingDelete(series).then(function (choice) {
+            return choice ? { keepSeries: choice === 'skip' } : null;
+          });
+        }
+        return Promise.resolve(window.confirm(message) ? { keepSeries: false } : null);
+      };
+      window.askRepeatingDelete = function (repeatLabel) {
+        return new Promise(function (resolve) {
+          var overlay = document.createElement('div');
+          overlay.style.cssText = 'box-sizing:border-box; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px;';
+          overlay.innerHTML =
+            '<div role="dialog" aria-modal="true" style="box-sizing:border-box; background:white; padding:1.5rem; border-radius:12px; max-width:420px; width:100%; box-shadow:0 20px 25px -5px rgba(0,0,0,0.15);">' +
+              '<h3 style="margin:0 0 0.5rem; font-size:1.15rem; color:#1f2937;">{% trans "Delete a repeating task" %}</h3>' +
+              '<p style="margin:0 0 1.25rem; color:#6b7280; line-height:1.5;"><span data-label></span>. ' +
+                '{% trans "Deleting it stops the series, unless you only skip this one." %}</p>' +
+              '<div style="display:flex; flex-direction:column; gap:0.5rem;">' +
+                '<button type="button" data-choice="skip" style="padding:0.65rem 1rem; border:1px solid #d1d5db; background:white; color:#1f2937; border-radius:8px; cursor:pointer; font-weight:600;">{% trans "Skip just this one" %}</button>' +
+                '<button type="button" data-choice="stop" style="padding:0.65rem 1rem; border:none; background:#ef4444; color:white; border-radius:8px; cursor:pointer; font-weight:600;">{% trans "Delete and stop repeating" %}</button>' +
+                '<button type="button" data-choice="" style="padding:0.5rem 1rem; border:none; background:none; color:#6b7280; cursor:pointer;">{% trans "Cancel" %}</button>' +
+              '</div>' +
+            '</div>';
+          overlay.querySelector('[data-label]').textContent = repeatLabel;
+          function done(choice) { overlay.remove(); resolve(choice || null); }
+          overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) return done(null);
+            var b = e.target.closest('[data-choice]');
+            if (b) done(b.getAttribute('data-choice'));
+          });
+          document.body.appendChild(overlay);
+        });
+      };
     </script>
 </body>
 

@@ -15,6 +15,12 @@
             {% if not can_edit %}disabled{% endif %}>
     </div>
 
+    {% if can_edit %}
+    {% include "todo/components/_repeat_fields.html" with unit=task.repeat_unit every=task.repeat_every %}
+    {% elif task.repeat_unit %}
+    <div class="form-group"><label>{% trans "Repeat" %}</label><div>{{ task.repeat_label }}</div></div>
+    {% endif %}
+
     <div class="form-group">
         <label for="id_priority">{% trans "Priority" %}</label>
         <select name="priority" id="id_priority" class="form-input" {% if not can_edit %}disabled{% endif %}>

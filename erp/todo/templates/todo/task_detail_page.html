@@ -477,6 +477,11 @@
       <div class="meta-item">
         <i class="far fa-clock"></i> Due {{ task.due_date|date:"F j, Y" }}
       </div>
+      {% if task.repeat_unit %}
+      <div class="meta-item">
+        <i class="fa fa-redo"></i> {% blocktrans with schedule=task.repeat_label %}Repeats: {{ schedule }}{% endblocktrans %}
+      </div>
+      {% endif %}
       <div class="meta-item">
         <i class="far fa-user"></i> {{ task.member.user.get_full_name }}
       </div>
@@ -485,10 +490,11 @@
       <div class="meta-item" style="margin-left: auto;">
         <a href="#" onclick="openTaskEditSidebar('{{ task.id }}')" style="color:inherit; text-decoration:none;"><i
             class="fa fa-pen"></i></a>
-        <a href="#" onclick="if(confirm('Delete?')) document.getElementById('delTask').submit()"
+        <a href="#"{% if task.carries_series %} data-repeat="{{ task.repeat_label }}"{% endif %}
+          onclick="event.preventDefault(); window.confirmTaskDelete(this, 'Delete?').then(function (a) { if (!a) return; var f = document.getElementById('delTask'); f.keep_series.value = a.keepSeries ? '1' : ''; f.submit(); })"
           style="color:var(--danger-color); margin-left:1rem;"><i class="fa fa-trash"></i></a>
         <form id="delTask" method="POST" action="{% url 'todo:delete_task' task.id %}" style="display:none;">{%
-          csrf_token %}</form>
+          csrf_token %}<input type="hidden" name="keep_series" value=""></form>
       </div>
       {% endif %}
     </div>

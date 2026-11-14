@@ -1,0 +1,26 @@
+{% load i18n %}
+{% comment %}
+  The Repeat field of every task form: "Repeat every [N] [weeks / months /
+  years]", or "Doesn't repeat". Pass `unit` and `every` to show a task's
+  current schedule. The number shows only once a unit is picked; the
+  handler is inline because forms loaded into the sidebar by fetch() do not
+  run their <script> tags.
+{% endcomment %}
+<div class="form-group repeat-fields">
+  <label>{% trans "Repeat" %}</label>
+  <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <span class="repeat-every" style="display:{% if unit %}flex{% else %}none{% endif %}; align-items:center; gap:0.4rem; white-space:nowrap;">
+      {% trans "every" %}
+      <input type="number" name="repeat_every" min="1" max="99" value="{{ every|default:1 }}"
+        class="form-input" style="width:4.5rem;" aria-label="{% trans 'Repeat every' %}">
+    </span>
+    <select name="repeat_unit" class="form-input" style="flex:1; min-width:9rem;"
+      aria-label="{% trans 'Repeat' %}"
+      onchange="this.parentNode.querySelector('.repeat-every').style.display = this.value ? 'flex' : 'none'">
+      <option value="">{% trans "Doesn't repeat" %}</option>
+      <option value="week" {% if unit == 'week' %}selected{% endif %}>{% trans "week(s)" %}</option>
+      <option value="month" {% if unit == 'month' %}selected{% endif %}>{% trans "month(s)" %}</option>
+      <option value="year" {% if unit == 'year' %}selected{% endif %}>{% trans "year(s)" %}</option>
+    </select>
+  </div>
+</div>

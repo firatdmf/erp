@@ -59,6 +59,24 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     google_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the task in Google Tasks")
+
+    # Repeating: every `repeat_every` weeks, months or years (todo/repeat.py).
+    # Finishing the task makes the next one; `repeat_day` is the day of the
+    # month the series was set for, and `repeated_from` the task this one
+    # came after — one next task per task, so ticking twice makes one.
+    REPEAT_CHOICES = [
+        ('', 'Never'),
+        ('week', 'Week'),
+        ('month', 'Month'),
+        ('year', 'Year'),
+    ]
+    repeat_unit = models.CharField(max_length=10, choices=REPEAT_CHOICES, blank=True, default='')
+    repeat_every = models.PositiveSmallIntegerField(default=1)
+    repeat_day = models.PositiveSmallIntegerField(blank=True, null=True)
+    repeated_from = models.OneToOneField(
+        'self', on_delete=models.SET_NULL, blank=True, null=True,
+        related_name='next_in_series',
+    )
     # make it either a company, contact, or supplier
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True
@@ -143,7 +161,102 @@ class Task(models.Model):
     def save(self, *args, **kwargs):
         if not self.member and hasattr(self, "_current_member"):
             self.member = self._current_member
+        # A series remembers the day of the month it was set for; an edit
+        # that moves the due date clears it here to set it afresh.
+        if self.repeat_unit:
+            if not self.repeat_day and self.due_date:
+                self.repeat_day = self.due_date.day
+                if kwargs.get('update_fields') is not None:
+                    kwargs['update_fields'] = set(kwargs['update_fields']) | {'repeat_day'}
+        else:
+            self.repeat_day = None
         super().save(*args, **kwargs)
+        # Finished, wherever that happened: the series comes round again.
+        if self.completed and self.repeat_unit:
+            self.make_next()
+
+    def set_repeat(self, unit, every):
+        """Give the task a schedule ('' = none) from the Repeat field."""
+        if unit != self.repeat_unit:
+            self.repeat_day = None
+        self.repeat_unit, self.repeat_every = unit, every
+
+    def set_due_date(self, due):
+        """Move the due date; a series then keeps the new day of the month."""
+        if due != self.due_date:
+            self.repeat_day = None
+        self.due_date = due
+
+    @property
+    def repeat_label(self):
+        """'Every month' — empty for a task that does not repeat."""
+        from .repeat import label
+        return label(self.repeat_unit, self.repeat_every)
+
+    @property
+    def carries_series(self):
+        """Whether the series hangs on this task: it repeats and its next
+        one is not made yet. Deleting it ends the series unless the next
+        one is made first (make_next)."""
+        if not self.repeat_unit or not self.pk:
+            return False
+        return not Task.everywhere.filter(repeated_from=self).exists()
+
+    def delete_from_series(self, keep_series=False):
+        """Delete the task. With `keep_series`, its series goes on: the next
+        one is made first, as if this one were done ("skip just this one").
+        Without, a series that hangs on this task ends with it."""
+        if keep_series:
+            self.make_next()
+        self.delete()
+
+    def make_next(self):
+        """Make the task after this one in its series, if it repeats and
+        that task is not made already. Returns the next task, or None."""
+        from django.db import IntegrityError, transaction
+        from .repeat import next_due
+
+        if not self.repeat_unit or not self.pk:
+            return None
+        existing = Task.everywhere.filter(repeated_from=self).first()
+        if existing:
+            return existing
+        try:
+            with transaction.atomic():
+                nxt = Task.everywhere.create(
+                    name=self.name,
+                    description=self.description,
+                    priority=self.priority,
+                    due_date=next_due(self.due_date, self.repeat_unit,
+                                      self.repeat_every, self.repeat_day),
+                    contact=self.contact,
+                    company=self.company,
+                    supplier=self.supplier,
+                    team=self.team,
+                    # No column: the board puts an open task in To Do.
+                    member=self.member,
+                    created_by=self.created_by,
+                    repeat_unit=self.repeat_unit,
+                    repeat_every=self.repeat_every,
+                    repeat_day=self.repeat_day,
+                    repeated_from=self,
+                )
+                nxt.assignees.set(self.assignees.all())
+        except IntegrityError:
+            # Made by a save running at the same moment.
+            return Task.everywhere.filter(repeated_from=self).first()
+
+        def push():
+            owner = self.member or self.created_by
+            if owner is None or owner.user is None:
+                return
+            try:
+                from .google_tasks import push_task_to_google
+                push_task_to_google(owner.user, nxt)
+            except Exception as e:
+                print(f"Error pushing the next repeating task to Google Tasks: {e}")
+        transaction.on_commit(push)
+        return nxt
     
     def get_priority_color(self):
         """Return color for priority badge"""

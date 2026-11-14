@@ -322,6 +322,11 @@
             <div class="meta-item">
                 <i class="far fa-clock"></i> Due {{ task.due_date|date:"F j, Y" }}
             </div>
+            {% if task.repeat_unit %}
+            <div class="meta-item">
+                <i class="fa fa-redo"></i> {% blocktrans with schedule=task.repeat_label %}Repeats: {{ schedule }}{% endblocktrans %}
+            </div>
+            {% endif %}
             <div class="meta-item">
                 <i class="far fa-user"></i> {{ task.member.user.get_full_name }}
             </div>
@@ -575,7 +580,7 @@
                 style="flex:1; padding:0.6rem; background:white; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#1e293b; display:flex; align-items:center; justify-content:center; gap:0.5rem; cursor:pointer; transition:all 0.2s;">
                 <i class="fas fa-pen" style="color:#64748b;"></i> Edit
             </button>
-            <button onclick="deleteTeamTask('{{ task.id }}')"
+            <button onclick="deleteTeamTask('{{ task.id }}', this)"{% if task.carries_series %} data-repeat="{{ task.repeat_label }}"{% endif %}
                 style="padding:0.6rem 0.8rem; background:#fee2e2; border:1px solid #fecaca; border-radius:8px; color:#dc2626; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
                 <i class="fas fa-trash"></i>
             </button>
@@ -836,19 +841,22 @@
         });
     }
 
-    function deleteTeamTask(taskId) {
-        if (!confirm('Are you sure you want to delete this task?')) return;
-        fetch(`/team/task/${taskId}/delete/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                // Redirect to team tasks if available
-                const teamId = '{{ task.team.id }}';
-                window.location.href = `{% url 'team:team_tasks' %}?team_id=${teamId}`;
-            } else {
-                alert(data.error || 'Error deleting task');
-            }
+    function deleteTeamTask(taskId, button) {
+        window.confirmTaskDelete(button, 'Are you sure you want to delete this task?').then(answer => {
+            if (!answer) return;
+            fetch(`/team/task/${taskId}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: answer.keepSeries ? new URLSearchParams({ keep_series: '1' }) : null
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    // Redirect to team tasks if available
+                    const teamId = '{{ task.team.id }}';
+                    window.location.href = `{% url 'team:team_tasks' %}?team_id=${teamId}`;
+                } else {
+                    alert(data.error || 'Error deleting task');
+                }
+            });
         });
     }
 

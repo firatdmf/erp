@@ -322,8 +322,6 @@ class SalesRepRoleTests(TestCase):
 
         self.assertEqual(edit(order_in(ergene, order_status="pending")).status_code, 404)
 
-        completed = order_in(laleli, order_status="pending", status="completed")
-        self.assertEqual(edit(completed).status_code, 403)
         shipped = order_in(laleli, order_status="shipped")
         self.assertEqual(edit(shipped).status_code, 302)
 

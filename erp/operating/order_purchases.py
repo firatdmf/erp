@@ -105,8 +105,8 @@ def _figure(value):
 
 
 def release_line_rolls(item):
-    """Put the rolls reserved for `item` back on the shelf — its line is
-    leaving the order, or turning into another variant the rolls aren't.
+    """Free the rolls reserved for `item` — its line is leaving the order.
+    They are warehouse stock the order had set aside, free to sell again.
     Written in the order's history, roll by roll. Returns the barcodes."""
     from .audit import _item_label, log_change
     from .models import OrderStockReservation
@@ -118,7 +118,7 @@ def release_line_rolls(item):
         return []
     codes = [r.stock_item.barcode or "#%s" % r.stock_item_id for r in reservations]
     log_change(item.order_id, "item_updated", field="rolls", item_label=_item_label(item),
-               old=", ".join(codes), new=_("back on the shelf"))
+               old=", ".join(codes), new=_("no longer reserved for the order"))
     OrderStockReservation.objects.filter(pk__in=[r.pk for r in reservations]).delete()
     return codes
 
@@ -212,7 +212,7 @@ def purchase_cancel_warning(invoice):
              for r in (OrderStockReservation.objects
                        .filter(order_item__in=going, consumed=False)
                        .select_related("stock_item").order_by("pk"))]
-    rolls_note = (" " + _("Roll(s) %(codes)s go back on the shelf.")
+    rolls_note = (" " + _("Roll(s) %(codes)s will no longer be reserved for the order.")
                   % {"codes": ", ".join(codes)}) if codes else ""
     if items and len(going) == len(items):
         return (_("Order %(number)s: all its lines come from this purchase, so the order "
@@ -385,6 +385,8 @@ def put_plan_in_catalog(plan, order=None):
         seen = set()
         rows = _intake_variants(item, main_product)
         for idx, (v_in, v) in enumerate(zip(p_in.get("variants") or [], rows), start=1):
+            # The SKU the row had when the page loaded it; not kept in the plan.
+            was_sku = (v_in.pop("orig_sku", None) or "").strip()
             qty = _row_quantity(v)
             if not _row_label(v) and not (v.get("sku") or "").strip() and qty <= 0:
                 continue
@@ -408,7 +410,8 @@ def put_plan_in_catalog(plan, order=None):
             if qty > 0:
                 lines.append({"product": main_product, "variant": variant,
                               "quantity": qty,
-                              "sale_price": _decimal(v_in.get("sale_price"))})
+                              "sale_price": _decimal(v_in.get("sale_price")),
+                              "was_sku": was_sku})
     return lines
 
 
@@ -432,11 +435,13 @@ def plan_expected_rolls(plan, sku):
             for q in [_decimal(t.get("qty"))] if q > 0]
 
 
-def sync_customer_order(invoice, customer, lines, *, book, member=None, previous_skus=()):
+def sync_customer_order(invoice, customer, lines, *, book, member=None, previous_skus=(),
+                        changes=None):
     """Create the customer order `invoice` is bought for, or bring its
     lines in step with the purchase. Returns what the purchase page says
     about the order — what this save changed on it, or why it could not —
-    else None.
+    else None. `changes`, when given, is extended with each change one by
+    one — what the save-confirmation lists before the real save.
 
     Lines are matched by variant. A line fed by several purchases comes to
     their sum: this purchase's rows plus what the order's other purchases
@@ -446,8 +451,9 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     anything added on the order itself is the order's business. The lines
     follow until the order ships, packaging included; a shipped order is
     left as it is. Rolls reserved for a line stay with it when its quantity
-    changes, and go back on the shelf when its row leaves the purchase or
-    turns into another variant (release_line_rolls).
+    changes or its SKU is corrected (the row's `was_sku`: same line, new
+    variant), and are freed only when its row leaves the purchase
+    (release_line_rolls).
     """
     from accounting.services_accounts import (
         get_or_create_current_account_for_order, post_order_movement,
@@ -496,6 +502,12 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
         entry["sale_price"] = line["sale_price"]
     wanted = set()
     changed = 0
+    # A row whose SKU was corrected on the purchase (it came in as
+    # `was_sku`): the order line of the old SKU becomes the new one's —
+    # same line, its reserved rolls still reserved — rather than one line
+    # removed and another added. Only a line this purchase alone brought.
+    by_sku = {(it.product_variant.variant_sku or "").lower(): it
+              for it in existing.values() if it.product_variant_id}
     with syncing():
         for line in merged.values():
             variant = line["variant"]
@@ -504,6 +516,28 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
             sku = (variant.variant_sku or "").lower()
             qty = _as_line_decimal(line["quantity"] + others.get(sku, Decimal("0")))
             price = _as_line_decimal(line["sale_price"])
+            was = (line.get("was_sku") or "").strip().lower()
+            fixed = by_sku.get(was) if item is None and was and was != sku else None
+            if (fixed is not None and was in previous and fixed.product_variant_id not in merged
+                    and others.get(was, Decimal("0")) == 0):
+                old_sku, old_qty = fixed.product_variant.variant_sku, fixed.quantity
+                existing.pop(fixed.product_variant_id, None)
+                del by_sku[was]
+                fixed.product = line["product"]
+                fixed.product_variant = variant
+                fixed.save(update_fields=["product", "product_variant"])
+                said.append(_("%(old)s → %(new)s, same line") % {"old": old_sku,
+                                                                 "new": variant.variant_sku})
+                if old_qty != qty:
+                    # Saved apart so the history has the quantity on its own.
+                    fixed.quantity = qty
+                    fixed.save(update_fields=["quantity"])
+                    said.append(_("%(sku)s %(old)s → %(new)s")
+                                % {"sku": variant.variant_sku, "old": _figure(old_qty),
+                                   "new": _figure(qty)})
+                existing[variant.pk] = fixed
+                changed += 1
+                continue
             if item is None:
                 OrderItem.objects.create(order=order, product=line["product"],
                                          product_variant=variant,
@@ -522,9 +556,8 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                 item.quantity = qty
                 item.save(update_fields=["quantity"])
                 changed += 1
-        # Rows gone from the purchase — removed, or turned into another
-        # variant (that one was added above): their lines leave the order,
-        # and the rolls reserved for them go back on the shelf.
+        # Rows gone from the purchase: their lines leave the order, and the
+        # rolls reserved for them are freed.
         for variant_id, item in existing.items():
             sku = (item.product_variant.variant_sku or "").lower() if item.product_variant_id else ""
             if variant_id not in wanted and sku in previous:
@@ -543,7 +576,7 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
                     item.delete()
                     said.append(_("%(sku)s removed") % {"sku": _line_sku(item)})
                     if codes:
-                        said.append(_("roll(s) %(codes)s back on the shelf")
+                        said.append(_("roll(s) %(codes)s no longer reserved for the order")
                                     % {"codes": ", ".join(codes)})
                 changed += 1
     if changed and not created:
@@ -569,6 +602,8 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
             # page can still be printed without it.
             pass
     post_order_movement(order, member=member)
+    if changes is not None and not created:
+        changes.extend(said)
     if said and not created:
         return (_("Order %(number)s changed with this purchase: %(changes)s.")
                 % {"number": order.order_number or order.pk, "changes": "; ".join(said)})
@@ -839,7 +874,7 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         log_change(order, "field", field="purchase",
                    new=_("%(number)s cancelled — %(count)s line(s) removed")
                    % {"number": invoice.number, "count": removed})
-        rolls_note = (_("Roll(s) %(codes)s went back on the shelf.")
+        rolls_note = (_("Roll(s) %(codes)s are no longer reserved for the order.")
                       % {"codes": ", ".join(shelved)}) if shelved else ""
         if order.items.exists():
             said = (_("Its %(count)s line(s) were removed from order %(number)s, which "

@@ -12781,8 +12781,8 @@ msgctxt "order change"
 msgid "rolls"
 msgstr "Rezerve toplar"
 
-msgid "back on the shelf"
-msgstr "rafa geri döndü"
+msgid "no longer reserved for the order"
+msgstr "artık sipariş için rezerve değil"
 
 msgid "%(sku)s added, %(qty)s"
 msgstr "%(sku)s eklendi, %(qty)s"
@@ -12793,17 +12793,26 @@ msgstr "%(sku)s %(old)s → %(new)s"
 msgid "%(sku)s removed"
 msgstr "%(sku)s çıkarıldı"
 
-msgid "roll(s) %(codes)s back on the shelf"
-msgstr "%(codes)s topları rafa geri döndü"
+msgid "roll(s) %(codes)s no longer reserved for the order"
+msgstr "%(codes)s topları artık sipariş için rezerve değil"
+
+msgid "%(old)s → %(new)s, same line"
+msgstr "%(old)s → %(new)s, aynı satır"
 
 msgid "Order %(number)s changed with this purchase: %(changes)s."
 msgstr "%(number)s siparişi bu alımla değişti: %(changes)s."
 
-msgid "Roll(s) %(codes)s went back on the shelf."
-msgstr "%(codes)s topları rafa geri döndü."
+msgid "Roll(s) %(codes)s are no longer reserved for the order."
+msgstr "%(codes)s topları artık sipariş için rezerve değil."
 
-msgid "Roll(s) %(codes)s go back on the shelf."
-msgstr "%(codes)s topları rafa geri döner."
+msgid "Roll(s) %(codes)s will no longer be reserved for the order."
+msgstr "%(codes)s topları artık sipariş için rezerve olmayacak."
+
+msgid "Saving this purchase changes order {number}:"
+msgstr "Bu alımı kaydetmek {number} siparişini değiştirir:"
+
+msgid "Save?"
+msgstr "Kaydedilsin mi?"
 
 msgid "Changed on the purchase"
 msgstr "Alımda değiştirildi"

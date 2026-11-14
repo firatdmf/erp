@@ -3509,7 +3509,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
           sale_price: (v.querySelector('.np-v-sale') || {}).value || '',
           invoice_item_id: npIdOf(v, 'itemId'),
           sku_choice: v.dataset.skuChoice || '',
-          rename_from: v.dataset.renameFrom || ''
+          rename_from: v.dataset.renameFrom || '',
+          // The SKU the row was loaded with: a changed one is a correction,
+          // and the order keeps the same line for it.
+          orig_sku: v.dataset.origSku || ''
         });
       });
       if (!variants.length) { alert(label + ': {% trans "Add at least one variant with an item." %}'); return; }
@@ -3604,6 +3607,28 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (btn._npOrig) btn.innerHTML = btn._npOrig;
   }
 
+  // A purchase that feeds an order changes the order when it is saved.
+  // Ask first: the server runs the save as a preview, undoes it, and says
+  // what it would change. Resolves true to go on with the real save.
+  function npAskOrderChanges(payload) {
+    if (!GR_ORDER_ID && !GR_FOR_ORDER_ID) return Promise.resolve(true);
+    const probe = Object.assign({}, payload, { preview: true });
+    return fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(probe),
+    }).then(npReadJson)
+      .then(function (d) {
+        if (!d || !d.success) { alert((d && d.error) || '{% trans "Could not save." %}'); return false; }
+        const changes = d.preview || [];
+        if (!changes.length) return true;
+        return confirm('{% filter escapejs %}{% trans "Saving this purchase changes order {number}:" %}{% endfilter %}'
+                         .replace('{number}', d.order) +
+                       '\n\n• ' + changes.join('\n• ') + '\n\n' +
+                       '{% filter escapejs %}{% trans "Save?" %}{% endfilter %}');
+      });
+  }
+
   // Save as an ORDER: writes the document and nothing else. No stock, no
   // catalog rows, no debt — that all waits for the confirm.
   window.npSaveOrder = function () {
@@ -3611,7 +3636,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
     const payload = npOrderPayload();
     if (!payload) return;
     npBusy(btn, '{% trans "Saving…" %}');
-    fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
+    npAskOrderChanges(payload).then(function (go) {
+    if (!go) { npUnbusy(btn); return; }
+    return fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
@@ -3619,7 +3646,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
       .then(function (d) {
         if (d && d.success) { npGoAfterSave(d.detail_url, d.notices); }
         else { alert((d && d.error) || '{% trans "Could not save." %}'); npUnbusy(btn); }
-      }).catch(function (err) { npFailed(err); npUnbusy(btn); });
+      });
+    }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
 
   // Receive: for a saved order, store any edits first and then confirm it,
@@ -3633,7 +3661,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
     const payload = npOrderPayload();
     if (!payload) return;
     npBusy(btn, '{% trans "Saving…" %}');
-    fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
+    npAskOrderChanges(payload).then(function (go) {
+    if (!go) { npUnbusy(btn); return; }
+    return fetch(GR_ORDER_ID ? GR_ORDER_UPDATE_TPL.replace('/0/', '/' + GR_ORDER_ID + '/') : GR_ORDER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(payload),
@@ -3664,7 +3694,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
               npUnbusy(btn);
             }
           });
-      }).catch(function (err) { npFailed(err); npUnbusy(btn); });
+      });
+    }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
 
   // Receive straight away, without the order step — the delivery is already

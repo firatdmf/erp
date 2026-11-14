@@ -310,8 +310,9 @@ class PurchaseForCustomerTest(TestCase):
         self.assertIn("Order %s changed with this purchase: K24644.G07 55 → 5; "
                       "K24644.G08 10 → 20." % order.order_number, said)
 
-    def test_a_changed_sku_changes_the_order_and_shelves_the_old_lines_rolls(self):
-        """Order 351 again, with a roll already reserved for the line."""
+    def test_a_row_replaced_by_another_frees_the_old_lines_rolls(self):
+        """A new row in place of one removed (no SKU it was loaded with):
+        the old line leaves the order and its rolls are freed."""
         inv_id, order = self._two_row_purchase()
         self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G07"),
                               barcode="SHELF01")
@@ -322,11 +323,50 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(self._held(order), [])
         self.assertEqual(WarehouseProductItem.objects.get(barcode="SHELF01").status, "in_stock")
         self.assertIn("Order %s changed with this purchase: K24644.G09 added, 55; "
-                      "K24644.G07 removed; roll(s) SHELF01 back on the shelf."
+                      "K24644.G07 removed; roll(s) SHELF01 no longer reserved for the order."
                       % order.order_number, said)
         log = self._order_log(order)
-        self.assertIn(("item_updated", "rolls", "back on the shelf"), log)
+        self.assertIn(("item_updated", "rolls", "no longer reserved for the order"), log)
         self.assertTrue(order.change_logs.filter(field="rolls", old_value="SHELF01").exists())
+
+    def test_a_corrected_sku_keeps_the_line_and_its_reserved_rolls(self):
+        """A SKU mistyped on the purchase and put right: the same order
+        line takes the right SKU, and the roll reserved for it stays."""
+        inv_id, order = self._two_row_purchase()
+        line = order.items.get(product_variant__variant_sku="K24644.G07")
+        self._hold_shelf_roll(line, barcode="SHELF04")
+        fixed = dict(self._variant(name="G09", sku="K24644.G09", tops=(60,)),
+                     orig_sku="K24644.G07")
+        said = self._resave(inv_id, [fixed, self._variant(name="G08", sku="K24644.G08",
+                                                          tops=(10,))])
+        line.refresh_from_db()
+        self.assertEqual(line.product_variant.variant_sku, "K24644.G09")
+        self.assertEqual(line.quantity, Decimal("60.00"))
+        self.assertEqual(order.items.count(), 2)
+        self.assertEqual(list(OrderStockReservation.objects.filter(order=order)
+                              .values_list("order_item_id", flat=True)), [line.pk])
+        self.assertIn("Order %s changed with this purchase: K24644.G07 → K24644.G09, same line; "
+                      "K24644.G09 55 → 60." % order.order_number, said)
+        self.assertTrue(order.change_logs.filter(field="product", old_value="K24644.G07",
+                                                 new_value="K24644.G09").exists())
+        # The SKU the page loaded is not kept in the plan.
+        self.assertNotIn("orig_sku", Invoice.objects.get(pk=inv_id)
+                         .intake_plan["products"][0]["variants"][0])
+
+    def test_a_preview_says_what_the_save_would_do_and_writes_nothing(self):
+        inv_id, order = self._two_row_purchase()
+        plan_before = Invoice.objects.get(pk=inv_id).intake_plan
+        changes_before = order.change_logs.count()
+        plan = self._plan(variants=[self._variant(tops=(5,))], customer=False,
+                          product=Product.objects.get(sku="K24644"))
+        plan["preview"] = True
+        r = self._save(plan, pk=inv_id)
+        self.assertEqual(r.json(), {"success": True, "order": order.order_number,
+                                    "preview": ["K24644.G07 55 → 5", "K24644.G08 removed"]})
+        self.assertEqual(dict(order.items.values_list("product_variant__variant_sku", "quantity")),
+                         {"K24644.G07": Decimal("55.00"), "K24644.G08": Decimal("10.00")})
+        self.assertEqual(Invoice.objects.get(pk=inv_id).intake_plan, plan_before)
+        self.assertEqual(order.change_logs.count(), changes_before)
 
     def test_a_row_deleted_on_the_purchase_leaves_the_order_with_its_rolls(self):
         inv_id, order = self._two_row_purchase()
@@ -337,9 +377,9 @@ class PurchaseForCustomerTest(TestCase):
                          ["K24644.G07"])
         self.assertEqual(self._held(order), [])
         self.assertIn("Order %s changed with this purchase: K24644.G08 removed; "
-                      "roll(s) SHELF02 back on the shelf." % order.order_number, said)
+                      "roll(s) SHELF02 no longer reserved for the order." % order.order_number, said)
 
-    def test_cancelling_the_purchase_shelves_the_rolls_of_its_lines(self):
+    def test_cancelling_the_purchase_frees_the_rolls_of_its_lines(self):
         inv_id, order = self._two_row_purchase()
         self._stock_line(order)
         self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G07"),
@@ -347,7 +387,7 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(
             self._cancel_warning(inv_id),
             "Order %s: its 2 line(s) from this purchase are removed; the order stays open "
-            "with the rest. Roll(s) SHELF03 go back on the shelf." % order.order_number)
+            "with the rest. Roll(s) SHELF03 will no longer be reserved for the order." % order.order_number)
 
         r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]),
                              {"reason": "Supplier ran out"})
@@ -356,7 +396,7 @@ class PurchaseForCustomerTest(TestCase):
                          ["STK0001.1"])
         self.assertEqual(self._held(order), [])
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "Roll(s) SHELF03 went back on the shelf.")
+        self.assertContains(page, "Roll(s) SHELF03 are no longer reserved for the order.")
 
     def test_moving_the_draft_to_another_books_warehouse_is_refused(self):
         inv_id = self._save(self._plan()).json()["invoice_id"]

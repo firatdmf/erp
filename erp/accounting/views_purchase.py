@@ -648,6 +648,15 @@ class _SaveRefused(Exception):
     user-facing message."""
 
 
+class _Previewed(Exception):
+    """Rolls back a save run only to see what it would do to the order
+    (payload "preview"): the page asks before the real save."""
+
+    def __init__(self, order, changes):
+        super().__init__()
+        self.order, self.changes = order, changes
+
+
 def order_to_link(order_pk, book):
     """The existing customer order a new purchase is to be bought for, or
     _SaveRefused saying why it can't be: it must exist, still be open, and
@@ -735,6 +744,9 @@ class PurchaseOrderSave(View):
         delivery = _parse_date(data.get("delivery_date"))
         order_warning = None
         price_note = None
+        # A preview runs the very save and undoes it, so what the page asks
+        # about is what the real save then does.
+        preview = [] if data.get("preview") else None
         try:
             with transaction.atomic():
                 if pk is not None:
@@ -804,6 +816,7 @@ class PurchaseOrderSave(View):
                         book=warehouse.accounting_book,
                         member=getattr(request.user, "member", None),
                         previous_skus=previous_skus,
+                        changes=preview,
                     )
                     # One sale price per item, the order's: the purchase's
                     # rows for lines the order has follow it.
@@ -840,6 +853,14 @@ class PurchaseOrderSave(View):
                 else:
                     diff_fields(invoice, before_fields, user=request.user)
                     diff_plans(invoice, before_plan, data, user=request.user)
+                if preview is not None:
+                    raise _Previewed(invoice.for_order, preview)
+        except _Previewed as done:
+            order = done.order
+            return JsonResponse({
+                "success": True, "preview": done.changes,
+                "order": (order.order_number or str(order.pk)) if order is not None else None,
+            })
         except (_SaveRefused, CustomerOrderError) as exc:
             # CustomerOrderError reaches here from put_plan_in_catalog — a
             # row with no sale price, refused before the order is touched.

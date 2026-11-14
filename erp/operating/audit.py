@@ -146,6 +146,21 @@ def _item_label(item):
         return f"item #{item.pk}"
 
 
+def _item_code(product_id, variant_id):
+    """What a line was of, for its history: the variant's SKU, else the
+    product's."""
+    from marketing.models import Product, ProductVariant
+    if variant_id:
+        sku = ProductVariant.objects.filter(pk=variant_id).values_list("variant_sku", flat=True).first()
+        if sku:
+            return sku
+    if product_id:
+        row = Product.objects.filter(pk=product_id).values_list("sku", "title").first()
+        if row:
+            return row[0] or row[1]
+    return None
+
+
 def _fmt_qty_price(qty, price):
     """"200.00 × 2.00" — bare figures. An order's lines are saved before
     its currency is stamped, so the money is named where the history is
@@ -199,7 +214,8 @@ def _audit_item_saved(sender, instance, created, **kwargs):
                 or old.get("product_variant_id") != instance.product_variant_id):
             _log(instance.order_id, "item_updated", field="product",
                  item_label=_item_label(instance),
-                 new=_fmt_qty_price(instance.quantity, instance.price))
+                 old=_item_code(old.get("product_id"), old.get("product_variant_id")),
+                 new=_item_code(instance.product_id, instance.product_variant_id))
             return
         if (old.get("quantity") or 0) != (instance.quantity or 0):
             _log(instance.order_id, "item_updated", field="quantity",

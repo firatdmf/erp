@@ -310,24 +310,32 @@ class PurchaseForCustomerTest(TestCase):
         self.assertIn("Order %s changed with this purchase: K24644.G07 55 → 5; "
                       "K24644.G08 10 → 20." % order.order_number, said)
 
-    def test_a_row_replaced_by_another_frees_the_old_lines_rolls(self):
+    def test_a_row_replaced_keeps_the_old_line_on_its_warehouse_roll(self):
         """A new row in place of one removed (no SKU it was loaded with):
-        the old line leaves the order and its rolls are freed."""
+        the purchase's 55 m come off the old line, but the 50 m roll from
+        the warehouse reserved for it stays, and so does the line."""
         inv_id, order = self._two_row_purchase()
-        self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G07"),
-                              barcode="SHELF01")
+        line = order.items.get(product_variant__variant_sku="K24644.G07")
+        self._hold_shelf_roll(line, barcode="SHELF01")
+        said = self._resave(inv_id, [self._variant(name="G09", sku="K24644.G09"),
+                                     self._variant(name="G08", sku="K24644.G08", tops=(10,))])
+        self.assertEqual(dict(order.items.values_list("product_variant__variant_sku", "quantity")),
+                         {"K24644.G07": Decimal("50.00"), "K24644.G08": Decimal("10.00"),
+                          "K24644.G09": Decimal("55.00")})
+        self.assertEqual(list(OrderStockReservation.objects.filter(order=order)
+                              .values_list("order_item_id", flat=True)), [line.pk])
+        self.assertIn("Order %s changed with this purchase: K24644.G09 added, 55; "
+                      "K24644.G07 stays on the order with roll(s) SHELF01 already reserved "
+                      "for it; K24644.G07 55 → 50." % order.order_number, said)
+
+    def test_a_row_replaced_with_nothing_reserved_leaves_the_order(self):
+        inv_id, order = self._two_row_purchase()
         said = self._resave(inv_id, [self._variant(name="G09", sku="K24644.G09"),
                                      self._variant(name="G08", sku="K24644.G08", tops=(10,))])
         self.assertEqual(sorted(order.items.values_list("product_variant__variant_sku", flat=True)),
                          ["K24644.G08", "K24644.G09"])
-        self.assertEqual(self._held(order), [])
-        self.assertEqual(WarehouseProductItem.objects.get(barcode="SHELF01").status, "in_stock")
         self.assertIn("Order %s changed with this purchase: K24644.G09 added, 55; "
-                      "K24644.G07 removed; roll(s) SHELF01 no longer reserved for the order."
-                      % order.order_number, said)
-        log = self._order_log(order)
-        self.assertIn(("item_updated", "rolls", "no longer reserved for the order"), log)
-        self.assertTrue(order.change_logs.filter(field="rolls", old_value="SHELF01").exists())
+                      "K24644.G07 removed." % order.order_number, said)
 
     def test_a_corrected_sku_keeps_the_line_and_its_reserved_rolls(self):
         """A SKU mistyped on the purchase and put right: the same order
@@ -450,35 +458,39 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(Invoice.objects.get(pk=inv_id).intake_plan, plan_before)
         self.assertEqual(order.change_logs.count(), changes_before)
 
-    def test_a_row_deleted_on_the_purchase_leaves_the_order_with_its_rolls(self):
+    def test_a_row_deleted_while_a_warehouse_roll_covers_its_line(self):
+        """The warehouse had the 10 m and it was reserved for the line, so
+        the row is deleted from the purchase: the line stays, on that roll."""
         inv_id, order = self._two_row_purchase()
         self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G08"),
-                              barcode="SHELF02")
+                              meters=Decimal("10"), barcode="SHELF02")
         said = self._resave(inv_id, [self._variant()])
-        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
-                         ["K24644.G07"])
-        self.assertEqual(self._held(order), [])
-        self.assertIn("Order %s changed with this purchase: K24644.G08 removed; "
-                      "roll(s) SHELF02 no longer reserved for the order." % order.order_number, said)
+        self.assertEqual(dict(order.items.values_list("product_variant__variant_sku", "quantity")),
+                         {"K24644.G07": Decimal("55.00"), "K24644.G08": Decimal("10.00")})
+        self.assertEqual(self._held(order), [Decimal("10.00")])
+        self.assertIn("Order %s changed with this purchase: K24644.G08 stays on the order with "
+                      "roll(s) SHELF02 already reserved for it." % order.order_number, said)
 
-    def test_cancelling_the_purchase_frees_the_rolls_of_its_lines(self):
+    def test_cancelling_the_purchase_keeps_lines_on_their_warehouse_rolls(self):
         inv_id, order = self._two_row_purchase()
         self._stock_line(order)
         self._hold_shelf_roll(order.items.get(product_variant__variant_sku="K24644.G07"),
                               barcode="SHELF03")
         self.assertEqual(
             self._cancel_warning(inv_id),
-            "Order %s: its 2 line(s) from this purchase are removed; the order stays open "
-            "with the rest. Roll(s) SHELF03 will no longer be reserved for the order." % order.order_number)
+            "Order %s: its 1 line(s) from this purchase are removed; the order stays open "
+            "with the rest. Lines with roll(s) SHELF03 already reserved for them stay, "
+            "with those rolls." % order.order_number)
 
         r = self.client.post(reverse("accounts:purchase_cancel", args=[inv_id]),
                              {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
-        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
-                         ["STK0001.1"])
-        self.assertEqual(self._held(order), [])
+        self.assertEqual(dict(order.items.values_list("product_variant__variant_sku", "quantity")),
+                         {"STK0001.1": Decimal("50.00"), "K24644.G07": Decimal("50.00")})
+        self.assertEqual(self._held(order), [Decimal("50.00")])
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[inv_id]))
-        self.assertContains(page, "Roll(s) SHELF03 are no longer reserved for the order.")
+        self.assertContains(page, "Lines with roll(s) SHELF03 already reserved for them stay, "
+                                  "with those rolls.")
 
     def test_a_received_purchase_cancel_names_the_order_holding_its_rolls(self):
         """Its rolls were reserved for the order it was bought for on

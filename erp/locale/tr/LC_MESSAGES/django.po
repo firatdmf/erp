@@ -12801,8 +12801,8 @@ msgstr "%(sku)s %(old)s → %(new)s"
 msgid "%(sku)s removed"
 msgstr "%(sku)s çıkarıldı"
 
-msgid "roll(s) %(codes)s no longer reserved for the order"
-msgstr "%(codes)s topları artık sipariş için rezerve değil"
+msgid "%(sku)s stays on the order with roll(s) %(codes)s already reserved for it"
+msgstr "%(sku)s, kendisi için zaten rezerve edilmiş %(codes)s toplarıyla siparişte kalır"
 
 msgid "%(old)s → %(new)s, same line"
 msgstr "%(old)s → %(new)s, aynı satır"
@@ -12810,11 +12810,8 @@ msgstr "%(old)s → %(new)s, aynı satır"
 msgid "Order %(number)s changed with this purchase: %(changes)s."
 msgstr "%(number)s siparişi bu alımla değişti: %(changes)s."
 
-msgid "Roll(s) %(codes)s are no longer reserved for the order."
-msgstr "%(codes)s topları artık sipariş için rezerve değil."
-
-msgid "Roll(s) %(codes)s will no longer be reserved for the order."
-msgstr "%(codes)s topları artık sipariş için rezerve olmayacak."
+msgid "Lines with roll(s) %(codes)s already reserved for them stay, with those rolls."
+msgstr "Kendileri için zaten rezerve edilmiş %(codes)s topları olan satırlar o toplarla kalır."
 
 msgid "Saving this purchase changes order {number}:"
 msgstr "Bu alımı kaydetmek {number} siparişini değiştirir:"

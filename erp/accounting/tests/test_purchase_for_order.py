@@ -353,6 +353,88 @@ class PurchaseForCustomerTest(TestCase):
         self.assertNotIn("orig_sku", Invoice.objects.get(pk=inv_id)
                          .intake_plan["products"][0]["variants"][0])
 
+    def test_a_corrected_sku_renames_the_drafts_own_variant(self):
+        """The draft made K24644.G07 and nothing else uses it: putting the
+        SKU right renames it, so the catalog keeps no unused copy."""
+        inv_id, order = self._two_row_purchase()
+        line = order.items.get(product_variant__variant_sku="K24644.G07")
+        variant_id = line.product_variant_id
+        self._hold_shelf_roll(line, barcode="SHELF05")
+        said = self._resave(inv_id, [dict(self._variant(name="G09", sku="K24644.G09"),
+                                          orig_sku="K24644.G07"),
+                                     self._variant(name="G08", sku="K24644.G08", tops=(10,))])
+        self.assertEqual(ProductVariant.objects.get(pk=variant_id).variant_sku, "K24644.G09")
+        self.assertFalse(ProductVariant.objects.filter(variant_sku="K24644.G07").exists())
+        line.refresh_from_db()
+        self.assertEqual(line.product_variant_id, variant_id)
+        self.assertEqual(list(OrderStockReservation.objects.filter(order=order)
+                              .values_list("order_item_id", flat=True)), [line.pk])
+        self.assertIn("Order %s changed with this purchase: K24644.G07 → K24644.G09, same line."
+                      % order.order_number, said)
+        self.assertTrue(order.change_logs.filter(field="product", old_value="K24644.G07",
+                                                 new_value="K24644.G09").exists())
+
+    def test_a_corrected_sku_on_a_shared_variant_asks_first(self):
+        """K24644.G07 is on another order too: the save does not guess
+        between renaming it for both and making a separate one."""
+        inv_id, order = self._two_row_purchase()
+        line = order.items.get(product_variant__variant_sku="K24644.G07")
+        other = Order.objects.create(contact=self.customer)
+        OrderItem.objects.create(order=other, product=line.product,
+                                 product_variant=line.product_variant,
+                                 quantity=Decimal("3"), price=Decimal("5"))
+        self._hold_shelf_roll(line, barcode="SHELF06")
+        fixed = dict(self._variant(name="G09", sku="K24644.G09"), orig_sku="K24644.G07")
+        plan = self._plan(variants=[fixed, self._variant(name="G08", sku="K24644.G08",
+                                                         tops=(10,))],
+                          customer=False, product=Product.objects.get(sku="K24644"))
+        r = self._save(plan, pk=inv_id)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("used outside this purchase too", r.json()["error"])
+
+        # "Separate": a new variant, and the same line moves onto it.
+        said = self._resave(inv_id, [dict(fixed, sku_choice="separate"),
+                                     self._variant(name="G08", sku="K24644.G08", tops=(10,))])
+        line.refresh_from_db()
+        self.assertEqual(line.product_variant.variant_sku, "K24644.G09")
+        self.assertTrue(ProductVariant.objects.filter(variant_sku="K24644.G07").exists())
+        self.assertEqual(list(OrderStockReservation.objects.filter(order=order)
+                              .values_list("order_item_id", flat=True)), [line.pk])
+        self.assertIn("Order %s changed with this purchase: K24644.G07 → K24644.G09, same line."
+                      % order.order_number, said)
+
+    def test_a_corrected_product_name_renames_the_drafts_own_product(self):
+        """The card cleared and typed anew: the product the draft made is
+        put right rather than a second one made beside it."""
+        inv_id, order = self._two_row_purchase()
+        product = Product.objects.get(sku="K24644")
+        plan = self._plan(variants=[self._variant(),
+                                    self._variant(name="G08", sku="K24644.G08", tops=(10,))],
+                          customer=False)
+        plan["products"][0]["main_product"] = {"mode": "new", "name": "Linen K24645",
+                                               "sku": "K24645", "orig_product_id": product.pk}
+        r = self._save(plan, pk=inv_id)
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(Product.objects.filter(variants__isnull=False).distinct().count(), 1)
+        product.refresh_from_db()
+        self.assertEqual((product.sku, product.title), ("K24645", "Linen K24645"))
+        self.assertEqual(set(order.items.values_list("product_id", flat=True)), {product.pk})
+        stored = Invoice.objects.get(pk=inv_id).intake_plan["products"][0]["main_product"]
+        self.assertEqual((stored["mode"], stored["id"]), ("existing", product.pk))
+
+    def test_the_drafts_edit_page_says_which_rows_may_rename(self):
+        inv_id, order = self._two_row_purchase()
+        other = Order.objects.create(contact=self.customer)
+        g08 = ProductVariant.objects.get(variant_sku="K24644.G08")
+        OrderItem.objects.create(order=other, product=g08.product, product_variant=g08,
+                                 quantity=Decimal("3"), price=Decimal("5"))
+        page = self.client.get(reverse("accounts:goods_receipt_edit", args=[inv_id]))
+        rows = {v["sku"]: v for v in page.context["intake_plan"]["products"][0]["variants"]}
+        self.assertEqual((rows["K24644.G07"]["sku_follows"], rows["K24644.G07"]["sku_uses"]),
+                         (True, []))
+        self.assertFalse(rows["K24644.G08"]["sku_follows"])
+        self.assertEqual(len(rows["K24644.G08"]["sku_uses"]), 1)
+
     def test_a_preview_says_what_the_save_would_do_and_writes_nothing(self):
         inv_id, order = self._two_row_purchase()
         plan_before = Invoice.objects.get(pk=inv_id).intake_plan

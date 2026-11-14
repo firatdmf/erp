@@ -343,7 +343,120 @@ def check_sale_prices(plan, known=()):
             % {"rows": ", ".join(missing)})
 
 
-def put_plan_in_catalog(plan, order=None):
+def _correct_draft_products(products_in, invoice, *, user=None, renamed):
+    """A saved draft's card that named a product, sent back as a new one —
+    cleared and retyped to put its title or SKU right. When nothing but
+    this draft (and the order it is for) uses that product, it is corrected
+    in place instead of a second product being made beside it, which would
+    leave the first one in the catalog unused. Used elsewhere, the new
+    product is made as typed."""
+    from accounting.purchase_audit import log_purchase
+    from marketing.models import Product
+    from .models import OrderItem
+    from .views_warehouse import IntakeError, _variant_uses
+
+    for p_in in products_in:
+        mp = p_in.get("main_product") or {}
+        orig = str(mp.pop("orig_product_id", None) or "")
+        if invoice is None or not invoice.pk or mp.get("mode") != "new" or not orig.isdigit():
+            continue
+        product = Product.objects.filter(pk=int(orig)).first()
+        if product is None or product.featured:
+            continue
+        if (OrderItem.objects.filter(product=product).exclude(order_id=invoice.for_order_id).exists()
+                or any(_variant_uses(v, invoice=invoice) for v in product.variants.all())):
+            continue
+        title = (mp.get("name") or "").strip() or product.title
+        sku = (mp.get("sku") or "").strip().upper() or product.sku
+        if sku and Product.objects.filter(sku__iexact=sku).exclude(pk=product.pk).exists():
+            raise IntakeError({"success": False,
+                               "error": _("%(sku)s is already used by another product.")
+                               % {"sku": sku}}, status=400)
+        old = f"{product.sku} · {product.title}" if product.sku else product.title
+        before = dict(product.variants.values_list("pk", "variant_sku"))
+        product.title, product.sku = title, sku
+        product.save(update_fields=["title", "sku"])
+        new = f"{product.sku} · {product.title}" if product.sku else product.title
+        if new != old:
+            log_purchase(invoice, "item_updated", field="product", item_label=new,
+                         old=old, new=new, user=user)
+            renamed.append((old, new))
+        # Its variants' SKUs carry the product's and follow it on save; the
+        # rows naming them follow too.
+        moved = {(before[pk] or "").lower(): now
+                 for pk, now in product.variants.values_list("pk", "variant_sku")
+                 if pk in before and now and now != before[pk]}
+        for v in p_in.get("variants") or []:
+            for key in ("sku", "orig_sku"):
+                now = moved.get((v.get(key) or "").strip().lower())
+                if now:
+                    v[key] = now
+        p_in["main_product"] = {"mode": "existing", "id": product.pk, "title": product.title,
+                                "name": product.title, "sku": product.sku or ""}
+
+
+def _correct_draft_variants(products_in, invoice, *, user=None, renamed):
+    """A saved draft's row whose values (and so its SKU) changed from the
+    variant it named (`orig_sku`): the same rule as a received line's own
+    variant (views_warehouse._rename_own_variants). Nothing else uses the
+    variant → renamed in place, so the catalog keeps no unused copy and the
+    order line, with its reserved rolls, stays on it. Used elsewhere → the
+    row has asked "rename for all, or a separate variant"
+    (_apply_sku_choices); unanswered, the save is refused rather than
+    guessing. A SKU another variant has already means the row moves there."""
+    from marketing.models import ProductVariant
+    from .catalog_sync import _attribute_pairs
+    from .views_warehouse import (
+        SKU_MAX_LENGTH, IntakeError, _rename_variant, _row_attributes, _variant_uses,
+    )
+
+    if invoice is None or not invoice.pk:
+        return
+    for p_in in products_in:
+        for v in p_in.get("variants") or []:
+            old = (v.get("orig_sku") or "").strip()
+            new = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
+            if (not old or not new or old.upper() == new.upper()
+                    or v.get("sku_choice") in ("rename", "separate")):
+                continue
+            variant = (ProductVariant.objects.select_related("product")
+                       .filter(variant_sku__iexact=old).first())
+            if variant is None or ProductVariant.objects.filter(variant_sku__iexact=new).exists():
+                continue
+            if _variant_uses(variant, invoice=invoice):
+                raise IntakeError(
+                    {"success": False,
+                     "error": _("%(sku)s is used outside this purchase too — choose on its row "
+                                "whether to rename it for all, or make a separate variant.")
+                     % {"sku": variant.variant_sku}}, status=400)
+            _rename_variant(variant, new, invoice=invoice, user=user,
+                            attributes=_attribute_pairs(_row_attributes(v), None, None))
+            renamed.append((old, variant.variant_sku))
+
+
+def plan_for_editing(plan, invoice):
+    """A saved draft's plan as its edit page loads it: each row that names
+    a variant says whether a change to its values renames it (`sku_follows`:
+    nothing but this draft uses it) or what else does (`sku_uses`, for the
+    row to list when it asks) — the same as a received line's rows."""
+    from marketing.models import ProductVariant
+    from .views_warehouse import _variant_uses
+
+    plan = copy.deepcopy(plan or {})
+    for p_in in plan.get("products") or []:
+        for v in p_in.get("variants") or []:
+            sku = (v.get("sku") or "").strip()
+            variant = (ProductVariant.objects.select_related("product")
+                       .filter(variant_sku__iexact=sku).first()) if sku else None
+            if variant is None:
+                continue
+            uses = _variant_uses(variant, invoice=invoice)
+            v["sku_follows"] = not uses
+            v["sku_uses"] = uses
+    return plan
+
+
+def put_plan_in_catalog(plan, order=None, *, invoice=None, user=None, renamed=None):
     """Create the catalog products and variants a draft purchase names, and
     rewrite `plan` in place to point at them — each card as an existing
     product, each variant row with the SKU it was given — so confirming the
@@ -367,7 +480,10 @@ def put_plan_in_catalog(plan, order=None):
 
     check_sale_prices(plan, known=set(order_line_prices(order)))
     products_in = plan.get("products") or []
-    _apply_sku_choices(products_in)
+    renamed = [] if renamed is None else renamed
+    _correct_draft_products(products_in, invoice, user=user, renamed=renamed)
+    renamed.extend(_apply_sku_choices(products_in, invoice=invoice, user=user))
+    _correct_draft_variants(products_in, invoice, user=user, renamed=renamed)
     account = _intake_account(plan)
     prefix = _intake_prefix(plan, account.name)
     resolved = _intake_resolve_products(products_in, prefix,
@@ -436,12 +552,14 @@ def plan_expected_rolls(plan, sku):
 
 
 def sync_customer_order(invoice, customer, lines, *, book, member=None, previous_skus=(),
-                        changes=None):
+                        changes=None, renamed=()):
     """Create the customer order `invoice` is bought for, or bring its
     lines in step with the purchase. Returns what the purchase page says
     about the order — what this save changed on it, or why it could not —
     else None. `changes`, when given, is extended with each change one by
-    one — what the save-confirmation lists before the real save.
+    one — what the save-confirmation lists before the real save. `renamed`
+    is what put_plan_in_catalog renamed in the catalog, [(old, new)]: the
+    lines on those stay as they are, and the order is told.
 
     Lines are matched by variant. A line fed by several purchases comes to
     their sum: this purchase's rows plus what the order's other purchases
@@ -493,6 +611,21 @@ def sync_customer_order(invoice, customer, lines, *, book, member=None, previous
     previous = {s.lower() for s in previous_skus}
     others = {} if created else other_purchase_quantities(order, invoice)
     said = []   # what this save did to the order, for the purchase page to say
+    if not created and renamed:
+        from .audit import _item_label
+        for item in existing.values():
+            # A renamed variant is named by its SKU, a renamed product as
+            # "SKU · title" (_correct_draft_products).
+            p = item.product
+            names = {(item.product_variant.variant_sku or "").lower() if item.product_variant_id else "",
+                     ((f"{p.sku} · {p.title}" if p.sku else p.title) or "").lower() if p else ""}
+            for old, new in renamed:
+                if new.lower() in names:
+                    log_change(order, "item_updated", field="product",
+                               item_label=_item_label(item), old=old, new=new)
+                    told = _("%(old)s → %(new)s, same line") % {"old": old, "new": new}
+                    if told not in said:
+                        said.append(told)
     # One entry per variant: two rows of one variant on this purchase are
     # one line on the order, their quantities summed.
     merged = {}

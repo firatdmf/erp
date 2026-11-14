@@ -4711,12 +4711,14 @@ def _purchase_variant_label(wp, title):
     return name
 
 
-def _variant_uses(variant, item=None):
-    """What carries `variant` besides purchase line `item` (None: besides
-    nothing), as short lines the page can list before a rename: other
-    purchases' items, items no purchase brought, meters gone out, orders
-    other than the one `item`'s purchase is bought for, and draft
-    purchases naming it. Empty: the variant is the line's alone."""
+def _variant_uses(variant, item=None, *, invoice=None):
+    """What carries `variant` besides purchase line `item` — or, for a
+    draft purchase that has no lines yet, besides `invoice` itself (None:
+    besides nothing) — as short lines the page can list before a rename:
+    other purchases' items, items no purchase brought, meters gone out,
+    orders other than the one the purchase is bought for, other draft
+    purchases naming it, and the website. Empty: the variant is the
+    purchase's alone."""
     from collections import Counter
     from django.db.models import TextField
     from django.db.models.functions import Cast
@@ -4725,7 +4727,8 @@ def _variant_uses(variant, item=None):
 
     if variant is None:
         return []
-    invoice = item.invoice if item is not None else None
+    if item is not None:
+        invoice = item.invoice
     rolls = list(WarehouseProductItem.objects
                  .filter(product__catalog_variant=variant)
                  .select_related("purchase_invoice_item__invoice"))
@@ -4742,8 +4745,8 @@ def _variant_uses(variant, item=None):
     if out:
         uses.append(_gettext("stock has gone out of %(count)s item(s)") % {"count": out})
     lines = InvoiceItem.objects.filter(variant=variant).select_related("invoice")
-    if item is not None:
-        lines = lines.exclude(invoice_id=item.invoice_id)
+    if invoice is not None and invoice.pk:
+        lines = lines.exclude(invoice_id=invoice.pk)
     for number in sorted({li.invoice.display_number for li in lines
                           if li.invoice.display_number not in by_doc}):
         uses.append(_gettext("purchase or invoice %(number)s") % {"number": number})
@@ -4762,10 +4765,14 @@ def _variant_uses(variant, item=None):
     drafts = (Invoice.objects.filter(type="purchase", status="ordered")
               .annotate(plan_text=Cast("intake_plan", TextField()))
               .filter(plan_text__icontains=f'"{variant.variant_sku}"'))
-    if invoice is not None:
+    if invoice is not None and invoice.pk:
         drafts = drafts.exclude(pk=invoice.pk)
     for draft in drafts:
         uses.append(_gettext("draft purchase %(number)s") % {"number": draft.display_number})
+    if item is None and invoice is not None and variant.product.featured:
+        # Renamed on the product page only (_apply_sku_choices), so a
+        # draft's row asks rather than renaming it unasked.
+        uses.append(_gettext("the website"))
     return uses
 
 

@@ -2184,7 +2184,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
       skuI.value = key === vEl.dataset.baseKey ? vEl.dataset.baseSku : npAutoSku(vEl);
       npApplyOrderPrice(vEl);
     }
-    const ownChanged = !!vEl.dataset.itemId && key !== vEl.dataset.baseKey;
+    // A row with a variant of its own: a received line's, or a saved
+    // draft's that the server said whether it may rename (sku_uses).
+    const ownChanged = (!!vEl.dataset.itemId || (!!vEl.dataset.origSku && 'skuUses' in vEl.dataset))
+                       && key !== vEl.dataset.baseKey;
     // A choice answers the values it was made for, not the next ones.
     if (vEl.dataset.choiceKey !== key) {
       delete vEl.dataset.skuChoice; delete vEl.dataset.renameFrom; delete vEl.dataset.choiceKey;
@@ -3477,7 +3480,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
             sku: (card.querySelector('.np-main-existing-sku').value || '').trim() }
         : { mode: 'new', name: (card.querySelector('.np-main-name').value || '').trim(),
             sku: (((card.querySelector('.np-main-sku') || {}).value || '').trim().toUpperCase()
-                  || slug(card.querySelector('.np-main-name').value || '')) };
+                  || slug(card.querySelector('.np-main-name').value || '')),
+            orig_product_id: card.dataset.origProductId || '' };
       if (!card._npMode) { alert(label + ': {% filter escapejs %}{% trans "Pick the main product from the list, or create it there." %}{% endfilter %}'); return; }
       if (card._npMode === 'existing' && !main.id) { alert(label + ': {% trans "Select an existing main product." %}'); return; }
       if (card._npMode === 'new' && !main.name && !main.sku) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
@@ -3770,6 +3774,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
 
       if (mp.mode === 'existing') {
         npMainPickExisting(card, mp.id, mp.title, mp.sku);
+        // Cleared and typed anew to put its title or SKU right, the
+        // product a saved draft made is corrected rather than copied.
+        if (GR_ORDER_ID) card.dataset.origProductId = mp.id || '';
       } else {
         npSetMode(card, 'new');
         card.querySelector('.np-main-name').value = mp.name || '';
@@ -3828,6 +3835,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (v.invoice_item_id) {
       vEl.dataset.itemId = v.invoice_item_id;
       vEl.dataset.origSku = v.sku || '';
+    } else if (GR_ORDER_ID && v.sku) {
+      // A saved draft's row: the variant it named, which a change to its
+      // values renames or asks about, like a received line's.
+      vEl.dataset.origSku = v.sku;
     }
     const card = vEl.closest('.np-product-card');
     const skuI = vEl.querySelector('.np-v-sku');

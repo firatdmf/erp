@@ -15123,6 +15123,12 @@ msgstr "taslak alım %(number)s"
 msgid "%(sku)s is already used by another variant."
 msgstr "%(sku)s zaten başka bir varyantta kullanılıyor."
 
+msgid "%(sku)s is already used by another product."
+msgstr "%(sku)s zaten başka bir üründe kullanılıyor."
+
+msgid "the website"
+msgstr "web sitesi"
+
 msgid "%(sku)s is on the website, so it is renamed on the product page."
 msgstr "%(sku)s web sitesinde, bu yüzden ürün sayfasından yeniden adlandırılır."
 

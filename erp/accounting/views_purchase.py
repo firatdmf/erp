@@ -423,7 +423,12 @@ class GoodsReceipt(View):
             "selected_warehouse_id": selected_id,
             "edit_invoice": invoice,
             "order_invoice": order,
-            "intake_plan": (order.intake_plan or {}) if order else prefill,
+            # A draft bought for an order has its products in the catalog
+            # already (put_plan_in_catalog), so its rows say what renaming
+            # them would touch.
+            "intake_plan": (_plan_for_editing(order.intake_plan, order)
+                            if order and for_order is not None
+                            else (order.intake_plan or {}) if order else prefill),
             # Opened inside the order's purchase panel: no site menus, and
             # the page tells the panel when to close.
             "embedded": request.GET.get("embed") == "1",
@@ -638,6 +643,11 @@ def line_prefill_plan(order, line_pk, qty):
     }
 
 
+def _plan_for_editing(plan, invoice):
+    from operating.order_purchases import plan_for_editing
+    return plan_for_editing(plan, invoice)
+
+
 def order_line_prices(order):
     from operating.order_purchases import order_line_prices as prices
     return prices(order)
@@ -810,13 +820,17 @@ class PurchaseOrderSave(View):
                         raise _SaveRefused(_(
                             "This purchase is for an order in another book — "
                             "receive it into a warehouse of that book."))
-                    order_lines = put_plan_in_catalog(data, order=order_bought_for(invoice))
+                    renamed = []
+                    order_lines = put_plan_in_catalog(data, order=order_bought_for(invoice),
+                                                      invoice=invoice, user=request.user,
+                                                      renamed=renamed)
                     order_warning = sync_customer_order(
                         invoice, customer, order_lines,
                         book=warehouse.accounting_book,
                         member=getattr(request.user, "member", None),
                         previous_skus=previous_skus,
                         changes=preview,
+                        renamed=renamed,
                     )
                     # One sale price per item, the order's: the purchase's
                     # rows for lines the order has follow it.

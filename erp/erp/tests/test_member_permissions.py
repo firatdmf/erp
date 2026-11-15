@@ -13,7 +13,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from authentication.models import Permission, Role
-from erp.roles import is_operations_manager, is_sales_rep, may_print_labels, may_see_profit
+from erp.roles import (is_operations_manager, is_sales_rep, may_print_labels, may_see_profit,
+                       sees_order_money)
 
 
 class RoleBoard(TestCase):
@@ -40,14 +41,17 @@ class RoleBoard(TestCase):
         # Only what a role can be given: no Sales rep or Operations manager
         # boxes — those are roles.
         chips = [name for name, *_ in board["roles"][0]["granted"]]
-        self.assertEqual(chips, ["orders", "beyond_sales", "admin", "purchase_confirm",
-                                 "view_profit", "print_labels"])
+        self.assertEqual(chips, ["orders", "prices_customers", "beyond_sales", "admin",
+                                 "purchase_confirm", "view_profit", "print_labels"])
 
     def test_moving_someone_gives_them_exactly_the_role_s_permissions(self):
         r = self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk,
                                         "role": self.ops.pk})
         self.assertTrue(r.json()["ok"])
-        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "print_labels"})
+        # Orders without Prices and customers: the role's members carry
+        # its restriction, and work orders without their money.
+        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "print_labels", "packing_only"})
+        self.assertFalse(sees_order_money(self.cuma))
         self.assertTrue(may_print_labels(self.cuma))
         self.assertFalse(may_see_profit(self.cuma))
         self.assertFalse(is_sales_rep(self.cuma) or is_operations_manager(self.cuma))
@@ -56,10 +60,11 @@ class RoleBoard(TestCase):
         self.client.post(self.url, {"action": "move", "member": self.cuma.member.pk, "role": self.ops.pk})
         self.client.post(self.url, {"action": "permission", "role": self.ops.pk,
                                     "permission": "view_profit", "granted": "on"})
-        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "print_labels", "view_profit"})
+        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "print_labels", "view_profit",
+                                                 "packing_only"})
         self.client.post(self.url, {"action": "permission", "role": self.ops.pk,
                                     "permission": "print_labels", "granted": "off"})
-        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "view_profit"})
+        self.assertEqual(self._held(self.cuma), {"orders", "beyond_sales", "view_profit", "packing_only"})
         self.assertFalse(may_print_labels(self.cuma))
 
     def test_a_role_without_beyond_sales_sells_and_without_orders_sees_none(self):
@@ -210,7 +215,7 @@ class SuperadminAndBooks(TestCase):
         self.assertFalse(self.cuma.is_superuser or self.cuma.is_staff)
         self.assertEqual(self.cuma.member.role, self.staff)
         self.assertEqual(set(self.cuma.member.permissions.values_list("name", flat=True)),
-                         {"orders", "beyond_sales"})
+                         {"orders", "beyond_sales", "packing_only"})
 
     def test_nobody_takes_themselves_out_and_the_last_one_stays(self):
         from authentication.member_roles import Refused, leave_superadmin

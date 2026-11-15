@@ -12,7 +12,7 @@ from . import warehouse_excel
 from accounting import views_invoice
 from accounting.book_scope import book_guarded, book_guarded_for_sales_rep, book_scoped, order_book_guarded
 from crm.directories import customer_guarded
-from erp.roles import label_printers_only
+from erp.roles import label_printers_only, order_money_only
 from .models import Order, OrderItem, Pack, Warehouse
 from .split_orders import split_order_guarded
 from django.views.generic import RedirectView
@@ -113,35 +113,35 @@ urlpatterns = [
     # form was opened in — and a URL naming no book falls back to the
     # member's default, which is not necessarily the list they came from.
     path("books/<int:book_id>/orders/create/",
-         book_scoped(views.OrderCreate.as_view()), name="create_order_page"),
+         order_money_only(book_scoped(views.OrderCreate.as_view())), name="create_order_page"),
     # The form POSTs here, and carries its book in a hidden field, so this
     # one needs no book of its own. Still serves the sidebar partial to an
     # HX-Request, for anything still opening the drawer.
-    path("orders/create", views.OrderCreate.as_view(), name="create_order"),
-    path("orders/edit/<int:pk>/", book_guarded(views.OrderEdit.as_view(), Order, "current_account.book"), name="edit_order"),
-    path("orders/web/<int:pk>/status/", order_book_guarded(views.WebOrderStatusEdit.as_view(), Order), name="web_order_status"),
+    path("orders/create", order_money_only(views.OrderCreate.as_view()), name="create_order"),
+    path("orders/edit/<int:pk>/", order_money_only(book_guarded(views.OrderEdit.as_view(), Order, "current_account.book")), name="edit_order"),
+    path("orders/web/<int:pk>/status/", order_money_only(order_book_guarded(views.WebOrderStatusEdit.as_view(), Order)), name="web_order_status"),
     # book_guarded, plus the split-order exception: a half in another book
     # leads to the half the viewer may open, which shows the whole order.
     path("orders/<int:pk>/", split_order_guarded(views.OrderDetail.as_view()), name="order_detail"),
     # Book admins only — cancel_approval checks the order's books itself.
-    path("orders/cancel-requests/<int:pk>/decide/", views.order_cancel_request_decide,
+    path("orders/cancel-requests/<int:pk>/decide/", order_money_only(views.order_cancel_request_decide),
          name="order_cancel_request_decide"),
-    path("orders/<int:pk>/customer/", of_a_customer_in_reach(views.order_customer_card_view), name="order_customer_card"),
-    path("orders/<int:pk>/print/", of_a_customer_in_reach(views.OrderPrint.as_view()), name="order_print"),
+    path("orders/<int:pk>/customer/", order_money_only(of_a_customer_in_reach(views.order_customer_card_view)), name="order_customer_card"),
+    path("orders/<int:pk>/print/", order_money_only(of_a_customer_in_reach(views.OrderPrint.as_view())), name="order_print"),
     # The order's invoice — a printout of the order, nothing stored.
-    path("orders/<int:pk>/invoice/", book_guarded(views_invoice.OrderInvoice.as_view(), Order, "current_account.book"), name="order_invoice"),
-    path("orders/<int:pk>/invoice/excel/", book_guarded(views_invoice.order_invoice_excel, Order, "current_account.book"), name="order_invoice_excel"),
+    path("orders/<int:pk>/invoice/", order_money_only(book_guarded(views_invoice.OrderInvoice.as_view(), Order, "current_account.book")), name="order_invoice"),
+    path("orders/<int:pk>/invoice/excel/", order_money_only(book_guarded(views_invoice.order_invoice_excel, Order, "current_account.book")), name="order_invoice_excel"),
     # Not book_guarded, and not scoped to one order: the sheet is a
     # customer's orders, which may sit in two books. The view checks the
     # viewer against each order's book itself.
-    path("orders/print/combined/", views.OrderPrintCombined.as_view(), name="order_print_combined"),
-    path("orders/print/combined/excel/", order_excel.combined_order_excel, name="order_excel_combined"),
-    path("orders/<int:pk>/changes/", of_a_customer_in_reach(views.order_changes), name="order_changes"),
+    path("orders/print/combined/", order_money_only(views.OrderPrintCombined.as_view()), name="order_print_combined"),
+    path("orders/print/combined/excel/", order_money_only(order_excel.combined_order_excel), name="order_excel_combined"),
+    path("orders/<int:pk>/changes/", order_money_only(of_a_customer_in_reach(views.order_changes)), name="order_changes"),
     # Ship some packages now; the rest moves to a follow-up order. The view
     # checks every half's book itself (a split order splits as one).
     path("orders/<int:pk>/ship-part/", views_partial_shipment.order_ship_part, name="order_ship_part"),
     # A retail order's counter takings brought into line with its bill.
-    path("orders/<int:pk>/settle-counter/", book_guarded(views.settle_counter, Order, "current_account.book"), name="settle_counter"),
+    path("orders/<int:pk>/settle-counter/", order_money_only(book_guarded(views.settle_counter, Order, "current_account.book")), name="settle_counter"),
     # The rolls to pull for an order, for the warehouse floor: no prices,
     # no customer name. Guarded the way the pack screen is — it is the
     # same people's sheet.
@@ -163,7 +163,7 @@ urlpatterns = [
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/create/barcode_resolve/", views.order_create_barcode_resolve, name="order_create_barcode_resolve"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
-    path("orders/<int:pk>/excel/", of_a_customer_in_reach(order_excel.order_excel), name="order_excel"),
+    path("orders/<int:pk>/excel/", order_money_only(of_a_customer_in_reach(order_excel.order_excel)), name="order_excel"),
     # An order's money lands in one book (through its current account), so the list
     # names the book the same way the ledger's collections do. The old
     # unscoped address stays as a redirect to the viewer's working book:
@@ -172,9 +172,9 @@ urlpatterns = [
     path("books/<int:book_id>/orders/", book_scoped(views.OrderList.as_view()),
          name="order_list_scoped"),
     path("orders/", views.OrderListRedirect.as_view(), name="order_list"),
-    path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
-    path("orders/delete/<int:pk>/", of_a_customer_in_reach(views.delete_order), name="delete_order"),
-    path("orders/bulk-delete/", views.bulk_delete_orders, name="bulk_delete_orders"),
+    path("orders/analytics/", order_money_only(views.OrderAnalytics.as_view()), name="order_analytics"),
+    path("orders/delete/<int:pk>/", order_money_only(of_a_customer_in_reach(views.delete_order)), name="delete_order"),
+    path("orders/bulk-delete/", order_money_only(views.bulk_delete_orders), name="bulk_delete_orders"),
     path(
         "orders/<int:pk>/production/",
         of_a_customer_in_reach(views.OrderProduction.as_view()),
@@ -212,16 +212,8 @@ urlpatterns = [
             kwarg="pack_pk", book="order__current_account__book")),
         name="pack_label",
     ),
-    # Under packs/, not orders/: whoever prints labels without working
-    # with orders reaches these, and the order pages stay closed to them
-    # (erp.roles.ORDER_PREFIXES).
     path(
-        "packs/labels/",
-        label_printers_only(pack_label.package_labels),
-        name="package_labels",
-    ),
-    path(
-        "packs/order/<int:pk>/labels/",
+        "orders/<int:pk>/packing_list/labels/",
         label_printers_only(of_a_customer_in_reach(pack_label.order_pack_labels)),
         name="order_pack_labels",
     ),

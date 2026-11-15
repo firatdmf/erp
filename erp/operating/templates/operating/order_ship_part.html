@@ -142,7 +142,7 @@
       <p class="sp-hint">{% trans "They stay on this order unless ticked to carry." %}</p>
       {% for a in adjustments %}
       <div class="sp-adj">
-        <span>{{ a.label }} · <b>{{ a.amount|floatformat:"2" }}</b></span>
+        <span>{{ a.label }}{% if sees_order_money %} · <b>{{ a.amount|floatformat:"2" }}</b>{% endif %}</span>
         <label><input type="checkbox" name="move_adjustment" value="{{ a.pk }}"> {% trans "Carry to the new order" %}</label>
       </div>
       {% endfor %}

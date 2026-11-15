@@ -14,6 +14,15 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Orders",
         "Sees and takes orders. Without it, no order is shown at all.",
     ),
+    # What an order is worth and who it is for: its prices, totals and
+    # payments, and its customer beyond the delivery address. A role with
+    # Orders but without this — Operations — packs and ships orders;
+    # its members carry the packing_only restriction (erp.roles.sees_order_money).
+    "prices_customers": (
+        "Prices and customers",
+        "Sees an order's prices, totals and payments, and its customer. "
+        "Without it, an order shows what to pack and ship and where it goes.",
+    ),
     # Everything beyond selling: warehouses, purchases, accounts, the
     # catalog. A role without it only looks up stock and customers and
     # takes orders, seeing prices where others see cost — a sales rep.
@@ -61,10 +70,15 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Sales only",
         "Set on whoever lacks the Beyond sales permission.",
     ),
+    "packing_only": (
+        "No prices or customers",
+        "Set on whoever lacks the Prices and customers permission.",
+    ),
 }
 
 # restriction → the permission whose absence sets it.
-RESTRICTIONS = {"manager": "orders", "sales_rep": "beyond_sales"}
+RESTRICTIONS = {"manager": "orders", "sales_rep": "beyond_sales",
+                "packing_only": "prices_customers"}
 
 # What a role can be given: every permission but the restrictions.
 GRANTS = [name for name in ACCESS_LEVEL_CHOICES_DICT if name not in RESTRICTIONS]

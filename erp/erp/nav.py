@@ -28,10 +28,8 @@ An ITEM points somewhere in exactly one of three ways:
               to)
 
 An item may also carry `admin: True`, which hides it from anyone the
-view behind it would refuse (operating.views_warehouse._is_admin), or
-`labels: True`, from anyone without the Print labels permission
-(erp.roles.may_print_labels). The view is the rule; this only spares
-the click.
+view behind it would refuse (operating.views_warehouse._is_admin). The
+view is the rule; this only spares the click.
 """
 from django.utils.translation import gettext_lazy as _
 
@@ -206,7 +204,6 @@ NAV_SECTIONS = [
             {"title": _("WAREHOUSE"), "items": [
                 {"label": _("My warehouses"), "icon": "warehouse",   "url": "operating:warehouse_list"},
                 {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse", "admin": True},
-                {"label": _("Package labels"), "icon": "tag",       "url": "operating:package_labels", "labels": True},
             ]},
             {"title": _("PURCHASING"), "items": [
                 {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},

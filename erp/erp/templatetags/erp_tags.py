@@ -478,21 +478,21 @@ def nav_sections(context, surface="desktop"):
     sections gathered under one heading. The items are identical either
     way; only the markup around them differs.
 
-    An operations manager sees nothing that leads into orders, judged
-    the same way (erp.roles.nav_item_reaches_orders).
+    A role without Orders sees nothing that leads into orders, judged
+    the same way (erp.roles.nav_item_reaches_orders); one without Prices
+    and customers nothing whose page needs them (nav_item_needs_order_money).
 
     A sales rep sees only the entries her role can actually open. Which
     those are is not listed anywhere: each item is checked against the
     same gate the middleware enforces (erp.roles.may_use_nav_item), so
     the menu tracks the rules instead of copying them. An item marked
-    `admin` drops for anyone who is not one, and one marked `labels` for
-    anyone who may not print labels. Hiding an entry is
+    `admin` drops for anyone who is not one. Hiding an entry is
     courtesy, not security — the middleware and the view refuse the
     request either way.
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
-    from erp.roles import (is_operations_manager, is_sales_rep, may_print_labels,
-                           nav_item_reaches_orders)
+    from erp.roles import (is_operations_manager, is_sales_rep, nav_item_needs_order_money,
+                           nav_item_reaches_orders, sees_order_money)
     from operating.views_warehouse import _is_admin
 
     user = context.get("user")
@@ -501,10 +501,10 @@ def nav_sections(context, surface="desktop"):
         sections = _readable_sections(sections)
     if is_operations_manager(user):
         sections = _sections_without(sections, nav_item_reaches_orders)
+    if not sees_order_money(user):
+        sections = _sections_without(sections, nav_item_needs_order_money)
     if not _is_admin(user):
         sections = _sections_without(sections, lambda i: i.get("admin"))
-    if not may_print_labels(user):
-        sections = _sections_without(sections, lambda i: i.get("labels"))
     return sections
 
 

@@ -689,6 +689,15 @@ class OrderDetail(DetailView):
             (it, ordered, got, units.unit_short(getattr(it.product, "unit", None)
                                                 or units.DEFAULT_UNIT))
             for it, ordered, got in ctx["scan_shortfall_rows"]]
+        # Whoever packs and ships without Prices and customers gets the
+        # goods and where they go, and none of the sale's figures — not
+        # even where the template would not print them.
+        from erp.roles import sees_order_money
+        if not sees_order_money(self.request.user):
+            for key in ("current_account_recent_movements", "combined_totals",
+                        "other_halves_total", "counter_gap", "counter_gap_abs",
+                        "order_changes_preview"):
+                ctx.pop(key, None)
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -736,6 +745,16 @@ class OrderDetail(DetailView):
             frozen = frozen_error(order)
             if frozen:
                 return JsonResponse({"ok": False, "error": frozen}, status=400)
+        # Lines are priced and the customer is the sale's: whoever packs and
+        # ships without Prices and customers changes neither, nor whether
+        # the customer is written to (erp.roles.sees_order_money).
+        from erp.roles import sees_order_money
+        if (action in {"update_item", "add_item", "remove_item", "preview_add_item",
+                       "update_customer", "update_guest", "update_notify"}
+                and not sees_order_money(request.user)):
+            return JsonResponse({"ok": False, "error": _gettext(
+                "Changing an order's lines or customer needs the Prices and customers permission.")},
+                status=403)
 
         def _sync_current_account_total():
             """Re-post the current account movement for this order after its total
@@ -5344,20 +5363,29 @@ class OrderList(ListView):
             + [o for o in all_orders if o.list_group == "cancelled"])
         context['orders'] = all_orders
 
+        # What an order is worth and who it is for are the sale's: a member
+        # without Prices and customers (Operations) gets neither, and the
+        # gross profit is money too, whatever their profit grant says.
+        from erp.roles import may_see_profit, sees_order_money
+        money = sees_order_money(self.request.user)
+        context['shows_profit'] = money and may_see_profit(self.request.user)
+
         # Every line's cost in one query: the gross profit column reads a
         # variant's cost from the stock it has on hand, which is otherwise
         # one query per line.
-        from marketing.models import attach_live_costs
-        attach_live_costs(item.product_variant for order in all_orders
-                          for item in order.items.all() if item.product_variant_id)
-        _attach_list_gross_profit(all_orders)
+        from .views_warehouse import _is_admin
+        if money and (context['shows_profit'] or _is_admin(self.request.user)):
+            from marketing.models import attach_live_costs
+            attach_live_costs(item.product_variant for order in all_orders
+                              for item in order.items.all() if item.product_variant_id)
+            _attach_list_gross_profit(all_orders)
 
         # What the search box actually filters on. Attached per row rather
         # than built in the template so all four panes index the same
         # thing — the tabs are the SAME orders, and a query that finds an
         # order under "All" has to find it under "Retail" too.
         for order in all_orders:
-            order.search_index = _order_search_index(order)
+            order.search_index = _order_search_index(order, customer=money)
         # A split order's row carries the combined name and the books of
         # its other halves, which this list (one book's) never shows.
         from .split_orders import label_split_rows
@@ -5497,7 +5525,7 @@ def _currency_codes(orders):
     return ", ".join(sorted({(o.currency_code or "").upper() for o in orders} - {""}))
 
 
-def _order_search_index(order):
+def _order_search_index(order, customer=True):
     """Everything the list's search box promises to match on one row.
 
     The box says "order no, customer, product", so all three have to be
@@ -5513,10 +5541,15 @@ def _order_search_index(order):
     `items__product_variant`), so this costs no extra query. Both title
     and the two SKUs go in: staff search by whichever is on the paper in
     front of them.
+
+    Without `customer` (a member without Prices and customers) no name
+    goes in: a row found by its customer would name the customer.
     """
     parts = [str(order.pk), order.order_number or ""]
 
-    if order.contact_id:
+    if not customer:
+        pass
+    elif order.contact_id:
         parts.append(order.contact.name)
     elif order.company_id:
         parts.append(order.company.name)
@@ -5524,7 +5557,7 @@ def _order_search_index(order):
         parts += [order.web_client.name or "", order.web_client.username or ""]
     else:
         parts += [order.guest_first_name or "", order.guest_last_name or ""]
-    if order.current_account_id:
+    if customer and order.current_account_id:
         parts += [order.current_account.name or "", order.current_account.code or ""]
 
     for item in order.items.all():
@@ -5685,6 +5718,28 @@ def _packing_list_customer(order):
     return ""
 
 
+def _packing_list_delivery(order):
+    """Where the sacks go, on one line: the delivery's name, address,
+    city, country and phone, whichever are filled in."""
+    from .countries import country_name
+
+    parts = [order.delivery_address_title, order.delivery_address, order.delivery_city,
+             country_name(order.delivery_country), order.delivery_phone]
+    return ", ".join(" ".join(str(p).split()) for p in parts if p and str(p).strip())
+
+
+def _packing_list_party(order, user):
+    """(label, text) for the packing list's header line: the customer, for
+    whoever sees an order's customer; otherwise where the goods go — the
+    delivery details are all packing and shipping need
+    (erp.roles.sees_order_money)."""
+    from erp.roles import sees_order_money
+
+    if sees_order_money(user):
+        return _gettext("Customer"), _packing_list_customer(order)
+    return _gettext("Deliver to"), _packing_list_delivery(order)
+
+
 def _pack_roll_rows(pack):
     """The physical stock items actually assigned to a Pack, sourced from
     OrderStockReservation.pack — the SAME data order_pack_scan.html's
@@ -5815,10 +5870,15 @@ class OrderPackingList(View):
 
         unassigned_count = OrderStockReservation.objects.filter(
             order__in=halves, pack__isnull=True).count()
+        # Whoever packs without seeing the customer still needs to know
+        # where the sacks go (erp.roles.sees_order_money).
+        from erp.roles import sees_order_money
+        deliver_to = None if sees_order_money(request.user) else _packing_list_delivery(order)
 
         return render(request, self.template_name, {
             "order": order,
             "number": combined_number(halves),
+            "deliver_to": deliver_to,
             "packs": packs,
             "net_kg": net_kg,
             "gross_kg": gross_kg,
@@ -6025,8 +6085,11 @@ def export_packing_list_excel(request, pk):
     ws["B3"] = combined_number(split_halves(order))
     ws["A4"] = "Date"
     ws["B4"] = _long_date(_order_dt, False)
-    ws["A5"] = "Customer"
-    ws["B5"] = _packing_list_customer(order) or "-"
+    from erp.roles import sees_order_money
+    if sees_order_money(request.user):
+        ws["A5"], ws["B5"] = "Customer", _packing_list_customer(order) or "-"
+    else:
+        ws["A5"], ws["B5"] = "Deliver to", _packing_list_delivery(order) or "-"
     for r in (3, 4, 5):
         ws.cell(row=r, column=1).font = Font(bold=True)
 
@@ -6991,7 +7054,6 @@ def order_packing_list_pdf(request, pk):
         'title': pgettext("document title", "Packing List"),
         'order_no': _gettext("Order No"),
         'date': _gettext("Date"),
-        'customer': _gettext("Customer"),
         'item_no': "No",
         'pack': _gettext("Pack"),
         'product': _gettext("Product"),
@@ -7066,7 +7128,7 @@ def order_packing_list_pdf(request, pk):
     story = []
 
     # ── Header: brand + document identity left, document QR top-right ──
-    cust_name = _packing_list_customer(order)
+    party_label, party = _packing_list_party(order, request.user)
 
     brand_line = brand_name_for()
     _order_dt = order.order_date or order.created_at.date()
@@ -7081,7 +7143,7 @@ def order_packing_list_pdf(request, pk):
         Paragraph(f"{labels['title']} {order.pk}", title_style),
         Paragraph(f"<b>{labels['order_no']}:</b> {combined_number(split_halves(order))}", normal_style),
         Paragraph(f"<b>{labels['date']}:</b> {_long_date(_order_dt, is_tr)}", normal_style),
-        Paragraph(f"<b>{labels['customer']}:</b> {cust_name or '-'}", normal_style),
+        Paragraph(f"<b>{party_label}:</b> {escape(party) if party else '-'}", normal_style),
     ]
 
     qr_io = BytesIO()

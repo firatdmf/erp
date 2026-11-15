@@ -197,7 +197,7 @@
   }
   .ord-list-head, .ord-row {
     display: grid;
-    grid-template-columns: 28px 56px 200px 1.4fr 1fr{% if may_see_profit %} 110px{% endif %} 150px 24px;
+    grid-template-columns: 28px 56px 200px 1.4fr{% if sees_order_money %} 1fr{% endif %}{% if shows_profit %} 110px{% endif %} 150px 24px;
     gap: 16px;
     align-items: center;
     padding: 12px 18px;
@@ -367,7 +367,7 @@
   .ord-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
 
   @media (max-width: 1100px) {
-    .ord-list-head, .ord-row { grid-template-columns: 28px 48px 1.2fr 1.4fr 0.9fr{% if may_see_profit %} 0.8fr{% endif %} 130px 20px; }
+    .ord-list-head, .ord-row { grid-template-columns: 28px 48px 1.2fr 1.4fr{% if sees_order_money %} 0.9fr{% endif %}{% if shows_profit %} 0.8fr{% endif %} 130px 20px; }
   }
   /* ─── MOBILE: head/tabs stack, rows become cards ─────── */
   @media (max-width: 820px) {
@@ -443,7 +443,7 @@
           </label>
         </div>
       </div>
-      <a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</a>
+      {% if sees_order_money %}<a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</a>{% endif %}
     </div>
   </div>
 
@@ -471,7 +471,7 @@
     </button>
     <div class="ord-tabs-r">
       <input id="ord-search-input" class="ord-search-input" type="text"
-             placeholder="{% trans 'Search order no, customer, product…' %}"/>
+             placeholder="{% if sees_order_money %}{% trans 'Search order no, customer, product…' %}{% else %}{% trans 'Search order no, product…' %}{% endif %}"/>
     </div>
   </div>
 
@@ -479,7 +479,7 @@
   <div class="ord-meta">
     <div class="ord-result">
       <span id="ord-visible-count"><b>{{ total_count }}</b></span> {% trans "orders" %}
-      {% if is_admin %}{# the rows on screen added up, per currency — filled in by applyOrderFilter #}
+      {% if is_admin and sees_order_money %}{# the rows on screen added up, per currency — filled in by applyOrderFilter #}
       <span class="ord-gp-total" id="ord-gp-total" title="{% trans 'Gross profit (internal)' %}">
         · {% trans "Gross profit" %} <b id="ord-gp-done"></b><span id="ord-gp-open-wrap"> · <b id="ord-gp-open"></b> {% trans "still open" %}</span>
       </span>
@@ -498,15 +498,15 @@
         </label>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
-        <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}{% if all_currencies %} ({{ all_currencies }}){% endif %}</span>
-        {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
+        <span>{% if sees_order_money %}{% trans "Customer" %}{% else %}{% trans "Delivers to" %}{% endif %}</span>
+        {% if sees_order_money %}<span class="num">{% trans "Total" %}{% if all_currencies %} ({{ all_currencies }}){% endif %}</span>{% endif %}
+        {% if shows_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
       </div>
       {% for order in orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and sees_order_money and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -517,6 +517,13 @@
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
+          {% if not sees_order_money %}{# who it is for is the sale's, not the packer's — erp.roles.sees_order_money #}
+            <div class="ord-cust-avatar" style="background: #6B7280;"><i class="fa fa-location-dot"></i></div>
+            <div>
+              <div class="ord-cust-n">{{ order.delivery_city|default:"—" }}</div>
+              <div class="ord-cust-c">{{ order.delivery_country|default:"" }}</div>
+            </div>
+          {% else %}
           {% if order.contact %}
             <div class="ord-cust-avatar" style="background: #147F74;">
               {{ order.contact.name|slice:":2"|upper }}
@@ -567,7 +574,9 @@
               <div class="ord-cust-c">—</div>
             </div>
           {% endif %}
+          {% endif %}
         </div>
+        {% if sees_order_money %}
         <div class="num ord-total">
           {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
             {{ order.currency_symbol }}{{ order.combined_total|money }}
@@ -576,7 +585,8 @@
             {{ order.currency_symbol }}{{ order.total_value|money }}
           {% endif %}
         </div>
-        {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
+        {% endif %}
+        {% if shows_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
@@ -599,7 +609,7 @@
       <div class="ico"><i class="fa fa-shopping-cart"></i></div>
       <h3>{% trans "No orders yet" %}</h3>
       <p>{% trans "Create your first order to get started" %}</p>
-      <a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</a>
+      {% if sees_order_money %}<a href="{% url 'operating:create_order_page' current_book.pk %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</a>{% endif %}
     </div>
     {% endif %}
   </div>
@@ -614,15 +624,15 @@
         </label>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
-        <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}{% if b2b_currencies %} ({{ b2b_currencies }}){% endif %}</span>
-        {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
+        <span>{% if sees_order_money %}{% trans "Customer" %}{% else %}{% trans "Delivers to" %}{% endif %}</span>
+        {% if sees_order_money %}<span class="num">{% trans "Total" %}{% if b2b_currencies %} ({{ b2b_currencies }}){% endif %}</span>{% endif %}
+        {% if shows_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
       </div>
       {% for order in b2b_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and sees_order_money and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -633,6 +643,13 @@
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
+          {% if not sees_order_money %}{# who it is for is the sale's, not the packer's — erp.roles.sees_order_money #}
+            <div class="ord-cust-avatar" style="background: #6B7280;"><i class="fa fa-location-dot"></i></div>
+            <div>
+              <div class="ord-cust-n">{{ order.delivery_city|default:"—" }}</div>
+              <div class="ord-cust-c">{{ order.delivery_country|default:"" }}</div>
+            </div>
+          {% else %}
           {% if order.contact %}
             <div class="ord-cust-avatar" style="background: #147F74;">{{ order.contact.name|slice:":2"|upper }}</div>
             <div>
@@ -646,7 +663,9 @@
               <div class="ord-cust-c">{% trans "B2B · Company" %}</div>
             </div>
           {% endif %}
+          {% endif %}
         </div>
+        {% if sees_order_money %}
         <div class="num ord-total">
           {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
             {{ order.currency_symbol }}{{ order.combined_total|money }}
@@ -655,7 +674,8 @@
             {{ order.currency_symbol }}{{ order.total_value|money }}
           {% endif %}
         </div>
-        {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
+        {% endif %}
+        {% if shows_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
@@ -690,15 +710,15 @@
         <span></span>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
-        <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}{% if b2c_currencies %} ({{ b2c_currencies }}){% endif %}</span>
-        {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
+        <span>{% if sees_order_money %}{% trans "Customer" %}{% else %}{% trans "Delivers to" %}{% endif %}</span>
+        {% if sees_order_money %}<span class="num">{% trans "Total" %}{% if b2c_currencies %} ({{ b2c_currencies }}){% endif %}</span>{% endif %}
+        {% if shows_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
       </div>
       {% for order in b2c_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and sees_order_money and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -709,6 +729,13 @@
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
+          {% if not sees_order_money %}{# who it is for is the sale's, not the packer's — erp.roles.sees_order_money #}
+            <div class="ord-cust-avatar" style="background: #6B7280;"><i class="fa fa-location-dot"></i></div>
+            <div>
+              <div class="ord-cust-n">{{ order.delivery_city|default:"—" }}</div>
+              <div class="ord-cust-c">{{ order.delivery_country|default:"" }}</div>
+            </div>
+          {% else %}
           <div class="ord-cust-avatar" style="background: #C2A45A;">
             {% with display=order.web_client.name|default:order.web_client.username %}
               {{ display|slice:":2"|upper }}
@@ -718,7 +745,9 @@
             <div class="ord-cust-n">{{ order.web_client.name|default:order.web_client.username }}</div>
             <div class="ord-cust-c">{% trans "Web customer" %}</div>
           </div>
+          {% endif %}
         </div>
+        {% if sees_order_money %}
         <div class="num ord-total">
           {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
             {{ order.currency_symbol }}{{ order.combined_total|money }}
@@ -727,7 +756,8 @@
             {{ order.currency_symbol }}{{ order.total_value|money }}
           {% endif %}
         </div>
-        {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
+        {% endif %}
+        {% if shows_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
@@ -764,15 +794,15 @@
         </label>
         <span>{% trans "ID" %}</span>
         <span>{% trans "Order" %}</span>
-        <span>{% trans "Customer" %}</span>
-        <span class="num">{% trans "Total" %}{% if retail_currencies %} ({{ retail_currencies }}){% endif %}</span>
-        {% if may_see_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
+        <span>{% if sees_order_money %}{% trans "Customer" %}{% else %}{% trans "Delivers to" %}{% endif %}</span>
+        {% if sees_order_money %}<span class="num">{% trans "Total" %}{% if retail_currencies %} ({{ retail_currencies }}){% endif %}</span>{% endif %}
+        {% if shows_profit %}<span class="num">{% trans "Gross profit" %}</span>{% endif %}
         <span>{% trans "Status" %}</span>
         <span></span>
       </div>
       {% for order in retail_orders %}
       {% ifchanged order.list_group %}<div class="ord-group" data-group="{{ order.list_group }}">{% if order.list_group == "open" %}{% trans "Open" %}{% elif order.list_group == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Completed" %}{% endif %}</div>{% endifchanged %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row{% if order.list_group == 'cancelled' %} is-cancelled{% endif %}" data-group="{{ order.list_group }}" data-order-id="{{ order.pk }}" data-search="{{ order.search_index }}"{% if is_admin and sees_order_money and order.counts_in_profit %} data-gp="{{ order.list_gross_profit|stringformat:'.2f' }}" data-ccy="{{ order.currency_code }}" data-sym="{{ order.currency_symbol }}"{% endif %}{% if not order.in_period %} data-out style="display:none"{% endif %}>
         <label class="ord-select">
           <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}" data-draft-purchases="{{ order.draft_purchase_numbers }}">
         </label>
@@ -783,6 +813,13 @@
           <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
+          {% if not sees_order_money %}{# who it is for is the sale's, not the packer's — erp.roles.sees_order_money #}
+            <div class="ord-cust-avatar" style="background: #6B7280;"><i class="fa fa-location-dot"></i></div>
+            <div>
+              <div class="ord-cust-n">{{ order.delivery_city|default:"—" }}</div>
+              <div class="ord-cust-c">{{ order.delivery_country|default:"" }}</div>
+            </div>
+          {% else %}
           <div class="ord-cust-avatar" style="background: #9F1239;">
             {% if order.guest_first_name %}{{ order.guest_first_name|slice:":2"|upper }}{% else %}PK{% endif %}
           </div>
@@ -790,7 +827,9 @@
             <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name }} {{ order.guest_last_name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
             <div class="ord-cust-c">{% trans "Retail" %}</div>
           </div>
+          {% endif %}
         </div>
+        {% if sees_order_money %}
         <div class="num ord-total">
           {% if order.combined_number and order.combined_total is not None %}{# a split order: the whole order's total, this book's half under it #}
             {{ order.currency_symbol }}{{ order.combined_total|money }}
@@ -799,7 +838,8 @@
             {{ order.currency_symbol }}{{ order.total_value|money }}
           {% endif %}
         </div>
-        {% if may_see_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
+        {% endif %}
+        {% if shows_profit %}{# the margin: a grant, see erp.roles.may_see_profit #}
         <div class="num ord-gross-cell">
           {% with gp=order.list_gross_profit %}
             <span class="ord-gross{% if gp < 0 %} loss{% endif %}" title="{% trans 'Gross profit (internal)' %}">
@@ -835,7 +875,10 @@
   {% endif %}
 </div>
 
-<!-- Floating bulk action bar -->
+<!-- Floating bulk action bar. Deleting needs Prices and customers
+     (erp.roles.order_money_only), so the bar is not drawn without it and
+     its script below stops at the missing bar. -->
+{% if sees_order_money %}
 <div id="ord-bulk-bar" class="ord-bulk-bar" aria-hidden="true">
   <span class="ord-bulk-bar-msg">
     <b id="ord-bulk-count">0</b> {% trans "order selected" %}<span id="ord-bulk-plural">s</span>
@@ -845,6 +888,7 @@
     <i class="fa fa-trash"></i> {% trans "Delete selected" %}
   </button>
 </div>
+{% endif %}
 
 <script>
   // Search filter over the active pane. Both sides go through foldText

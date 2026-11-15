@@ -400,6 +400,57 @@ def may_see_profit(actor):
     return _has_permission(member, VIEW_PROFIT)
 
 
+def sees_order_money(actor):
+    """Whether this member sees what an order is worth and who it is for:
+    its prices, totals and payments, and its customer beyond the delivery
+    address (the Prices and customers permission).
+
+    Operations hold Orders without it: they pack and ship an order, so
+    they see its goods, its packages and where it goes, and nothing of
+    the sale. Read as a restriction, like Orders and Beyond sales: a role
+    leaving the permission out writes packing_only onto its members
+    (authentication.member_roles). Superusers always may.
+    """
+    member, user = _member_and_user(actor)
+    if member is None:
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return not _has_permission(member, "packing_only")
+
+
+def order_money_only(view):
+    """Refuse an order page that is all money or customer — a priced
+    printout, the invoice, the customer card, the edit form — to a member
+    without Prices and customers. Applied in the URLconf."""
+    from functools import wraps
+
+    from django.core.exceptions import PermissionDenied
+
+    @wraps(view)
+    def wrapper(request, *args, **kwargs):
+        if not sees_order_money(request.user):
+            raise PermissionDenied("This page shows an order's prices or customer.")
+        return view(request, *args, **kwargs)
+    # Read by nav_item_needs_order_money, so the menu follows the guard.
+    wrapper.needs_order_money = True
+    return wrapper
+
+
+def nav_item_needs_order_money(item):
+    """Whether a nav item leads to a page order_money_only guards: its
+    link, or the endpoint its sidebar posts to (NAV_ACTION_ENDPOINTS),
+    resolved to the view actually routed there."""
+    from django.urls import NoReverseMatch, Resolver404, resolve, reverse
+
+    name = NAV_ACTION_ENDPOINTS.get(item["action"]) if item.get("action") else item.get("url")
+    try:
+        path = reverse(name) if name else item.get("href")
+        return bool(path) and getattr(resolve(path).func, "needs_order_money", False)
+    except (NoReverseMatch, Resolver404):
+        return False
+
+
 def may_print_labels(actor):
     """Whether this member may print labels: a roll's or stock item's, a
     purchase line's rolls, a package's.

@@ -137,6 +137,7 @@
       <h1 class="pk-title">{% trans "Package list" %}</h1>
       {% get_current_language as LANGUAGE_CODE %}
       <div class="pk-sub">{% trans 'View only — to change which roll goes in which package, use the "Edit &amp; Pack" screen.' %}</div>
+      {% if deliver_to %}<div class="pk-sub"><b>{% trans "Deliver to" %}:</b> {{ deliver_to }}</div>{% endif %}
     </div>
   </div>
 

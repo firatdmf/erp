@@ -485,12 +485,14 @@ def nav_sections(context, surface="desktop"):
     those are is not listed anywhere: each item is checked against the
     same gate the middleware enforces (erp.roles.may_use_nav_item), so
     the menu tracks the rules instead of copying them. An item marked
-    `admin` drops for anyone who is not one. Hiding an entry is
+    `admin` drops for anyone who is not one, and one marked `labels` for
+    anyone who may not print labels. Hiding an entry is
     courtesy, not security — the middleware and the view refuse the
     request either way.
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
-    from erp.roles import is_operations_manager, is_sales_rep, nav_item_reaches_orders
+    from erp.roles import (is_operations_manager, is_sales_rep, may_print_labels,
+                           nav_item_reaches_orders)
     from operating.views_warehouse import _is_admin
 
     user = context.get("user")
@@ -501,6 +503,8 @@ def nav_sections(context, surface="desktop"):
         sections = _sections_without(sections, nav_item_reaches_orders)
     if not _is_admin(user):
         sections = _sections_without(sections, lambda i: i.get("admin"))
+    if not may_print_labels(user):
+        sections = _sections_without(sections, lambda i: i.get("labels"))
     return sections
 
 

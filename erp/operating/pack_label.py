@@ -288,6 +288,46 @@ def pack_label(request, pack_pk):
     return inline_pdf_response(pdf, f"package-label-{pack.code or pack.pk}")
 
 
+OPEN_STATUSES = ("pending", "confirmed", "preparing", "packaging")
+
+
+def package_labels(request):
+    """Every package still to go out, by order, with its label a click
+    away — for whoever prints labels without working with orders
+    (erp.roles.is_operations_manager): the order pages are closed to them,
+    and this page names an order by its number and nothing else of it.
+
+    The orders of the viewer's books only; an order with no book, a web
+    order not yet given an account, to install admins only.
+    """
+    from django.shortcuts import render
+
+    from accounting.services_accounts import member_books
+    from erp.ownership import is_install_admin
+
+    orders = (Order.objects.filter(order_status__in=OPEN_STATUSES, packs__isnull=False)
+              .distinct().order_by("-pk"))
+    if not is_install_admin(request.user):
+        member = getattr(request.user, "member", None)
+        orders = orders.filter(current_account__book__in=member_books(member))
+    rows, seen_groups = [], set()
+    for order in orders:
+        # A split order's packages are one run across its halves: one row.
+        if order.split_group:
+            if order.split_group in seen_groups:
+                continue
+            seen_groups.add(order.split_group)
+        halves = split_halves(order)
+        packs = list(order_packs(order))
+        for pack in packs:
+            lines = _pack_lines(pack)
+            pack.contents = ", ".join(
+                f"{line['sku']} · {_describe(line['items'], line['quantity'], line['unit'], line['pack_type'], line['tracking'])}"
+                for line in lines)
+        rows.append({"order": halves[0], "number": combined_number(halves), "packs": packs})
+    return render(request, "operating/package_labels.html", {"rows": rows})
+
+
 def order_pack_labels(request, pk):
     """Every package of an order, a label each, to print in one go."""
     order = get_object_or_404(Order, pk=pk)

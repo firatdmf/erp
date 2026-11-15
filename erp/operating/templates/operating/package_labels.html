@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Package labels" %} | Nejum ERP{% endblock %}
+{% block css %}
+<style>
+  :root {
+    --pl-teal-50:  #E5F1F0;
+    --pl-teal-500: #147F74;
+    --pl-teal-700: #005354;
+    --pl-line: #E0E6EE;
+    --pl-muted: #6B7280;
+    --pl-ink: #0F1419;
+    --pl-card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --pl-line: #2A3340; --pl-muted: #9AA3AE; --pl-ink: #E6EAEE; --pl-card: #161B22; --pl-teal-50: #10302D; }
+  }
+  :root[data-theme="dark"] { --pl-line: #2A3340; --pl-muted: #9AA3AE; --pl-ink: #E6EAEE; --pl-card: #161B22; --pl-teal-50: #10302D; }
+
+  .pl { padding: 22px 28px 100px; color: var(--pl-ink); max-width: 960px; }
+  .pl h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .pl-sub { color: var(--pl-muted); margin: 0 0 18px; }
+  .pl-order { background: var(--pl-card); border: 1px solid var(--pl-line); border-radius: 10px; margin-bottom: 12px; }
+  .pl-order-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+                padding: 10px 14px; border-bottom: 1px solid var(--pl-line); }
+  .pl-number { font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .pl-pack { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; }
+  .pl-pack + .pl-pack { border-top: 1px solid var(--pl-line); }
+  .pl-pack-name { font-weight: 600; }
+  .pl-contents { color: var(--pl-muted); font-size: 12.5px; overflow-wrap: anywhere; }
+  .pl-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+            border: 1px solid var(--pl-line); color: var(--pl-teal-700); background: var(--pl-card);
+            text-decoration: none; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+  .pl-btn:hover { border-color: var(--pl-teal-500); background: var(--pl-teal-50); }
+  .pl-empty { color: var(--pl-muted); padding: 24px 0; }
+  @media (max-width: 600px) { .pl { padding: 16px 16px 80px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pl">
+  <h1>{% trans "Package labels" %}</h1>
+  <p class="pl-sub">{% trans "Packages of orders not yet shipped. Print a label for each sack, or every label of an order at once." %}</p>
+
+  {% for row in rows %}
+    <section class="pl-order">
+      <div class="pl-order-h">
+        <span class="pl-number">{{ row.number }}</span>
+        <a data-label-print class="pl-btn" href="{% url 'operating:order_pack_labels' row.order.pk %}" target="_blank" rel="noopener">
+          <i class="fa fa-print"></i>{% blocktrans count n=row.packs|length %}Print {{ n }} label{% plural %}Print all {{ n }} labels{% endblocktrans %}
+        </a>
+      </div>
+      {% for pack in row.packs %}
+        <div class="pl-pack">
+          <div>
+            <div class="pl-pack-name">{% blocktrans with number=pack.pack_number total=row.packs|length %}Package {{ number }} / {{ total }}{% endblocktrans %}</div>
+            {% if pack.contents %}<div class="pl-contents">{{ pack.contents }}</div>{% else %}<div class="pl-contents">{% trans "Empty" %}</div>{% endif %}
+          </div>
+          <a data-label-print class="pl-btn" href="{% url 'operating:pack_label' pack.pk %}" target="_blank" rel="noopener">
+            <i class="fa fa-tag"></i>{% trans "Label" %}
+          </a>
+        </div>
+      {% endfor %}
+    </section>
+  {% empty %}
+    <p class="pl-empty">{% trans "No packages waiting to go out." %}</p>
+  {% endfor %}
+</div>
+{% include "components/_label_print_menu.html" %}
+{% endblock %}

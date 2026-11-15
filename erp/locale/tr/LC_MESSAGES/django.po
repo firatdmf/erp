@@ -16485,3 +16485,17 @@ msgstr "liste fiyatı"
 
 msgid "Order updated, but %(number)s's current account could not be updated: %(error)s"
 msgstr "Sipariş güncellendi, ancak %(number)s siparişinin cari hesabı güncellenemedi: %(error)s"
+
+msgid "Packages of orders not yet shipped. Print a label for each sack, or every label of an order at once."
+msgstr "Henüz gönderilmemiş siparişlerin paketleri. Her çuval için bir etiket yazdırın ya da bir siparişin tüm etiketlerini birden."
+
+msgid "Print %(n)s label"
+msgid_plural "Print all %(n)s labels"
+msgstr[0] "%(n)s etiketi yazdır"
+msgstr[1] "%(n)s etiketin hepsini yazdır"
+
+msgid "Package %(number)s / %(total)s"
+msgstr "Paket %(number)s / %(total)s"
+
+msgid "No packages waiting to go out."
+msgstr "Gönderilmeyi bekleyen paket yok."

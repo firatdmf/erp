@@ -212,8 +212,16 @@ urlpatterns = [
             kwarg="pack_pk", book="order__current_account__book")),
         name="pack_label",
     ),
+    # Under packs/, not orders/: whoever prints labels without working
+    # with orders reaches these, and the order pages stay closed to them
+    # (erp.roles.ORDER_PREFIXES).
     path(
-        "orders/<int:pk>/packing_list/labels/",
+        "packs/labels/",
+        label_printers_only(pack_label.package_labels),
+        name="package_labels",
+    ),
+    path(
+        "packs/order/<int:pk>/labels/",
         label_printers_only(of_a_customer_in_reach(pack_label.order_pack_labels)),
         name="order_pack_labels",
     ),

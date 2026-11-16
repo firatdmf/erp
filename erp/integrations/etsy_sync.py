@@ -53,6 +53,7 @@ def _member(connection):
 def record_receipt(connection, r):
     """Draft the order for one Etsy receipt, or say why a person must."""
     from accounting.services_accounts import post_order_movement, stamp_order_currency
+    from notifications.signals import notify_new_order
     from operating.models import Order, OrderItem, WarehouseProduct
     from operating.views import save_order_adjustments
 
@@ -113,6 +114,7 @@ def record_receipt(connection, r):
     problem = "" if billed == expected else (
         f"The order bills {billed}; Etsy's goods less discount plus shipping come to {expected}.")
     note(RECORDED, problem, order=order)
+    notify_new_order(order)
     return order
 
 

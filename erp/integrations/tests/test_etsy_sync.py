@@ -67,6 +67,20 @@ class OrdersArriveAsDrafts(SyncBase):
         # An open order is no sale: nothing reaches Etsy's account until it is completed.
         self.assertFalse(CurrentAccountMovement.objects.filter(movement_type="order_sale").exists())
 
+    def test_the_books_people_hear_of_an_etsy_order_once(self):
+        from notifications.models import Notification
+        self.run_sync(receipts=[RECEIPT])
+        self.run_sync(receipts=[RECEIPT])
+        order = Order.objects.get()
+        [note] = Notification.objects.filter(notification_type="new_order",
+                                             recipient=self.admin.member)
+        self.assertEqual(note.content_object, order)
+        # Nothing on the shelf, no order: no "new order" either.
+        r = _receipt(receipt_id=2)
+        r["transactions"][0]["sku"] = "NOPE"
+        self.run_sync(receipts=[r])
+        self.assertEqual(Notification.objects.filter(notification_type="new_order").count(), 1)
+
     def test_running_again_records_nothing_twice(self):
         self.run_sync(receipts=[RECEIPT], entries=LEDGER)
         self.run_sync(receipts=[RECEIPT], entries=LEDGER)

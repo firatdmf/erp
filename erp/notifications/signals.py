@@ -68,31 +68,38 @@ def create_order_notification_handler(sender, instance, created, **kwargs):
         return
 
     print(f"📦 Order signal triggered for Order #{instance.pk}")
+    notify_new_order(instance)
 
-    # Don't notify for orders without an order_number (internal orders)
-    # Only notify for web orders or orders with explicit order numbers
-    order_number = instance.order_number or f"#{instance.pk}"
-    
+
+def notify_new_order(order):
+    """Tell the order's book that an order has come in from outside.
+
+    The web checkout reaches this through the post_save signal; anything
+    else that brings orders in from outside (a marketplace sync) calls it
+    itself once the order and its lines are saved.
+    """
+    order_number = order.order_number or f"#{order.pk}"
+
     # Only the members of the order's book. A web cart off two books'
     # shelves is two orders (create_web_order), so each book hears of its
     # own half. An order with no book yet goes to superusers only.
     from operating.split_orders import order_book
-    book = order_book(instance)
+    book = order_book(order)
     recipients = get_notification_recipients('new_order', book=book)
     if book is None:
         recipients = [m for m in recipients if m.user and m.user.is_superuser]
-    
+
     for member in recipients:
         Notification.create_notification(
             recipient=member,
             notification_type='new_order',
             title=f'New order received - {order_number}',
-            message=f'Order from {instance.get_client()}',
-            link=reverse('operating:order_detail', kwargs={'pk': instance.pk}),
+            message=f'Order from {order.get_client()}',
+            link=reverse('operating:order_detail', kwargs={'pk': order.pk}),
             icon='fa-shopping-cart',
-            content_object=instance,
+            content_object=order,
         )
-    
+
     print(f"✓ Created order notifications for {len(recipients)} recipients - Order {order_number}")
 
 

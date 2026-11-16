@@ -3025,6 +3025,9 @@ def free_rolls_response(request, books):
             "book_id": (wh.accounting_book_id if wh else None),
             "book": (wh.accounting_book.name if (wh and wh.accounting_book_id) else ""),
             "available": float(avail),
+            # What a person finds this item by on the shelf when it has no
+            # barcode of its own: the number written on the box.
+            "lot": roll.lot_number or "",
             # What the quantity and the cost are counted in: meters for
             # cloth, but a box of ready-made curtains is packs.
             "unit": roll.product.unit_short if roll.product else "",
@@ -3052,6 +3055,10 @@ def free_rolls_response(request, books):
         "ok": True, "rolls": out, "cost_symbol": _base_currency_symbol(),
         "counted": bool(first and first.sold_by_count),
         "printed_barcode": (first.printed_barcode if first else ""),
+        # What one stock item of it is called ("box", "roll"), to name the
+        # items in the form's list.
+        "item_noun": (first.item_noun if first else ""),
+        "item_noun_plural": (first.item_noun_plural if first else ""),
         "line_cost_base": line_cost,
     })
 

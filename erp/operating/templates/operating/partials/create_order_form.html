@@ -177,6 +177,16 @@
 .co-stockline.short{color:#B45309;}
 .co-stockline .sep{color:#CBD5E1;margin:0 5px;}
 .co-stockline .cost{font-weight:500;}
+/* A counted card's boxes: which one each piece came out of. */
+.co-box-list{margin-top:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;}
+.co-box-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:11px;color:#0F766E;text-transform:uppercase;letter-spacing:.04em;}
+.co-box-topick{margin-left:auto;text-transform:none;letter-spacing:0;font-size:10.5px;font-weight:800;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:999px;}
+.co-box-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 6px 5px 9px;font-size:12px;background:#fff;border:1px solid #E2E8EE;border-radius:7px;}
+.co-box-row.taken{background:#ECFDF5;border-color:#A7F3D0;}
+.co-box-row code{background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+.co-box-where{flex:1;min-width:0;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.co-box-free{color:#0F766E;font-weight:600;white-space:nowrap;}
+.co-box-row .form-input{width:64px;flex:0 0 auto;padding:5px 7px;}
 /* What this customer paid for the variant last time (coLastPaidHtml). */
 .co-lastpaid{display:block;margin-top:3px;font-size:11px;font-weight:600;color:#0B5F60;}
 .co-lastpaid .sep{color:#CBD5E1;margin:0 5px;}
@@ -1775,6 +1785,8 @@
         // read the answer off, and what the pick said must stand.
         item.counted = item.counted || !!(d && d.counted);
         item.printedBarcode = (d && d.printed_barcode) || '';
+        item.itemNoun = (d && d.item_noun) || '';
+        item.itemNounPlural = (d && d.item_noun_plural) || '';
         // Cost per unit by barcode, kept apart from availableRolls: a
         // ticked or saved roll is a different object that never carried
         // it, and the row still wants to show it. A sales rep is sent
@@ -2108,7 +2120,7 @@
         </div>
         ${coLockedNoteHtml(item)}
         ${coFiguresHtml(item, i)}
-        ${(item.counted || coLocked(item)) ? '' : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i)}
+        ${coLocked(item) ? '' : (item.counted ? coBoxListHtml(item, i) : rollSectionHtml(item, i) + manualEntrySectionHtml(item, i))}
         ${coNoteHtml(item, i)}
       </div>`;
     }).join('');
@@ -2204,11 +2216,14 @@
 
   // What a stock item's row is labelled with. Its key is its barcode
   // where it has one; a batch of alike pieces has none and is keyed by
-  // "#id", which is the server's name for it and nothing a person reads.
-  function coRollLabel(r) {
+  // "#id", which is the server's name for it and nothing a person reads —
+  // so it goes by the number written on it (its lot), "Box 101".
+  function coRollLabel(r, noun) {
     var key = r.barcode || '';
     if (!key) return '—';
-    return key.charAt(0) === '#' ? '{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}' : key;
+    if (key.charAt(0) !== '#') return key;
+    if (r.lot) return (noun ? noun.charAt(0).toUpperCase() + noun.slice(1) + ' ' : '') + r.lot;
+    return '{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}';
   }
 
   function coPickedTotal(item) {
@@ -2219,12 +2234,10 @@
   // Replaces the card's picks with whatever that comes to — the batches
   // are alike, so which ones is not the user's decision to make. Saved
   // holds keep their reservation ids; whatever cannot be covered is said.
-  window.coTakeQuantity = function (i, n) {
-    var item = orderItems[i];
-    if (!item) return false;
-    n = Math.max(0, Math.floor(parseFloat(n) || 0));
-    var old = {};
-    (item.rolls || []).forEach(function (r) { old[(r.barcode || '').toLowerCase()] = r; });
+  // The stock a card of a product sold by count can take from, oldest
+  // first: what the list says is free, less what another line of this
+  // order took, plus this card's own picks.
+  function coCountedPool(item) {
     var taken = {};
     orderItems.forEach(function (other) {
       if (other === item) return;
@@ -2241,17 +2254,42 @@
       var key = (r.barcode || '').toLowerCase();
       if (!pool.some(function (p) { return (p.barcode || '').toLowerCase() === key; })) pool.unshift(r);
     });
-    var left = n, picked = [];
+    return pool;
+  }
+
+  window.coTakeQuantity = function (i, n) {
+    var item = orderItems[i];
+    if (!item) return false;
+    n = Math.max(0, Math.floor(parseFloat(n) || 0));
+    var old = {};
+    (item.rolls || []).forEach(function (r) { old[(r.barcode || '').toLowerCase()] = r; });
+    var pool = coCountedPool(item);
+    var left = n, picked = [], byKey = {};
+    // What is already taken stays where it was taken from — a box the
+    // person chose by hand keeps its count — and only the rest comes off
+    // the oldest stock. A smaller number gives back the last taken first.
+    (item.rolls || []).forEach(function (r) {
+      if (left <= 0) return;
+      var take = Math.min(left, Math.floor(parseFloat(r.quantity) || 0));
+      if (take <= 0) return;
+      var kept = Object.assign({}, r, { quantity: take });
+      picked.push(kept);
+      byKey[(r.barcode || '').toLowerCase()] = kept;
+      left -= take;
+    });
     pool.forEach(function (p) {
       if (left <= 0) return;
-      var take = Math.min(left, Math.floor(parseFloat(p.available) || 0));
+      var key = (p.barcode || '').toLowerCase();
+      var have = byKey[key] ? byKey[key].quantity : 0;
+      var take = Math.min(left, Math.floor(parseFloat(p.available) || 0) - have);
       if (take <= 0) return;
-      var prev = old[(p.barcode || '').toLowerCase()] || {};
+      left -= take;
+      if (byKey[key]) { byKey[key].quantity += take; return; }
+      var prev = old[key] || {};
       picked.push({ reservation_id: prev.reservation_id || null, barcode: p.barcode,
                     stock_item_id: p.id || prev.stock_item_id, available: p.available,
                     warehouse: p.warehouse, book_id: p.book_id || null, book: p.book || '',
-                    quantity: take });
-      left -= take;
+                    lot: p.lot || '', quantity: take });
     });
     item.rolls = picked;
     if (left > 0) {
@@ -2484,10 +2522,10 @@
   }
 
   function coCountedQtyHtml(item, i) {
-    var free = coCountedFree(item);
-    // Nothing on the shelf: the quantity is still wanted, it is just not
-    // held against any stock (what the outsourced box is for cloth).
-    var value = free > 0 ? coPickedTotal(item) : (parseFloat(item.manualMeters) || 0);
+    // The line's whole quantity: what its boxes hold, and whatever is
+    // still to be picked (or, with nothing on the shelf, not held against
+    // any stock at all — what the outsourced box is for cloth).
+    var value = parseFloat(item.quantity) || 0;
     // The field waits for the stock list; what is free is said under the
     // product's code (coStockLineHtml), not here.
     var loading = !!item.rollsLoading;
@@ -2497,6 +2535,84 @@
         'onchange="coCountedQty(' + i + ',this.value)" ' +
         'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}"></div>';
   }
+
+  // How many of a counted line no box holds yet — an order that came in
+  // with a quantity and no stock chosen (a marketplace draft), or one
+  // taken down by hand. Only while there is stock to pick it from.
+  function coToPick(item) {
+    if (coCountedFree(item) <= 0) return 0;
+    return Math.max(0, Math.round((parseFloat(item.quantity) || 0) - coPickedTotal(item)));
+  }
+
+  // The boxes of a product sold by count. Any of them will do, so the
+  // quantity box takes from the oldest; but the one opened is often just
+  // the nearest, and the list is where the person says which it was, so
+  // the shelf and the books keep telling the same story.
+  function coBoxListHtml(item, i) {
+    if (item.rollsLoading) return '';
+    var pool = coCountedPool(item);
+    if (!pool.length) return '';
+    var held = {};
+    (item.rolls || []).forEach(function (r) {
+      held[(r.barcode || '').toLowerCase()] = parseFloat(r.quantity) || 0;
+    });
+    var unit = esc(item.rollUnit || '');
+    var rows = pool.map(function (p) {
+      var key = (p.barcode || '').toLowerCase();
+      var n = held[key] || 0;
+      var free = Math.floor(parseFloat(p.available) || 0);
+      return '<div class="co-box-row' + (n ? ' taken' : '') + '">' +
+        '<code>' + esc(coRollLabel(p, item.itemNoun)) + '</code>' +
+        '<span class="co-box-where">' + esc(p.warehouse || '') + coRollBookHtml(p) + '</span>' +
+        '<span class="co-box-free">' + fmtNum(free) + ' ' + unit + ' {% trans "free" %}</span>' +
+        '<input type="number" class="form-input" inputmode="numeric" min="0" step="1"' +
+          (free ? ' max="' + free + '"' : '') + ' value="' + (n || '') + '" placeholder="0"' +
+          ' data-bc="' + escAttr(p.barcode || '') + '" onfocus="this.select()"' +
+          ' onchange="coTakeFromBox(' + i + ',this.dataset.bc,this.value)"' +
+          ' onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
+      '</div>';
+    }).join('');
+    var toPick = coToPick(item);
+    var title = item.itemNounPlural || '{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}';
+    return '<div class="co-box-list">' +
+      '<div class="co-box-head"><span>' + esc(title.charAt(0).toUpperCase() + title.slice(1)) + '</span>' +
+        (toPick ? '<span class="co-box-topick">' +
+          '{% filter escapejs %}{% trans "%(n)s to pick" %}{% endfilter %}'.replace('%(n)s', toPick) +
+          '</span>' : '') +
+      '</div>' + rows + '</div>';
+  }
+
+  // Take `raw` of a counted line from this one box. What it takes goes
+  // first to what the line still had to pick, so choosing the box for an
+  // order that came in unpicked leaves its quantity as it was.
+  window.coTakeFromBox = function (i, bc, raw) {
+    var item = orderItems[i];
+    if (!item) return false;
+    var key = (bc || '').toLowerCase();
+    var p = coCountedPool(item).find(function (x) { return (x.barcode || '').toLowerCase() === key; });
+    if (!p) return false;
+    var cap = Math.floor(parseFloat(p.available) || 0);
+    var n = Math.max(0, Math.floor(parseFloat(raw) || 0));
+    if (cap && n > cap) {
+      n = cap;
+      showToast('{% filter escapejs %}{% trans "Only %(n)s are free in this one." %}{% endfilter %}'.replace('%(n)s', cap), 'warning');
+    }
+    var prev = (item.rolls || []).find(function (r) { return (r.barcode || '').toLowerCase() === key; });
+    var had = prev ? (parseFloat(prev.quantity) || 0) : 0;
+    var unheld = Math.max(0, (parseFloat(item.quantity) || 0) - coPickedTotal(item));
+    var rest = (item.rolls || []).filter(function (r) { return r !== prev; });
+    if (n > 0) {
+      rest.push({ reservation_id: (prev && prev.reservation_id) || null, barcode: p.barcode,
+                  stock_item_id: p.id || (prev && prev.stock_item_id), available: p.available,
+                  warehouse: p.warehouse, book_id: p.book_id || null, book: p.book || '',
+                  lot: p.lot || '', quantity: n });
+    }
+    item.rolls = rest;
+    item.manualMeters = Math.max(0, unheld - Math.max(0, n - had));
+    syncQtyFromRolls(i, true);
+    renderProducts();
+    return true;
+  };
 
   window.coCountedQty = function (i, raw) {
     var item = orderItems[i];
@@ -2546,6 +2662,10 @@
         }, 150);
       });
     }
+    // A piece scanned for a line that still had some to pick is one of
+    // those, not one more on top of them.
+    var unheld = parseFloat(item.manualMeters) || 0;
+    if (unheld > 0 && coCountedFree(item) > 0) item.manualMeters = Math.max(0, unheld - (by || 1));
     return Promise.resolve(window.coTakeQuantity(i, coPickedTotal(item) + (by || 1)));
   };
 

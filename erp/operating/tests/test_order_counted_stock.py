@@ -142,6 +142,16 @@ class CountedStock(TestCase):
                          [self.key(self.old), self.key(self.new)])
         self.assertEqual([r["available"] for r in data["rolls"]], [3.0, 5.0])
 
+    def test_the_list_names_each_batch_by_the_number_on_it(self):
+        """The form lists the boxes so a person can say which one they
+        opened; with no barcode, a box goes by the number written on it."""
+        Product.objects.filter(pk=self.variant.product_id).update(pack_type="box")
+        self.old.lot_number = "101"
+        self.old.save()
+        data = self.get("order_create_roll_list", sku=EAN).json()
+        self.assertEqual([r["lot"] for r in data["rolls"]], ["101", ""])
+        self.assertEqual((data["item_noun"], data["item_noun_plural"]), ("box", "boxes"))
+
     def test_cloth_is_listed_as_it_always_was(self):
         data = self.get("order_create_roll_list", sku="K1.G1").json()
         self.assertFalse(data["counted"])

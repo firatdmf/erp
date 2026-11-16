@@ -16515,3 +16515,11 @@ msgstr "Fiyat ve müşteri yok"
 
 msgid "Set on whoever lacks the Prices and customers permission."
 msgstr "Fiyatlar ve müşteriler iznine sahip olmayanlara verilir."
+
+#, python-format
+msgid "%(n)s to pick"
+msgstr "%(n)s seçilecek"
+
+#, python-format
+msgid "Only %(n)s are free in this one."
+msgstr "Bunda yalnızca %(n)s adet boşta."

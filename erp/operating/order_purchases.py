@@ -223,6 +223,58 @@ def purchase_locked_lines(order):
     return locked
 
 
+def expected_line_costs(order):
+    """{order line pk: (quantity, base cost per unit)} for the lines a
+    purchase still on its way in feeds (purchase_locked_lines): what those
+    goods will cost when they arrive, so the order shows that cost now
+    rather than the variant's last cost on record.
+
+    The cost is worked out as the receipt will stamp it on the rolls —
+    each row's price into base at the rates the purchase was saved with,
+    else the published rate (views_warehouse._PurchaseRates). Several
+    purchases for one line are averaged by quantity. A row with no price,
+    or no rate into base, is left out, and its line keeps its catalog cost."""
+    from accounting.services_accounts import invoice_currency_for
+    from .views_warehouse import _PurchaseRates, _purchase_costs, _purchase_price
+
+    locked = purchase_locked_lines(order)
+    if not locked:
+        return {}
+    by_invoice = {}
+    for invoices in locked.values():
+        for invoice in invoices:
+            if invoice.pk in by_invoice:
+                continue
+            plan = invoice.intake_plan or {}
+            rates = _PurchaseRates(invoice_currency_for(invoice.current_account),
+                                   plan.get("rates"))
+            rows = {}
+            for p in (plan.get("products") or []):
+                for v in (p.get("variants") or []):
+                    sku = (v.get("sku") or "").strip().lower()
+                    qty = _row_quantity(v)
+                    price, currency = _purchase_price(v)
+                    cost = _purchase_costs(price, currency, rates)[0] if price else None
+                    if not sku or not qty or qty <= 0 or cost is None:
+                        continue
+                    q, value = rows.get(sku, (Decimal("0"), Decimal("0")))
+                    rows[sku] = (q + qty, value + qty * cost)
+            by_invoice[invoice.pk] = rows
+
+    skus = dict(order.items.filter(pk__in=locked)
+                .values_list("pk", "product_variant__variant_sku"))
+    out = {}
+    for pk, invoices in locked.items():
+        sku = (skus.get(pk) or "").lower()
+        qty = value = Decimal("0")
+        for invoice in invoices:
+            q, v = by_invoice[invoice.pk].get(sku, (Decimal("0"), Decimal("0")))
+            qty, value = qty + q, value + v
+        if qty > 0:
+            out[pk] = (qty, (value / qty).quantize(Decimal("0.0001")))
+    return out
+
+
 def locked_line_error(item, invoices, *, removing=False):
     """What the order says when a line a purchase owns is changed on it."""
     what = {"sku": item.product_variant.variant_sku if item.product_variant_id else item.pk,

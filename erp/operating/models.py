@@ -1579,11 +1579,32 @@ class OrderItem(models.Model):
         its stored cost when none is held (see ProductVariant.live_cost). A
         product has no cost of its own. Returns 0 if nothing is set so
         callers don't crash on None * Decimal.
+
+        A line a purchase is still bringing in for this order costs what
+        that purchase pays (order_purchases.expected_line_costs): its
+        quantity at the purchase's cost, anything beyond it at the
+        variant's. Read once per order and kept on it, so a page of lines
+        asks once.
         """
         from decimal import Decimal
+        catalog = Decimal("0")
         if self.product_variant and self.product_variant.live_cost is not None:
-            return self.product_variant.live_cost
-        return Decimal("0")
+            catalog = self.product_variant.live_cost
+        if not self.order_id:
+            return catalog
+        order = self.order
+        expected = getattr(order, "_expected_line_costs", None)
+        if expected is None:
+            from .order_purchases import expected_line_costs
+            expected = order._expected_line_costs = expected_line_costs(order)
+        if self.pk not in expected:
+            return catalog
+        bought, cost = expected[self.pk]
+        qty = self.quantity or Decimal("0")
+        if qty <= 0 or bought >= qty:
+            return cost
+        return ((bought * cost + (qty - bought) * Decimal(str(catalog))) / qty
+                ).quantize(Decimal("0.0001"))
 
     def unit_cost(self):
         """Cost per unit IN THE ORDER'S CURRENCY, so it can be set against

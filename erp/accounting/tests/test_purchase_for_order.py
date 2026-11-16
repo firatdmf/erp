@@ -138,6 +138,41 @@ class PurchaseForCustomerTest(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         order = Invoice.objects.get(pk=r.json()["invoice_id"]).for_order
         self.assertEqual(order.items.get().product_variant, variant)
+
+    # ── What a line still on its way in costs ───────────────────────
+    def _priced_purchase(self, price, currency="USD", rates=None):
+        product = Product.objects.create(title="Krep", sku="KRP1", featured=False)
+        ProductVariant.objects.create(product=product, variant_sku="KRP1.G07",
+                                      variant_cost=Decimal("2.00"))
+        variant = {**self._variant(sku="KRP1.G07"), "price": price, "currency": currency}
+        plan = self._plan(product=product, variants=[variant])
+        if rates:
+            plan["rates"] = rates
+        r = self._save(plan)
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json()["invoice_id"], Invoice.objects.get(pk=r.json()["invoice_id"]).for_order
+
+    def test_a_line_on_its_way_costs_what_its_purchase_pays(self):
+        """Order 460: MT-1015 bought at $2.60 showed $2.45 and $2.70, the
+        last costs on record, until the goods arrived."""
+        inv_id, order = self._priced_purchase("2.60")
+        line = order.items.get()
+        self.assertEqual(line.unit_cost(), Decimal("2.6000"))
+        self.assertEqual(Order.objects.get(pk=order.pk).total_cost(), Decimal("143.00"))  # 55 m
+
+        # Received, the rolls carry the same cost.
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("2.6000"))
+
+    def test_a_purchase_in_another_currency_is_costed_in_base(self):
+        _inv_id, order = self._priced_purchase("2.00", currency="EUR", rates={"EUR": "1.10"})
+        self.assertEqual(order.items.get().unit_cost(), Decimal("2.2000"))
+
+    def test_a_line_longer_than_its_purchase_costs_the_rest_at_catalog(self):
+        _inv_id, order = self._priced_purchase("3.00")
+        line = order.items.get()
+        OrderItem.objects.filter(pk=line.pk).update(quantity=Decimal("110"))  # 55 bought
+        self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("2.5000"))
         self.assertEqual(ProductVariant.objects.count(), 1)
 
     def test_a_purchase_for_stock_still_leaves_no_trace(self):

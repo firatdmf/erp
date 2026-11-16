@@ -173,8 +173,8 @@ def read_spec(path):
 def read_stock(path):
     """The GÜNCEL sheet as rows, with box numbers carried down.
 
-    Skips the TOTAL row and the two loose notes below the table ("86
-    numaralı kutu nerde?"), which have no design code.
+    Skips the TOTAL row and the two loose notes below the table ("where
+    is box 86?"), which have no design code.
     """
     from openpyxl import load_workbook
 
@@ -393,7 +393,7 @@ class Command(BaseCommand):
                     status="in_stock",
                     unit_cost_base=row["price"],
                     notes=f"{IMPORT_REFERENCE} · sheet row {row['line']}"
-                          + (f" · kutu {box}" if box else " · kutusuz"),
+                          + (f" · box {box}" if box else " · no box"),
                 ))
                 stats["sets"] += row["sets"]
                 if row["price"]:
@@ -506,7 +506,7 @@ class Command(BaseCommand):
             for why, n in grouped.most_common():
                 w(f"      {n:>3} row(s)  {why}")
             for row, why in s["skipped"][:40]:
-                w(f"        row {row['line']:>3} kutu {str(row['box']):>4}  "
+                w(f"        row {row['line']:>3} box {str(row['box']):>4}  "
                   f"{row['design']} {row['length'] or '*'} {row['colour']} "
                   f"({row['sets']:.0f} sets)")
         w("")

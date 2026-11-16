@@ -47,10 +47,10 @@ class PurchaseLineLabelsTest(TestCase):
             warehouse=self.wh, name="K24644 G07", sku="K24644.G07",
             quantity=Decimal("55.00"))
         self.stock_items = [
-            WarehouseProductItem.objects.create(
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=self.product, quantity=Decimal("30.00"),
                 barcode="KRV0000001", purchase_invoice_item=self.item),
-            WarehouseProductItem.objects.create(
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=self.product, quantity=Decimal("25.00"),
                 barcode="KRV0000002", purchase_invoice_item=self.item),
         ]
@@ -85,7 +85,7 @@ class PurchaseLineLabelsTest(TestCase):
         other_item = InvoiceItem.objects.create(
             invoice=self.invoice, line_no=2, description="K24644 G09",
             quantity=Decimal("12.000"), unit="m", unit_price=Decimal("3.50"))
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.product, quantity=Decimal("12.00"),
             barcode="KRV0000003", purchase_invoice_item=other_item)
 
@@ -100,7 +100,7 @@ class PurchaseLineLabelsTest(TestCase):
         other_product = WarehouseProduct.objects.create(
             warehouse=self.wh, name="K24644 G11", sku="K24644.G11",
             quantity=Decimal("8.00"))
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=other_product, quantity=Decimal("8.00"),
             barcode="KRV0000004", purchase_invoice_item=self.item)
 

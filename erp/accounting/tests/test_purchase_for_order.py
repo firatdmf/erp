@@ -321,7 +321,7 @@ class PurchaseForCustomerTest(TestCase):
         """A roll off the shelf held for `item`, as the order form does."""
         wp = WarehouseProduct.objects.create(warehouse=self.wh, name="Shelf", sku="SHELF",
                                              quantity=meters)
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=meters, quantity_remaining=meters, status="in_stock",
             barcode=barcode)
         OrderStockReservation.objects.create(order=item.order, order_item=item,

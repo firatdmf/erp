@@ -83,7 +83,7 @@ class StockByCountry(TestCase):
         for place, key, meters in [(shop, "TR", "40"), (abroad, "KZ", "60")]:
             row = WarehouseProduct.objects.create(warehouse=place, sku="2086.WHITE",
                                                   name="2086 white", catalog_variant=variant)
-            self.rolls[key] = WarehouseProductItem.objects.create(
+            self.rolls[key] = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=row, barcode=f"R-{key}", quantity=Decimal(meters),
                 quantity_remaining=Decimal(meters), lot_number="4471", status="in_stock")
         self.buyer = WebClient.objects.create(username="buyer", email="buyer@example.com",

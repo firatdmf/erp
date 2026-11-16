@@ -30,7 +30,7 @@ class RollEditTrimsReservations(TestCase):
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.wh, name="Bergamo", sku="BRG-01",
             quantity=Decimal("19.50"))
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("19.50"),
             quantity_remaining=Decimal("19.50"), barcode="2000039337908")
 

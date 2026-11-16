@@ -158,7 +158,7 @@ class TheLabelSaysWhatItIsCounting(TestCase):
                 for s in re.findall(rb"\((.*?)\)\s*Tj", resp.content)]
 
     def test_it_prints_packs_not_meters(self):
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12")
         drawn = self._drawn_strings(roll)
@@ -183,7 +183,7 @@ class MovingStockCarriesTheUnit(TestCase):
         self.wp = _stock(
             warehouse=self.source, name="Peony 84in", sku="RN1357.RM8",
             quantity=Decimal("20"), unit="pack", pack_type="box")
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("20"),
             quantity_remaining=Decimal("20"), barcode="BOX-12",
             status="in_stock")

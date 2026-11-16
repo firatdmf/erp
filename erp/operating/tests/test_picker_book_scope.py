@@ -44,7 +44,7 @@ class PickerSeesOnlyItsOwnBooksShelves(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=name, sku=f"SKU-{book.pk}",
             quantity=Decimal("50"), catalog_variant=variant)
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 

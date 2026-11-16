@@ -9717,6 +9717,18 @@ msgid "A purchase price cannot be negative: %(lines)s"
 msgstr "Alış fiyatı negatif olamaz: %(lines)s"
 
 #, python-format
+msgid "Type a purchase price for: %(lines)s"
+msgstr "Alış fiyatını yazın: %(lines)s"
+
+#, python-format
+msgid "Type the purchase price: %(sku)s has no cost yet."
+msgstr "Alış fiyatını yazın: %(sku)s için henüz maliyet yok."
+
+#, python-format
+msgid "A stock item needs its cost: %(item)s has none."
+msgstr "Her stok kaleminin maliyeti olmalı: %(item)s için maliyet yok."
+
+#, python-format
 msgid "product %(n)s"
 msgstr "ürün %(n)s"
 

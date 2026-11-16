@@ -46,7 +46,7 @@ class PackingScreenRolls(TestCase):
             order=self.order, product=product, product_variant=variant,
             quantity=Decimal("100.00"), price=10)
         # 13 m cut off a 35 m roll — both figures are read by the JS.
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("35.00"),
             quantity_remaining=Decimal("35.00"), barcode="BC-301")
         self.reservation = OrderStockReservation.objects.create(
@@ -116,7 +116,7 @@ class ArrivingOnOneRoll(TestCase):
             accounting_book=Book.objects.get_or_create(name="Laleli Fabric")[0])
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.wh, name="Bergamo", sku="BRG-01", quantity=Decimal("35.00"))
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("35.00"),
             quantity_remaining=Decimal("35.00"), barcode="BC-301")
         self.client.force_login(User.objects.create_superuser("wh", "w@a.b", "pw"))

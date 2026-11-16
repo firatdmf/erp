@@ -100,11 +100,12 @@ class SplitOrderPage(TestCase):
         from operating.models import OrderStockReservation, Warehouse, WarehouseProduct, WarehouseProductItem
         ProductVariant.objects.filter(product__title="Krep").update(variant_cost=Decimal("1.00"))
         ProductVariant.objects.filter(product__title="Tul Ergene").update(variant_cost=Decimal("3.00"))
-        for half, meters in ((self.laleli_half, "10"), (self.ergene_half, "4.5")):
+        for half, meters, cost in ((self.laleli_half, "10", "1.00"), (self.ergene_half, "4.5", "3.00")):
             wh = Warehouse.objects.create(name=f"WH {half.pk}", accounting_book=half.current_account.book)
             wp = WarehouseProduct.objects.create(warehouse=wh, name="roll", sku=f"R{half.pk}")
+            # Each roll cost what its line's variant costs.
             roll = WarehouseProductItem.objects.create(
-                product=wp, barcode=f"B{half.pk}", quantity=Decimal("50"))
+                unit_cost_base=Decimal(cost), product=wp, barcode=f"B{half.pk}", quantity=Decimal("50"))
             OrderStockReservation.objects.create(
                 order=half, stock_item=roll, warehouse_product=wp,
                 order_item=half.items.get(), quantity=Decimal(meters))
@@ -136,7 +137,7 @@ class SplitOrderPage(TestCase):
         line = self.ergene_half.items.get()
         wp = WarehouseProduct.objects.create(warehouse=wh, name="roll", sku=line.product_variant.variant_sku,
                                              catalog_variant=line.product_variant)
-        roll = WarehouseProductItem.objects.create(product=wp, barcode="ERG-ROLL-1", quantity=Decimal("50"))
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=wp, barcode="ERG-ROLL-1", quantity=Decimal("50"))
         OrderStockReservation.objects.create(order=self.ergene_half, stock_item=roll, warehouse_product=wp,
                                              order_item=line, quantity=Decimal("4.5"))
         html = self._page(self.laleli_half).content.decode()

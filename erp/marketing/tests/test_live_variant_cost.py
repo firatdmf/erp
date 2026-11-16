@@ -42,10 +42,14 @@ class LiveVariantCostTest(TestCase):
             quantity=Decimal("0"), catalog_variant=self.variant)
 
     def _roll(self, where, meters, cost, *, left=None, status="in_stock"):
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.rows[where], quantity=Decimal(meters),
             quantity_remaining=Decimal(left if left is not None else meters),
-            unit_cost_base=(Decimal(cost) if cost is not None else None), status=status)
+            unit_cost_base=Decimal(cost if cost is not None else "1"), status=status)
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def _fresh(self):
         return ProductVariant.objects.get(pk=self.variant.pk)
@@ -175,8 +179,10 @@ class ProductCostFieldTest(TestCase):
         row = WarehouseProduct.objects.get(sku="N1522.G54")
         row.cost_usd = Decimal("6.00")
         row.save(update_fields=["cost_usd"])
-        WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=row, quantity=Decimal("100"), quantity_remaining=Decimal("100"))
+        # Stock is now stamped at birth; a missing stamp stands for older data.
+        WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         # (100 x 2 + 300 x 4 + 100 x 6) / 500
         self.assertEqual(self._form(self.product).variants_cost, Decimal("4.0000"))
 

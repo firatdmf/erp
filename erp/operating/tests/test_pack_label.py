@@ -49,7 +49,7 @@ class PackLabel(TestCase):
 
     def _reserve(self, line, barcode, quantity, pack):
         item, wp = line
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=quantity, quantity_remaining=quantity, barcode=barcode)
         OrderStockReservation.objects.create(
             order=self.order, order_item=item, stock_item=roll,

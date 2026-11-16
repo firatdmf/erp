@@ -2508,6 +2508,22 @@ class WarehouseProductItem(models.Model):
         validators=[MinValueValidator(Decimal("0"))],
     )
 
+    def save(self, *args, **kwargs):
+        """A stock item is born knowing what it cost: every item carries a
+        unit_cost_base, so the ledger can value it, an order can cost it and
+        nothing falls back to a guess later. The entry points ask for the
+        price first (receipt, label scan); this is what stops a path that
+        forgets. An item given no cost of its own is stamped with what its
+        stock row costs now, as the receipt and the scan do; with neither it
+        is refused. bulk_create skips save(), so the import commands check
+        it themselves."""
+        if self._state.adding and self.unit_cost_base is None:
+            self.unit_cost_base = self.product.cost_usd if self.product_id else None
+            if self.unit_cost_base is None:
+                raise ValidationError(_("A stock item needs its cost: %(item)s has none.")
+                                      % {"item": self.barcode or self.product_id})
+        super().save(*args, **kwargs)
+
     class Meta:
         ordering = ["-scanned_at"]
         indexes = [

@@ -110,13 +110,22 @@ class AGoodsReceiptWithANegativePriceIsRefused(TestCase):
         self.assertFalse(WarehouseProductItem.objects.exists())
         self.assertFalse(Product.objects.filter(sku="K24644").exists())
 
-    def test_a_positive_or_blank_price_still_goes_through(self):
-        response = self.receive("3.50", "")
+    def test_a_positive_price_still_goes_through(self):
+        response = self.receive("3.50", "4.00")
 
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(WarehouseProduct.objects.get(sku="K24644.G01").purchase_price,
                          Decimal("3.50"))
-        self.assertIsNone(WarehouseProduct.objects.get(sku="K24644.G02").purchase_price)
+        self.assertEqual(WarehouseProduct.objects.get(sku="K24644.G02").purchase_price,
+                         Decimal("4.00"))
+
+    def test_a_blank_price_is_refused(self):
+        response = self.receive("3.50", "")
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("Type a purchase price for:", response.json()["error"])
+        self.assertIn("K24644.G02", response.json()["error"])
+        self.assertFalse(WarehouseProductItem.objects.exists())
 
 
 class EditingAReceivedPurchaseToANegativePriceIsRefused(received.TestCase):

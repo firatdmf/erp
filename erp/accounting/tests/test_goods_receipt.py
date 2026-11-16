@@ -59,7 +59,7 @@ class GoodsReceiptPageTest(TestCase):
                 warehouse=warehouse, name="GREK Beyaz", sku="KZL001-BEYAZ",
                 quantity=Decimal("50.00"),
             )
-            WarehouseProductItem.objects.create(
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=wp, quantity=Decimal("50.00"), barcode="KZL000001",
                 purchase_invoice_item=item,
             )

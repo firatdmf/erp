@@ -57,7 +57,7 @@ class ScanStaysInScope(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=title, sku=sku, quantity=Decimal("50"),
             catalog_variant=v)
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 

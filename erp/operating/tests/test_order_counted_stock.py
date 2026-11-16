@@ -55,10 +55,10 @@ class CountedStock(TestCase):
             warehouse=self.shelves, name="Duvet set", sku=EAN, barcode=EAN,
             quantity=Decimal("8"), catalog_variant=self.variant)
         # Two batches, neither with a barcode of its own. The first is older.
-        self.old = WarehouseProductItem.objects.create(
+        self.old = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.duvets, quantity=Decimal("3"),
             quantity_remaining=Decimal("3"), status="in_stock")
-        self.new = WarehouseProductItem.objects.create(
+        self.new = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.duvets, quantity=Decimal("5"),
             quantity_remaining=Decimal("5"), status="in_stock")
 
@@ -67,7 +67,7 @@ class CountedStock(TestCase):
         self.cloth = WarehouseProduct.objects.create(
             warehouse=self.shelves, name="Krep", sku="K1.G1",
             quantity=Decimal("50"), catalog_variant=cloth_variant)
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.cloth, quantity=Decimal("50"),
             quantity_remaining=Decimal("50"), barcode=ROLL, status="in_stock")
 

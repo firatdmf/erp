@@ -78,7 +78,11 @@ class StampedAtIntake(TestCase):
                          Decimal("900.00"))
 
     def test_a_stock_item_with_no_price_anywhere_is_counted_not_guessed_at(self):
-        self._receive(self._product(None), 20)
+        wp = self._product(Decimal("1"))
+        roll = self._receive(wp, 20)
+        # Unpriced stock can no longer be created; this stands for older data.
+        WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        WarehouseProduct.objects.filter(pk=wp.pk).update(cost_usd=None)
         subs = subsidiary_equation(self.book)
         self.assertEqual(subs["inventory"], Decimal("0.00"))
         self.assertEqual(subs["unvalued_rolls"], 1)
@@ -124,9 +128,14 @@ class BackfillFromSkuCost(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=self.wh, name="seta", sku=sku, quantity=Decimal("0"),
             cost_usd=cost)
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
-            barcode=f"BC-{sku}", status="in_stock")
+            barcode=f"BC-{sku}", status="in_stock",
+            unit_cost_base=cost if cost is not None else Decimal("1"))
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def test_it_stamps_the_skus_cost(self):
         roll = self._top(Decimal("4.40"), "A")
@@ -179,10 +188,14 @@ class ShownOnThePage(TestCase):
         self.client.force_login(user)
 
     def _top(self, cost):
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("19.50"),
             quantity_remaining=Decimal("19.50"), barcode="BC-1",
             status="in_stock", unit_cost_base=cost)
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def _page(self):
         resp = self.client.get(reverse(
@@ -251,9 +264,13 @@ class PricingCardIsWeighted(TestCase):
         self.client.force_login(user)
 
     def _top(self, meters, cost, barcode):
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def _page(self):
         resp = self.client.get(reverse(
@@ -319,9 +336,13 @@ class DerivedNotStored(TestCase):
             quantity=Decimal("400"), cost_usd=Decimal("5.00"))
 
     def _top(self, meters, cost, barcode):
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def _annotated(self):
         return WarehouseProduct.with_stock_costs(
@@ -396,10 +417,14 @@ class SoldOutShowsLastCost(TestCase):
         self.client.force_login(user)
 
     def _item(self, cost, barcode):
-        return WarehouseProductItem.objects.create(
+        item = WarehouseProductItem.objects.create(
             product=self.wp, quantity=Decimal("100"),
             quantity_remaining=Decimal("0"), barcode=barcode,
             status="consumed", unit_cost_base=cost)
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=item.pk).update(unit_cost_base=None)
+        return item
 
     def _annotated(self):
         return WarehouseProduct.with_stock_costs(

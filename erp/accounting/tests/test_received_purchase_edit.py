@@ -272,14 +272,14 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_a_variant_with_stock_elsewhere_keeps_its_sku(self):
         wp = WarehouseProduct.objects.get()
-        WarehouseProductItem.objects.create(product=wp, quantity=Decimal("5"),
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=wp, quantity=Decimal("5"),
                                             barcode="OTHER-1")
         self.assertFalse(self._variant(self._form())["sku_follows"])
 
     def test_a_different_variant_takes_the_rolls_with_it(self):
         # Stock from elsewhere makes G07 more than this purchase's line, so
         # a new SKU on the line is another variant, not a new name for G07.
-        WarehouseProductItem.objects.create(product=WarehouseProduct.objects.get(),
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=WarehouseProduct.objects.get(),
                                             quantity=Decimal("5"), barcode="OTHER-1")
         form = self._form()
         v = self._variant(form)
@@ -519,7 +519,7 @@ class ReceivedPurchaseEditTest(TestCase):
 
     def test_a_roll_can_be_relabelled_but_not_onto_a_taken_code(self):
         other_wp = WarehouseProduct.objects.create(warehouse=self.wh, name="Other", sku="OTH")
-        WarehouseProductItem.objects.create(product=other_wp, quantity=5, barcode="TAKEN-1")
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=other_wp, quantity=5, barcode="TAKEN-1")
 
         form = self._form()
         self._variant(form)["tops"][0]["barcode"] = "TAKEN-1"

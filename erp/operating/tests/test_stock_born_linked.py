@@ -92,8 +92,9 @@ class AGoodsReceipt(SignedIn):
 
 class ARollScan(SignedIn):
     def _scan(self, **fields):
+        # A scan with no cost is refused; these tests are about linking.
         data = {"commit": "true", "quantity": "30", "barcode": "2000043130007",
-                "reason": "opening"}
+                "reason": "opening", "purchase_price": "2.00", "purchase_currency": "USD"}
         data.update(fields)
         return self.client.post(
             reverse("operating:warehouse_roll_scan", args=[self.warehouse.pk]), data)

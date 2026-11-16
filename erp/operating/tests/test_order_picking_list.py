@@ -56,7 +56,7 @@ class OrderPickingListTest(TestCase):
         wh, _ = Warehouse.objects.get_or_create(name=warehouse, accounting_book=book)
         wp, _ = WarehouseProduct.objects.get_or_create(warehouse=wh, sku="KRP", defaults={"name": "Krep"})
         on_roll = Decimal(on_roll or take)
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=on_roll, quantity_remaining=on_roll,
             barcode=barcode, lot_number=lot, status="in_stock")
         OrderStockReservation.objects.create(order=line.order, order_item=line, stock_item=roll,

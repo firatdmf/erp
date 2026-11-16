@@ -52,7 +52,7 @@ class PurchaseLineRollCountTest(TestCase):
             product=product,
         )
         for i, m in enumerate(meters, 1):
-            WarehouseProductItem.objects.create(
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=stock or self.product, quantity=m,
                 barcode=f"KRV{line_no}{i:06d}", purchase_invoice_item=item)
         return item

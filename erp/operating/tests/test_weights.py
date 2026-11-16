@@ -40,7 +40,7 @@ class NetKg(TestCase):
         self.wp = WarehouseProduct.objects.create(warehouse=wh, name="Velvet", sku="VEL.RED-280")
 
     def roll(self, weight=None):
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             weight_kg=weight)
 
@@ -87,7 +87,7 @@ class PackingListWeights(TestCase):
                                         product_variant=variant, quantity=60, price=10)
         self.pack = Pack.objects.create(order=self.order, pack_number=1)
         for code, weight in (("R1", Decimal("45")), ("R2", None)):
-            roll = WarehouseProductItem.objects.create(
+            roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
                 barcode=code, weight_kg=weight)
             OrderStockReservation.objects.create(
@@ -160,7 +160,8 @@ class ReceiptRollWeight(TestCase):
     def test_a_roll_keeps_the_weight_its_label_gave(self):
         wh = Warehouse.objects.create(
             name="WH", accounting_book=Book.objects.get_or_create(name="Laleli")[0])
-        wp = WarehouseProduct.objects.create(warehouse=wh, name="Velvet", sku="VEL.RED-280")
+        wp = WarehouseProduct.objects.create(warehouse=wh, name="Velvet", sku="VEL.RED-280",
+                                             cost_usd=Decimal("2.00"))
         codes = iter(["A1", "A2"])
         _added, ids = _add_stock_to_variant(
             wp, [{"qty": 50, "weight_kg": "45,2"}, {"qty": 40, "weight_kg": None}],

@@ -62,7 +62,7 @@ class StorefrontRuleTest(TestCase):
             row = WarehouseProduct.objects.create(warehouse=self.shelf, name="2052.SECOND",
                                                   sku="2052.SECOND", quantity=Decimal("4"),
                                                   catalog_variant=v)
-            WarehouseProductItem.objects.create(product=row, quantity=Decimal("4"),
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=row, quantity=Decimal("4"),
                                                 quantity_remaining=Decimal("4"),
                                                 status="in_stock", is_second=True)
             ProductFile.objects.create(product=self.product, product_variant=v,

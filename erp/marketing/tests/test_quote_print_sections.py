@@ -36,7 +36,7 @@ class PrintedQuoteSectionsTest(TestCase):
         wp, _ = WarehouseProduct.objects.get_or_create(
             warehouse=wh, catalog_variant=self.variant,
             defaults={"name": "Velvet", "sku": self.variant.variant_sku})
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
 

@@ -291,7 +291,7 @@ class ThePage(TransferBase):
         """One bad line must not lose the rest of the list."""
         elsewhere = Warehouse.objects.create(name="Ready-made Shop", accounting_book=self.ergene)
         other = WarehouseProduct.objects.create(warehouse=elsewhere, name="Krep", sku="OTHER")
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=other, quantity=Decimal("5"), quantity_remaining=Decimal("5"),
             barcode="R-0001", status="in_stock")
         resp = self.client.post(

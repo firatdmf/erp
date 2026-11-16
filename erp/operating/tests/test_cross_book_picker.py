@@ -60,7 +60,7 @@ class CrossBookPicker(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
             catalog_variant=self.variant)
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 

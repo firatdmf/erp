@@ -62,7 +62,7 @@ class CrossBookOrderSplit(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=title, sku=sku, quantity=Decimal("50"),
             catalog_variant=variant)
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 
@@ -333,7 +333,7 @@ class EditSplitsTheSameWay(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=title, sku=sku, quantity=Decimal("50"),
             catalog_variant=variant)
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
 
@@ -477,7 +477,7 @@ class EditingASplitOrderWhole(TestCase):
             name=f"{book.name} depo", defaults={"accounting_book": book})
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name=title, sku=sku, quantity=Decimal("50"), catalog_variant=variant)
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode=barcode, status="in_stock")
         line = order.items.create(product=parent, product_variant=variant,

@@ -37,7 +37,7 @@ class NextBarcodePreviewTest(TestCase):
     def test_it_carries_on_from_the_codes_already_in_stock(self):
         wp = WarehouseProduct.objects.create(
             warehouse=self.wh, name="Krep", sku="KZL001", quantity=Decimal("0"))
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("30"), quantity_remaining=Decimal("30"),
             barcode="KZL000007", status="in_stock")
         self.assertEqual(self._ask("KZL"), "KZL000008")

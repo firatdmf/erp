@@ -59,7 +59,7 @@ class PackingListColumns(TestCase):
                     product_variant=variant)
                 wp = WarehouseProduct.objects.create(
                     warehouse=wh, name=product.title, sku=product.sku, quantity=50)
-                roll = WarehouseProductItem.objects.create(
+                roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                     product=wp, quantity=Decimal("50.00"),
                     quantity_remaining=Decimal("50.00"), barcode=f"BC{pack_no}{i}")
                 OrderStockReservation.objects.create(

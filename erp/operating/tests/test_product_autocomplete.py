@@ -89,7 +89,7 @@ class AutocompleteOffersOnlyFreeStockTest(TestCase):
         self.wp = WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="PETEK FONLUK KUMAŞ 94",
             sku="PETEK.94.310", quantity=Decimal("30"), catalog_variant=self.variant)
-        self.stock_item = WarehouseProductItem.objects.create(
+        self.stock_item = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("30"), barcode="PTK-1")
         self.order = Order.objects.create()
 

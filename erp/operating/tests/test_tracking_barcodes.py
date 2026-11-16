@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 
 from django.contrib.auth import get_user_model
@@ -129,7 +130,7 @@ class NoBarcodeAboveTrackedItemsTest(TestCase):
     def test_a_variant_sold_by_count_without_a_code_gets_one_of_ours(self):
         from operating.models import WarehouseProduct
         row = WarehouseProduct.objects.create(warehouse=self.warehouse, name="r", sku="ROLLS.RED")
-        WarehouseProductItem.objects.create(product=row, quantity=1, quantity_remaining=1,
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=row, quantity=1, quantity_remaining=1,
                                             barcode="DMF000001")
         v = self._variant(self.boxes, "BOXES.BLUE", None)
         v.refresh_from_db()
@@ -181,9 +182,9 @@ class SwitchingTrackingTest(TestCase):
                                                      variant_barcode="8690000000017")
         self.row = WarehouseProduct.objects.create(warehouse=self.warehouse, name="Boxes white",
                                                    sku="BOXES.WHITE", catalog_variant=self.variant)
-        self.boxes = [WarehouseProductItem.objects.create(product=self.row, quantity=1, quantity_remaining=1)
+        self.boxes = [WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=self.row, quantity=1, quantity_remaining=1)
                       for _ in range(2)]
-        self.used_up = WarehouseProductItem.objects.create(product=self.row, quantity=1,
+        self.used_up = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=self.row, quantity=1,
                                                            quantity_remaining=0, status="consumed")
 
     def test_each_item_labels_the_boxes_in_stock(self):
@@ -198,7 +199,7 @@ class SwitchingTrackingTest(TestCase):
         self.assertEqual(self.product.labelled_items, [(self.row, 2)])
 
     def test_new_codes_continue_the_rows_own_family(self):
-        WarehouseProductItem.objects.create(product=self.row, quantity=1, quantity_remaining=1,
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=self.row, quantity=1, quantity_remaining=1,
                                             barcode="KRV000041")
         self.product.set_unit(tracking="item")
         self.assertEqual(sorted(WarehouseProductItem.objects.filter(

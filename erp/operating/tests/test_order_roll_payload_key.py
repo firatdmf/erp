@@ -44,7 +44,7 @@ class RollPayloadKey(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Crepe", sku=SKU, quantity=Decimal("50"),
             catalog_variant=variant)
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode="20582310112", status="in_stock")
 

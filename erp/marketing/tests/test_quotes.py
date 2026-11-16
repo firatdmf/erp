@@ -237,7 +237,7 @@ class QuoteTest(TestCase):
         wp, _ = WarehouseProduct.objects.get_or_create(
             warehouse=wh, catalog_variant=variant or self.variant,
             defaults={"name": "Velvet", "sku": (variant or self.variant).variant_sku})
-        return WarehouseProductItem.objects.create(
+        return WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
 

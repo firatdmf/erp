@@ -142,7 +142,7 @@ class AHalfAddedLaterIsTheSameOrder(TestCase):
         wh = Warehouse.objects.create(name="Ergene depo", accounting_book=self.ergene)
         wp = WarehouseProduct.objects.create(warehouse=wh, name="Tul", sku="K24777.B02",
                                              quantity=Decimal("50"), catalog_variant=variant)
-        WarehouseProductItem.objects.create(product=wp, quantity=Decimal("50"),
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=wp, quantity=Decimal("50"),
                                             quantity_remaining=Decimal("50"),
                                             barcode="E-0001", status="in_stock")
         User = get_user_model()

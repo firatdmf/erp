@@ -188,10 +188,10 @@ class StorefrontApiReadsLiveQuantityTest(TestCase):
         storefront offers, on the variant and on the product."""
         from operating.models import WarehouseProductItem
         row = WarehouseProduct.objects.get(warehouse=self.wh2, catalog_variant=self.stocked)
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=row, quantity=Decimal("5"), quantity_remaining=Decimal("5"),
             status="in_stock", is_second=True)
-        WarehouseProductItem.objects.create(  # sold out: nothing left to take off
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),   # sold out: nothing left to take off
             product=row, quantity=Decimal("3"), quantity_remaining=Decimal("0"),
             status="consumed", is_second=True)
         data = self._get()

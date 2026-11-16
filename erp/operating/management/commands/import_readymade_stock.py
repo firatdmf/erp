@@ -399,6 +399,10 @@ class Command(BaseCommand):
                 if row["price"]:
                     stats["value"] += row["sets"] * row["price"]
 
+            # bulk_create skips WarehouseProductItem.save(): every item needs its cost.
+            unpriced = sorted({r.product.sku for r in fresh if r.unit_cost_base is None})
+            if unpriced:
+                raise CommandError("No price for: " + ", ".join(unpriced))
             WarehouseProductItem.objects.bulk_create(fresh, batch_size=500)  # noqa: E501
             stats["items"] += len(fresh)
 

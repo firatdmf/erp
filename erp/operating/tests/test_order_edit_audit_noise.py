@@ -43,7 +43,7 @@ class OrderEditAuditNoise(TestCase):
         wh = Warehouse.objects.create(name="Laleli depo", accounting_book=self.book)
         self.wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("66.40"))
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("66.40"),
             quantity_remaining=Decimal("66.40"), barcode="L-0001",
             status="in_stock")

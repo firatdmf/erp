@@ -48,7 +48,7 @@ class PickedRolls(TestCase):
             row, _ = WarehouseProduct.objects.get_or_create(
                 warehouse=warehouse, sku="2086.WHITE",
                 defaults={"name": "2086 white", "catalog_variant": self.white})
-            self.rolls[key] = WarehouseProductItem.objects.create(
+            self.rolls[key] = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=row, barcode=f"R-{key}", quantity=Decimal(meters),
                 quantity_remaining=Decimal(meters), lot_number=lot, status="in_stock")
 
@@ -199,7 +199,7 @@ class PickedRolls(TestCase):
         only_ergene = ProductVariant.objects.create(product=self.cloth, variant_sku="2086.GOLD")
         row = WarehouseProduct.objects.create(warehouse=self.factory, name="2086 gold",
                                               sku="2086.GOLD", catalog_variant=only_ergene)
-        WarehouseProductItem.objects.create(product=row, barcode="R-G", quantity=Decimal("60"),
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=row, barcode="R-G", quantity=Decimal("60"),
                                             quantity_remaining=Decimal("60"), status="in_stock")
         self.order([{"product_sku": "2086", "product_variant_sku": "2086.GOLD",
                      "quantity": "12", "price": "4.50"}])

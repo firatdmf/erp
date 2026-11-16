@@ -449,6 +449,7 @@ class Command(BaseCommand):
                     lot_number=item["lot"], status="in_stock",
                     is_second=item["second"],
                     notes=" · ".join(x for x in notes if x) or None,
+                    unit_cost_base=product.cost_usd,
                 ))
             rolls.extend(fresh)
             stats["stock_created"] += len(fresh)
@@ -479,6 +480,10 @@ class Command(BaseCommand):
         # are built above but only written once every product exists.
         for roll in rolls:
             roll.product_id = roll.product.pk
+        # bulk_create skips WarehouseProductItem.save(): every item needs its cost.
+        unpriced = sorted({r.product.sku for r in rolls if r.unit_cost_base is None})
+        if unpriced:
+            raise CommandError("No cost for: " + ", ".join(unpriced))
         WarehouseProductItem.objects.bulk_create(rolls, batch_size=1000)
         StockMovement.objects.bulk_create([
             StockMovement(product_id=p.pk, movement_type="in", quantity=q,

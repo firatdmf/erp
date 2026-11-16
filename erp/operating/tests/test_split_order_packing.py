@@ -59,7 +59,7 @@ class SplitOrderPacking(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=Warehouse.objects.create(name=book.name, accounting_book=book),
             name=sku, sku=sku, quantity=Decimal("30"), catalog_variant=variant)
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("30"), quantity_remaining=Decimal("30"), barcode=barcode)
         reservation = OrderStockReservation.objects.create(
             order=order, order_item=item, stock_item=roll, warehouse_product=wp,

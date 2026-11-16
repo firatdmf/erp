@@ -67,7 +67,7 @@ class PartialShipmentBase(TestCase):
         wp = WarehouseProduct.objects.create(warehouse=wh, name=sku, sku=sku,
                                              quantity=Decimal("500"), catalog_variant=variant)
         for i, meters in enumerate(rolls):
-            roll = WarehouseProductItem.objects.create(
+            roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
                 barcode=f"B{self._n}-{i}")
             OrderStockReservation.objects.create(

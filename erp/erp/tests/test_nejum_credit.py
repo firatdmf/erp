@@ -44,7 +44,7 @@ class NejumCreditBase(TestCase):
         wp = WarehouseProduct.objects.create(warehouse=wh, name="Velvet Moss",
                                              sku="KZL000601", quantity=50,
                                              catalog_variant=variant)
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
             barcode="LZK0300003477")
         pack = Pack.objects.create(order=self.order, pack_number=1)

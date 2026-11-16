@@ -33,9 +33,13 @@ class InventoryAttribution(TestCase):
     def _roll(self, warehouse, meters, cost, status="in_stock"):
         product = WarehouseProduct.objects.create(
             warehouse=warehouse, name="seta grey", cost_usd=cost)
-        return WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=product, quantity=meters, quantity_remaining=meters,
-            status=status)
+            status=status, unit_cost_base=cost or Decimal("1"))
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+        return roll
 
     def test_uninvoiced_stock_still_counts(self):
         self._roll(self.fabrika, Decimal("100.00"), Decimal("3.7350"))

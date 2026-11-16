@@ -53,7 +53,11 @@ class RollPicker(TestCase):
     def _top(self, wp, barcode, scanned=None):
         roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("20"), quantity_remaining=Decimal("20"),
-            barcode=barcode, status="in_stock")
+            barcode=barcode, status="in_stock",
+            unit_cost_base=None if wp.cost_usd is not None else Decimal("1"))
+        if wp.cost_usd is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         if scanned is not None:
             WarehouseProductItem.objects.filter(pk=roll.pk).update(
                 scanned_at=scanned)

@@ -3630,26 +3630,46 @@ def _negative_price_message():
 
 
 def _intake_check_prices(products_in):
-    """Refuse, before any stock is written, a line with a negative price.
+    """Refuse, before any stock is written, a line with a negative price,
+    and a line bringing stock in with no price.
 
     Intake used to drop one silently: `price > 0` guards turned a typed -12
     into "no price", so the receipt went through unvalued and nobody was
     told. WarehouseProduct's costs are constrained non-negative now, so
-    this is also what keeps a bad line from failing halfway through."""
+    this is also what keeps a bad line from failing halfway through.
+
+    Every stock item carries what it cost (WarehouseProductItem.
+    unit_cost_base), so a line with rolls and no price — blank, or 0, which
+    the costing reads as no price — is refused too: the price on the
+    purchase is where that cost comes from."""
     from django.utils.translation import gettext as _t
-    bad = []
+
+    def label(p_in, v, i):
+        return ((v.get("sku") or _row_label(v) or "").strip()
+                or ((p_in.get("main_product") or {}).get("name") or "").strip()
+                or _t("product %(n)s") % {"n": i})
+
+    negative, missing = [], []
     for i, p_in in enumerate(products_in, start=1):
         for v in (p_in.get("variants") or []):
             if _is_negative_price(v.get("price")):
-                label = ((v.get("sku") or _row_label(v) or "").strip()
-                         or ((p_in.get("main_product") or {}).get("name") or "").strip()
-                         or _t("product %(n)s") % {"n": i})
-                bad.append(label)
-    if bad:
+                negative.append(label(p_in, v, i))
+                continue
+            brings = any((_safe_decimal(t.get("qty")) or 0) > 0 for t in (v.get("tops") or []))
+            price = _safe_decimal(v.get("price"))
+            if brings and not (price and price > 0):
+                missing.append(label(p_in, v, i))
+    if negative:
         raise IntakeError({
             "success": False,
             "error": _t("A purchase price cannot be negative: %(lines)s")
-                     % {"lines": ", ".join(bad)},
+                     % {"lines": ", ".join(negative)},
+        }, status=400)
+    if missing:
+        raise IntakeError({
+            "success": False,
+            "error": _t("Type a purchase price for: %(lines)s")
+                     % {"lines": ", ".join(missing)},
         }, status=400)
 
 
@@ -8837,7 +8857,7 @@ class WarehouseRollScan(View):
                     product.cost_usd = sibling.cost_usd
                     product.cost_try = sibling.cost_try
 
-            # Price is optional. Barcode is not.
+            # A price is needed unless the row already costs something.
             purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
             purchase_currency = (request.POST.get("purchase_currency") or "").strip().upper() or product.purchase_currency or "USD"
             if purchase_price_raw:
@@ -8853,6 +8873,14 @@ class WarehouseRollScan(View):
                         purchase_price, purchase_currency)
                 except (InvalidOperation, TypeError):
                     pass
+            # Every stock item carries what it cost. With nothing typed and
+            # nothing the row (or its book's other rows) already costs, the
+            # scan is refused — whatever this request created rolls back.
+            if product.cost_usd is None:
+                transaction.set_rollback(True)
+                return JsonResponse({"success": False, "error": _gettext(
+                    "Type the purchase price: %(sku)s has no cost yet."
+                ) % {"sku": product.sku or product.name}}, status=400)
             # Goods sold by count share one barcode, so the first scanned
             # names the row too. A product tracked item by item keeps its
             # barcodes on its items only (WarehouseProduct.save).
@@ -8873,8 +8901,8 @@ class WarehouseRollScan(View):
                 source_image=local_image,
                 ocr_raw=(request.POST.get("ocr_raw") or "")[:5000] or None,
                 # What it is carried at, stamped like any other arrival: the
-                # price typed for it, else what the product already costs.
-                # None leaves it unvalued, and nothing is posted for it.
+                # price typed for it, else what the product already costs (never
+                # None: a scan with neither is refused above).
                 unit_cost_base=product.cost_usd,
             )
 

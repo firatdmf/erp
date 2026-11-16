@@ -51,7 +51,7 @@ class PackHeaderTotals(TestCase):
                                         quantity=Decimal("100.00"), price=10)
 
     def _reserve(self, barcode, roll_meters, reserved, pack):
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=roll_meters, quantity_remaining=roll_meters,
             barcode=barcode)
         return OrderStockReservation.objects.create(
@@ -205,7 +205,7 @@ class ScanningStraightIntoAPackage(TestCase):
         self.item = OrderItem.objects.create(order=self.order, product=product,
                                              product_variant=variant,
                                              quantity=Decimal("100.00"), price=10)
-        self.stock_item = WarehouseProductItem.objects.create(
+        self.stock_item = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("40.00"),
             quantity_remaining=Decimal("40.00"), barcode="SCAN-1")
         self.client.force_login(User.objects.create_superuser("p3", "p3@a.b", "pw"))

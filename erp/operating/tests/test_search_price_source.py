@@ -64,9 +64,13 @@ class ThePriceComesOffTheBooksStock(TestCase):
         wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
             catalog_variant=self.variant, **kwargs)
-        WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
-            barcode=f"B-{wp.pk}", status="in_stock")
+            barcode=f"B-{wp.pk}", status="in_stock",
+            unit_cost_base=None if wp.cost_usd is not None else Decimal("1"))
+        if wp.cost_usd is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return wp
 
     def _member_of(self, *books):

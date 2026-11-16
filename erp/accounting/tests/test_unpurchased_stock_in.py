@@ -96,17 +96,17 @@ class UnpurchasedStockInTest(base.TestCase):
         self.assertFalse(WarehouseProductItem.objects.filter(barcode="S27815").exists())
         self.assertEqual(self._balances()["1300"], Decimal("175.00"))
 
-    def test_an_item_with_no_cost_is_added_and_posts_nothing(self):
+    def test_an_item_with_no_cost_is_refused_and_posts_nothing(self):
         r = self._add(reason="opening", sku="NEW.SKU", name="New", barcode="OPEN-1")
-        self.assertTrue(r.json()["success"], r.json())
-        roll = WarehouseProductItem.objects.get(barcode="OPEN-1")
-        self.assertIsNone(roll.unit_cost_base)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("Type the purchase price: NEW.SKU has no cost yet.", r.json()["error"])
+        self.assertFalse(WarehouseProductItem.objects.filter(barcode="OPEN-1").exists())
         self.assertEqual(self._balances()["1300"], Decimal("175.00"))
 
     def test_a_barcode_held_in_another_warehouse_is_refused(self):
         other = Warehouse.objects.create(name="Shop", accounting_book=self.book)
         wp = WarehouseProduct.objects.create(warehouse=other, name="X", sku="X")
-        WarehouseProductItem.objects.create(product=wp, quantity=5, quantity_remaining=5,
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"), product=wp, quantity=5, quantity_remaining=5,
                                             barcode="S27815")
         r = self._add(reason="found")
         self.assertFalse(r.json()["success"])

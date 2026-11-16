@@ -45,7 +45,7 @@ class StorefrontStock(TestCase):
             row, _ = WarehouseProduct.objects.get_or_create(
                 warehouse=warehouse, sku="2086.WHITE",
                 defaults={"name": "2086 white", "catalog_variant": variant})
-            self.rolls[barcode] = WarehouseProductItem.objects.create(
+            self.rolls[barcode] = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=row, barcode=barcode, quantity=Decimal(meters),
                 quantity_remaining=Decimal(meters), lot_number=lot, status="in_stock")
 
@@ -56,7 +56,7 @@ class StorefrontStock(TestCase):
             row, _ = WarehouseProduct.objects.get_or_create(
                 warehouse=warehouse, sku="DUV.160",
                 defaults={"name": "Duvet set", "catalog_variant": duvet_variant})
-            WarehouseProductItem.objects.create(
+            WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
                 product=row, quantity=Decimal(count), quantity_remaining=Decimal(count),
                 status="in_stock")
 
@@ -129,7 +129,7 @@ class StorefrontStock(TestCase):
 
     def test_second_quality_is_not_offered(self):
         """Seconds are sold in person, never online."""
-        WarehouseProductItem.objects.create(
+        WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=WarehouseProduct.objects.get(warehouse=self.shop, sku="DUV.160"),
             quantity=Decimal("2"), quantity_remaining=Decimal("2"), status="in_stock",
             is_second=True)

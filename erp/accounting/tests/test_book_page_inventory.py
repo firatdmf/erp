@@ -37,10 +37,15 @@ class BookPageAssets(TestCase):
         self.client.force_login(user)
 
     def _item(self, meters, cost, product=None):
-        return WarehouseProductItem.objects.create(
+        item = WarehouseProductItem.objects.create(
             product=product or self.wp, quantity=Decimal(meters),
             quantity_remaining=Decimal(meters), barcode=f"BC-{meters}-{cost}",
-            status="in_stock", unit_cost_base=cost)
+            status="in_stock", unit_cost_base=cost or Decimal("1"))
+        if cost is None:
+            # Unpriced stock can no longer be created; this stands for older data.
+            WarehouseProductItem.objects.filter(pk=item.pk).update(unit_cost_base=None)
+            item.unit_cost_base = None
+        return item
 
     def _unpriced_product(self):
         """A product with no cost either — an item alone is not enough.

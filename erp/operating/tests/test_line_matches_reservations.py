@@ -45,7 +45,7 @@ class LineMatchesItsReservations(TestCase):
         self.wp = WarehouseProduct.objects.create(
             warehouse=wh, name="Krep", sku=SKU, quantity=Decimal("50"),
             catalog_variant=self.variant)
-        self.roll = WarehouseProductItem.objects.create(
+        self.roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=self.wp, quantity=Decimal("50"),
             quantity_remaining=Decimal("50"), barcode="L-0001", status="in_stock")
 

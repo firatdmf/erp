@@ -56,7 +56,7 @@ class OrderPrintShelvesTest(TestCase):
     def _hold(self, line, barcode, meters, warehouse, book):
         wh, _ = Warehouse.objects.get_or_create(name=warehouse, accounting_book=book)
         wp, _ = WarehouseProduct.objects.get_or_create(warehouse=wh, sku="KRP", defaults={"name": "Krep"})
-        roll = WarehouseProductItem.objects.create(
+        roll = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=wp, quantity=Decimal(meters), quantity_remaining=Decimal(meters),
             barcode=barcode, status="in_stock")
         OrderStockReservation.objects.create(order=line.order, order_item=line, stock_item=roll,

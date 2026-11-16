@@ -48,7 +48,7 @@ class PaidAtTheCounter(TestCase):
         row = WarehouseProduct.objects.create(
             warehouse=shelves, name="Sheet", sku=EAN, barcode=EAN,
             quantity=Decimal("5"), catalog_variant=variant)
-        self.batch = WarehouseProductItem.objects.create(
+        self.batch = WarehouseProductItem.objects.create(unit_cost_base=Decimal("1"),
             product=row, quantity=Decimal("5"), quantity_remaining=Decimal("5"), status="in_stock")
         user = get_user_model().objects.create_superuser("counter", "c@t.r", "pw")
         user.member.books.add(self.book)

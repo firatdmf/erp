@@ -3295,6 +3295,14 @@ class SalesDashboardView(View):
         orders = list(orders)
         attach_live_costs(item.product_variant for order in orders
                           for item in order.items.all() if item.product_variant_id)
+        # And what each line's goods actually cost — its held rolls, an
+        # open purchase's price — in a few queries for the whole page.
+        from operating.order_purchases import (
+            held_cost_per_unit, known_line_costs_for, line_unit_cost,
+        )
+        known = known_line_costs_for(orders)
+        for order in orders:
+            order._known_line_costs = known.get(order.pk, {})
 
         for order in orders:
             # Get customer name
@@ -3308,6 +3316,9 @@ class SalesDashboardView(View):
             # Calculate order revenue, cost, and profit from items
             order_revenue = Decimal('0')
             order_profit = Decimal('0')
+            # Costs are kept in base; this order's figures are in its own
+            # currency until they are added up below (OrderItem.unit_cost).
+            rate = Decimal(str(order.rate_to_base() or 1))
             
             for item in order.items.all():
                 qty = item.quantity or Decimal('1')
@@ -3321,14 +3332,20 @@ class SalesDashboardView(View):
                 # Calculate profit based on item type
                 item_profit = Decimal('0')
                 
-                # Get variant cost and price
-                variant_cost = Decimal('0')
-                variant_price = Decimal('0')
-                
+                # What the goods cost, per unit, in base: the rolls held
+                # for the line and any purchase still coming, the catalog
+                # only for the rest (OrderItem.unit_cost_base).
+                catalog_cost = Decimal('0')
                 if item.product_variant:
-                    variant_cost = item.product_variant.live_cost or Decimal('0')
-                    variant_price = item.product_variant.live_price or Decimal('0')
-                
+                    catalog_cost = item.product_variant.live_cost or Decimal('0')
+                parts = order._known_line_costs.get(item.pk)
+
+                if item.is_custom_curtain:
+                    # Per meter of fabric: a curtain's quantity is curtains.
+                    variant_cost = (held_cost_per_unit(parts) or catalog_cost) / rate
+                else:
+                    variant_cost = line_unit_cost(parts, qty, catalog_cost) / rate
+
                 if item.is_custom_curtain:
                     # Custom Curtain Formula:
                     # Profit = Total Price - (Fabric Amount × (variant_cost + 1)) - (Total Price × 0.145)

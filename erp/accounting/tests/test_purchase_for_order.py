@@ -173,6 +173,45 @@ class PurchaseForCustomerTest(TestCase):
         line = order.items.get()
         OrderItem.objects.filter(pk=line.pk).update(quantity=Decimal("110"))  # 55 bought
         self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("2.5000"))
+
+    def _hold_costed_roll(self, item, meters, cost):
+        wp, _ = WarehouseProduct.objects.get_or_create(
+            warehouse=self.wh, sku=item.product_variant.variant_sku,
+            defaults={"name": "Shelf", "quantity": meters,
+                      "catalog_variant": item.product_variant})
+        roll = WarehouseProductItem.objects.create(
+            product=wp, quantity=meters, quantity_remaining=meters, status="in_stock",
+            unit_cost_base=Decimal(cost))
+        OrderStockReservation.objects.create(order=item.order, order_item=item,
+                                             stock_item=roll, warehouse_product=wp,
+                                             quantity=meters)
+        return roll
+
+    def test_a_line_costs_its_held_rolls_not_the_variants_average(self):
+        """The variant's other stock (here a $5.00 roll) is not what this
+        order sends; the roll held for it is."""
+        order = Order.objects.create(contact=self.customer)
+        line = self._stock_line(order)                                  # 50 m
+        self._hold_costed_roll(line, Decimal("30"), "1.00")
+        self._hold_costed_roll(line, Decimal("20"), "2.00")
+        WarehouseProductItem.objects.create(
+            product=WarehouseProduct.objects.get(sku="STK0001.1"), quantity=Decimal("40"),
+            quantity_remaining=Decimal("40"), status="in_stock", unit_cost_base=Decimal("5.00"))
+        self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("1.4000"))
+
+        # Shipped, the holds are spent and the cost stays what went out.
+        OrderStockReservation.objects.filter(order_item=line).update(consumed=True)
+        WarehouseProductItem.objects.filter(reservations__order_item=line).update(
+            status="consumed", quantity_remaining=0)
+        self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("1.4000"))
+
+    def test_a_held_roll_and_a_purchase_share_a_line_by_quantity(self):
+        _inv_id, order = self._priced_purchase("3.00")                  # 55 m coming
+        line = order.items.get()
+        OrderItem.objects.filter(pk=line.pk).update(quantity=Decimal("75"))
+        self._hold_costed_roll(OrderItem.objects.get(pk=line.pk), Decimal("20"), "1.50")
+        # 20 × 1.50 + 55 × 3.00 = 195 over 75 m
+        self.assertEqual(OrderItem.objects.get(pk=line.pk).unit_cost(), Decimal("2.6000"))
         self.assertEqual(ProductVariant.objects.count(), 1)
 
     def test_a_purchase_for_stock_still_leaves_no_trace(self):

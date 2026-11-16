@@ -1580,31 +1580,25 @@ class OrderItem(models.Model):
         product has no cost of its own. Returns 0 if nothing is set so
         callers don't crash on None * Decimal.
 
-        A line a purchase is still bringing in for this order costs what
-        that purchase pays (order_purchases.expected_line_costs): its
-        quantity at the purchase's cost, anything beyond it at the
-        variant's. Read once per order and kept on it, so a page of lines
-        asks once.
+        Where more is known, that comes first (order_purchases.
+        known_line_costs_for): the rolls held for the line at their own cost,
+        then what a purchase still on its way in brings for it at that
+        purchase's price — the variant's cost only for whatever is left.
+        The result is the average weighted by quantity. Read once per order
+        and kept on it, so a page of lines asks once.
         """
         from decimal import Decimal
         catalog = Decimal("0")
         if self.product_variant and self.product_variant.live_cost is not None:
-            catalog = self.product_variant.live_cost
+            catalog = Decimal(str(self.product_variant.live_cost))
         if not self.order_id:
             return catalog
         order = self.order
-        expected = getattr(order, "_expected_line_costs", None)
-        if expected is None:
-            from .order_purchases import expected_line_costs
-            expected = order._expected_line_costs = expected_line_costs(order)
-        if self.pk not in expected:
-            return catalog
-        bought, cost = expected[self.pk]
-        qty = self.quantity or Decimal("0")
-        if qty <= 0 or bought >= qty:
-            return cost
-        return ((bought * cost + (qty - bought) * Decimal(str(catalog))) / qty
-                ).quantize(Decimal("0.0001"))
+        from .order_purchases import known_line_costs, line_unit_cost
+        known = getattr(order, "_known_line_costs", None)
+        if known is None:
+            known = order._known_line_costs = known_line_costs(order)
+        return line_unit_cost(known.get(self.pk), self.quantity, catalog)
 
     def unit_cost(self):
         """Cost per unit IN THE ORDER'S CURRENCY, so it can be set against

@@ -223,56 +223,121 @@ def purchase_locked_lines(order):
     return locked
 
 
-def expected_line_costs(order):
-    """{order line pk: (quantity, base cost per unit)} for the lines a
-    purchase still on its way in feeds (purchase_locked_lines): what those
-    goods will cost when they arrive, so the order shows that cost now
-    rather than the variant's last cost on record.
+def known_line_costs(order):
+    """{order line pk: [(quantity, base cost per unit), ...]} — what is
+    known of what each of `order`'s lines costs. See known_line_costs_for."""
+    return known_line_costs_for([order]).get(order.pk, {})
 
-    The cost is worked out as the receipt will stamp it on the rolls —
-    each row's price into base at the rates the purchase was saved with,
-    else the published rate (views_warehouse._PurchaseRates). Several
-    purchases for one line are averaged by quantity. A row with no price,
-    or no rate into base, is left out, and its line keeps its catalog cost."""
+
+def known_line_costs_for(orders):
+    """{order pk: {line pk: [(quantity, base cost per unit), ...]}} — what
+    is known of what each line's goods cost, most certain first, for many
+    orders in a few queries (a report reads hundreds):
+
+      1. the rolls held for the line (its reservations, kept after the
+         order ships), each at its own cost — the ledger's rule
+         (services_posting.stock_unit_cost), so the order shows the cost
+         its shipping posts;
+      2. what a purchase still on its way in for an open order brings for
+         the line's variant, at that purchase's price turned into base as
+         the receipt will stamp it on the rolls (views_warehouse.
+         _PurchaseRates: the rates the purchase was saved with, else the
+         published rate). Several purchases are weighted by quantity.
+
+    line_unit_cost takes these in turn up to the line's quantity and
+    prices whatever is left at the variant's catalog cost. A roll or a
+    purchase row with no cost, or no rate into base, is left out.
+    `orders` are Order instances or pks."""
+    from accounting.models_accounts import Invoice
     from accounting.services_accounts import invoice_currency_for
+    from accounting.services_posting import stock_unit_cost
+    from .models import Order, OrderItem, OrderStockReservation
     from .views_warehouse import _PurchaseRates, _purchase_costs, _purchase_price
 
-    locked = purchase_locked_lines(order)
-    if not locked:
+    ids = [getattr(o, "pk", o) for o in orders]
+    if not ids:
         return {}
-    by_invoice = {}
-    for invoices in locked.values():
-        for invoice in invoices:
-            if invoice.pk in by_invoice:
-                continue
-            plan = invoice.intake_plan or {}
-            rates = _PurchaseRates(invoice_currency_for(invoice.current_account),
-                                   plan.get("rates"))
-            rows = {}
-            for p in (plan.get("products") or []):
-                for v in (p.get("variants") or []):
-                    sku = (v.get("sku") or "").strip().lower()
-                    qty = _row_quantity(v)
-                    price, currency = _purchase_price(v)
-                    cost = _purchase_costs(price, currency, rates)[0] if price else None
-                    if not sku or not qty or qty <= 0 or cost is None:
-                        continue
-                    q, value = rows.get(sku, (Decimal("0"), Decimal("0")))
-                    rows[sku] = (q + qty, value + qty * cost)
-            by_invoice[invoice.pk] = rows
+    lines = list(OrderItem.objects.filter(order_id__in=ids).order_by("pk")
+                 .values_list("pk", "order_id", "product_variant__variant_sku", "quantity"))
+    parts = {pk: [] for pk, *_rest in lines}
+    covered = {pk: Decimal("0") for pk in parts}
 
-    skus = dict(order.items.filter(pk__in=locked)
-                .values_list("pk", "product_variant__variant_sku"))
+    held = (OrderStockReservation.objects
+            .filter(order_id__in=ids, order_item_id__isnull=False)
+            .select_related("stock_item__purchase_invoice_item", "stock_item__product"))
+    for r in held:
+        cost = stock_unit_cost(r.stock_item)
+        if r.order_item_id not in parts or cost is None or not r.quantity or r.quantity <= 0:
+            continue
+        parts[r.order_item_id].append((r.quantity, cost))
+        covered[r.order_item_id] += r.quantity
+
+    open_ids = (Order.objects.filter(pk__in=ids)
+                .exclude(order_status__in=list(_CLOSED_STATUSES)).values_list("pk", flat=True))
+    coming = {}   # (order pk, SKU lowercased) → [quantity, value]
+    for invoice in (Invoice.objects.filter(for_order_id__in=list(open_ids), status="ordered")
+                    .select_related("current_account")):
+        plan = invoice.intake_plan or {}
+        rates = _PurchaseRates(invoice_currency_for(invoice.current_account), plan.get("rates"))
+        for p in (plan.get("products") or []):
+            for v in (p.get("variants") or []):
+                sku = (v.get("sku") or "").strip().lower()
+                qty = _row_quantity(v)
+                price, currency = _purchase_price(v)
+                cost = _purchase_costs(price, currency, rates)[0] if price else None
+                if not sku or qty <= 0 or cost is None:
+                    continue
+                row = coming.setdefault((invoice.for_order_id, sku), [Decimal("0"), Decimal("0")])
+                row[0] += qty
+                row[1] += qty * cost
+    # A variant on two lines: what is coming fills them in turn.
+    for pk, order_id, sku, qty in lines:
+        row = coming.get((order_id, (sku or "").lower()))
+        if not row or row[0] <= 0:
+            continue
+        take = min(row[0], max((qty or Decimal("0")) - covered[pk], Decimal("0")))
+        if take > 0:
+            unit = (row[1] / row[0]).quantize(Decimal("0.0001"))
+            parts[pk].append((take, unit))
+            row[1] -= take * unit
+            row[0] -= take
+
     out = {}
-    for pk, invoices in locked.items():
-        sku = (skus.get(pk) or "").lower()
-        qty = value = Decimal("0")
-        for invoice in invoices:
-            q, v = by_invoice[invoice.pk].get(sku, (Decimal("0"), Decimal("0")))
-            qty, value = qty + q, value + v
-        if qty > 0:
-            out[pk] = (qty, (value / qty).quantize(Decimal("0.0001")))
+    for pk, order_id, _sku, _qty in lines:
+        if parts[pk]:
+            out.setdefault(order_id, {})[pk] = parts[pk]
     return out
+
+
+def line_unit_cost(parts, quantity, catalog):
+    """One line's cost per unit in base: `parts` (known_line_costs_for)
+    taken in turn up to `quantity`, whatever is left at `catalog`, averaged
+    by quantity."""
+    catalog = Decimal(str(catalog or 0))
+    if not parts:
+        return catalog
+    qty = quantity or Decimal("0")
+    if qty <= 0:
+        return parts[0][1]
+    left, value = qty, Decimal("0")
+    for part_qty, cost in parts:
+        take = min(part_qty, left)
+        value += take * cost
+        left -= take
+        if left <= 0:
+            break
+    value += left * catalog
+    return (value / qty).quantize(Decimal("0.0001"))
+
+
+def held_cost_per_unit(parts):
+    """The average cost of `parts` alone — per meter of the fabric held,
+    for a line whose own quantity is not meters (a custom curtain). None
+    when nothing is known."""
+    qty = sum((q for q, _c in parts or []), Decimal("0"))
+    if qty <= 0:
+        return None
+    return (sum((q * c for q, c in parts), Decimal("0")) / qty).quantize(Decimal("0.0001"))
 
 
 def locked_line_error(item, invoices, *, removing=False):

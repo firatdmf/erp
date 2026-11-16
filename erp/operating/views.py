@@ -5488,7 +5488,7 @@ def _attach_list_gross_profit(orders):
     posted nothing, so it, and a shipped order with no movements behind
     it, keep the live cost gross_profit() reads.
 
-    Two queries for the whole list, however many orders.
+    A few queries for the whole list, however many orders.
     """
     from collections import defaultdict
     from decimal import Decimal, ROUND_HALF_UP
@@ -5508,6 +5508,13 @@ def _attach_list_gross_profit(orders):
                     entry__source_id__in=list(movement_order))
             .values_list("entry__source_id", "debit", "credit")):
         recorded[movement_order[source_id]] += debit - credit
+
+    # What each open line actually costs — held rolls, a purchase still
+    # coming — for every order on the page at once (OrderItem.unit_cost_base).
+    from .order_purchases import known_line_costs_for
+    known = known_line_costs_for(orders)
+    for order in orders:
+        order._known_line_costs = known.get(order.pk, {})
 
     for order in orders:
         profit = order.gross_profit()
@@ -8024,7 +8031,6 @@ class OrderAnalytics(LoginRequiredMixin, View):
             output_field=DecimalField(max_digits=16, decimal_places=8),
         )
         line_rev = Round(F("quantity") * F("price") * order_rate, 2, output_field=DEC)
-        line_cost = Round(F("quantity") * unit_cost_expr, 2, output_field=DEC)
 
         items = OrderItem.objects.filter(order_id__in=filtered_ids)
         if product_type == "custom":
@@ -8034,10 +8040,22 @@ class OrderAnalytics(LoginRequiredMixin, View):
 
         money = items.aggregate(
             revenue=Coalesce(Sum(line_rev, output_field=DEC), Value(Decimal("0"), output_field=DEC)),
-            cost=Coalesce(Sum(line_cost, output_field=DEC), Value(Decimal("0"), output_field=DEC)),
         )
         total_revenue = money["revenue"] or Decimal("0")
-        total_cost = money["cost"] or Decimal("0")
+        # Cost line by line, as the order page states it (OrderItem.
+        # unit_cost_base): the rolls held for the line and any purchase
+        # still coming at their own cost, the catalog cost (unit_cost_expr)
+        # only for the rest. That can't be said in SQL, so the lines are
+        # read once and the known costs fetched for every order together.
+        from decimal import ROUND_HALF_UP
+        from .order_purchases import known_line_costs_for, line_unit_cost
+        known = known_line_costs_for(filtered_ids)
+        total_cost = Decimal("0")
+        for pk, order_id, qty, catalog in (items.annotate(catalog=unit_cost_expr)
+                                           .values_list("pk", "order_id", "quantity", "catalog")):
+            unit = line_unit_cost(known.get(order_id, {}).get(pk), qty, catalog)
+            total_cost += ((qty or Decimal("0")) * unit).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP)
         total_profit = total_revenue - total_cost
         total_orders = filtered_orders.count()
         avg_order = (total_revenue / total_orders) if total_orders else Decimal("0")

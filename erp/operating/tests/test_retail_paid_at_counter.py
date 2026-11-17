@@ -8,9 +8,12 @@ cannot be made without one. The collection is tied to the order by key
 (OrderPayment), never by text: the old automatic collection matched on
 notes reading "ORD-<pk>" and took order 286's money twice.
 
-When the order is edited or called off afterwards, the page says what
-the counter took against what the order now bills, and the person decides
-whether the difference changes hands. Nothing settles it on its own.
+Retail Sales is nobody's account, so the counter money follows the bill:
+completed again after an edit, cancelled or returned, the difference is
+collected or given back through the cash account that took it
+(operating.counter). A gap the status change could not settle — an older
+order, or one edited without a status change — shows on the page with
+"Collect it" / "Give it back".
 """
 import json
 from decimal import Decimal
@@ -129,7 +132,7 @@ class PaidAtTheCounter(TestCase):
         page = self.client.get(reverse("operating:order_detail", kwargs={"pk": order.pk}))
         self.assertContains(page, 'id="od-counter-gap"')
         self.assertContains(page, "Give it back")
-        # Nothing has moved on its own.
+        # Nothing has moved: no status changed.
         self.assertEqual(Payment.objects.count(), 1)
         self.client.post(reverse("operating:settle_counter", kwargs={"pk": order.pk}))
         refund = Payment.objects.get(type="refund_in")
@@ -155,7 +158,10 @@ class PaidAtTheCounter(TestCase):
         self.client.post(reverse("operating:settle_counter", kwargs={"pk": order.pk}))
         self.assertEqual(order.counter_takings(), Decimal("0.00"))
 
-    # ── cancelling gives it back in the same step, when ticked ──
+    # ── completing, cancelling: the counter follows the bill ────
+    # Retail Sales is nobody's account, so money left over there is
+    # nobody's credit: the status change settles it, through the cash
+    # account that took the money.
     def _reopened(self):
         order = self._made()
         detail = reverse("operating:order_detail", kwargs={"pk": order.pk})
@@ -164,34 +170,58 @@ class PaidAtTheCounter(TestCase):
         self.assertEqual(order.order_status, "pending")
         return order, detail
 
-    def test_the_cancel_dialog_offers_to_give_it_back(self):
+    def _square(self, order):
+        counter = order.current_account
+        counter.refresh_from_db()
+        self.assertEqual(Decimal(str(counter.own_currency_balance() or 0)), Decimal("0"))
+
+    def test_reopening_alone_settles_nothing(self):
+        order, _detail = self._reopened()
+        self.assertEqual(Payment.objects.count(), 1)
+
+    def test_the_cancel_dialog_says_what_goes_back(self):
         order, detail = self._reopened()
         page = self.client.get(detail)
-        self.assertContains(page, 'id="odxGiveBack" checked')
+        self.assertContains(page, 'id="odx-give-back"')
         self.assertContains(page, "Tenge")
 
-    def test_cancelling_with_the_tick_gives_it_all_back(self):
+    def test_cancelling_gives_it_all_back(self):
         order, detail = self._reopened()
         self.client.post(detail, {"action": "update_status", "order_status": "cancelled",
-                                  "cancel_reason": "trial", "give_back": "1"})
+                                  "cancel_reason": "trial"})
         order.refresh_from_db()
         self.assertEqual(order.order_status, "cancelled")
         refund = Payment.objects.get(type="refund_in")
         self.assertEqual((refund.amount, refund.cash_account, refund.status),
                          (Decimal("20000.00"), self.tenge, "confirmed"))
         self.assertIsNone(order.counter_gap())
-        counter = order.current_account
-        counter.refresh_from_db()
-        self.assertEqual(Decimal(str(counter.own_currency_balance() or 0)), Decimal("0"))
+        self._square(order)
 
-    def test_cancelling_without_the_tick_leaves_it_for_later(self):
+    def test_a_discount_added_after_payment_is_given_back_on_completion(self):
+        from operating.views import save_order_adjustments
         order, detail = self._reopened()
-        self.client.post(detail, {"action": "update_status", "order_status": "cancelled",
-                                  "cancel_reason": "kept as credit"})
+        save_order_adjustments(order, [{"label": "Discount", "amount": "-1500"}])
+        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "cancelled")
-        self.assertFalse(Payment.objects.filter(type="refund_in").exists())
-        self.assertEqual(order.counter_gap()[2], Decimal("-20000.00"))
+        self.assertEqual(order.order_status, "shipped")
+        refund = Payment.objects.get(type="refund_in")
+        self.assertEqual((refund.amount, refund.cash_account), (Decimal("1500.00"), self.tenge))
+        self.assertIsNone(order.counter_gap())
+        self._square(order)
+
+    def test_a_dearer_order_collects_the_rest_on_completion(self):
+        order, detail = self._reopened()
+        order.items.update(price=Decimal("11000"))
+        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
+        more = Payment.objects.filter(type="collection").order_by("-pk").first()
+        self.assertEqual((more.amount, more.cash_account), (Decimal("2000.00"), self.tenge))
+        self.assertIsNone(order.counter_gap())
+        self._square(order)
+
+    def test_completing_again_unchanged_moves_no_money(self):
+        order, detail = self._reopened()
+        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
+        self.assertEqual(Payment.objects.count(), 1)
 
     def test_an_older_retail_order_never_linked_says_nothing(self):
         order = self._made()

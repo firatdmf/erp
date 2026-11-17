@@ -2442,15 +2442,9 @@
         {% if reservation_count %}<li>{% blocktrans count counter=reservation_count %}{{ counter }} reserved roll is released{% plural %}{{ counter }} reserved rolls are released{% endblocktrans %}</li>{% endif %}
         {% if order.current_account_id %}<li>{% trans "The sale is removed from the customer's account" %}</li>{% endif %}
         {% if order.notify_customer %}<li>{% trans "The customer is emailed that the order was cancelled" %}</li>{% endif %}
+        {% if cancel_give_back %}{% comment %}Retail Sales holds no one's credit: the counter money goes back with the cancel (operating.counter).{% endcomment %}<li id="odx-give-back">{% blocktrans with amount=cancel_give_back.amount|floatformat:"2g" cur=order.currency_symbol box=cancel_give_back.box %}<b>{{ cur }}{{ amount }}</b> is given back from <b>{{ box }}</b>{% endblocktrans %}</li>{% endif %}
         <li>{% trans "The order can no longer be edited or packed" %}</li>
       </ul>
-      {% if cancel_give_back %}
-      {% comment %}Paid at the counter: give it back in the same step. Unticked, the order page keeps "Give it back" for later (operating.views.settle_counter_gap).{% endcomment %}
-      <label style="display:flex; align-items:flex-start; gap:8px; margin:10px 0 12px; font-size:13px; cursor:pointer;">
-        <input type="checkbox" id="odxGiveBack" checked style="margin-top:2px;">
-        <span>{% blocktrans with amount=cancel_give_back.amount|floatformat:"2g" cur=order.currency_symbol box=cancel_give_back.box %}Give back <b>{{ cur }}{{ amount }}</b> from <b>{{ box }}</b>{% endblocktrans %}</span>
-      </label>
-      {% endif %}
       {% if cancel_needs_approval %}
       <div class="odc-warn"><i class="fa fa-user-shield"></i><span>{% trans "It cancels supplier purchases, so a book admin must approve it. The order is frozen until they decide." %}</span></div>
       {% endif %}
@@ -3011,12 +3005,6 @@
           statusForm.appendChild(inp);
         }
         inp.value = reason;
-        const giveBack = document.getElementById('odxGiveBack');
-        if (giveBack && giveBack.checked) {
-          const gb = document.createElement('input');
-          gb.type = 'hidden'; gb.name = 'give_back'; gb.value = '1';
-          statusForm.appendChild(gb);
-        }
         statusInput.value = 'cancelled';
         submitForm();
       });

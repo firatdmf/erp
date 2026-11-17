@@ -7270,6 +7270,22 @@ def _apply_status_to_one(order, new_status, carrier=None, tracking=None,
                     post_retail_order_financials(order, user=user)
                 elif leaving_ship:
                     reverse_retail_order_financials(order, user=user)
+                # The counter money follows the bill: completed again after
+                # an edit, cancelled or returned, the difference is collected
+                # or given back through the cash account that took it
+                # (operating.counter). Not while the order is reopened —
+                # its lines are still being changed. A failure here never
+                # holds up the status change; the order page then shows the
+                # gap with "Collect it" / "Give it back".
+                if entering_ship or (changing and new_status in ("cancelled", "returned")):
+                    from .counter import settle_counter_gap
+                    try:
+                        with _tx.atomic():
+                            order._counter_settled = settle_counter_gap(order, user)
+                    except Exception:
+                        import logging
+                        logging.getLogger(__name__).exception(
+                            "Counter money not settled for order %s", order.pk)
     except Exception as _e:
         return False, f"error:{_e}"
     return True, None

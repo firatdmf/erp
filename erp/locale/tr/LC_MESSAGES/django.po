@@ -16544,5 +16544,5 @@ msgstr "Cari hesaplar ve müşteriler iznine sahip olmayanlara verilir."
 
 #: operating/templates/operating/order_detail.html
 #, python-format
-msgid "Give back <b>%(cur)s%(amount)s</b> from <b>%(box)s</b>"
-msgstr "<b>%(box)s</b> kasasından <b>%(cur)s%(amount)s</b> iade et"
+msgid "<b>%(cur)s%(amount)s</b> is given back from <b>%(box)s</b>"
+msgstr "<b>%(cur)s%(amount)s</b> <b>%(box)s</b> kasasından iade edilir"

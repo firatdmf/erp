@@ -480,13 +480,12 @@ class OrderDetail(DetailView):
         ctx["cancel_needs_approval"] = (
             ctx["cancel_request"] is None
             and cancel_approval.needs_approval(self.request.user, self.object))
-        # Money taken at the counter for this retail order: the cancel
-        # dialog offers to give it back in the same step, ticked. Not when
-        # a book admin must approve the cancel — that happens later, and
-        # the order page's "Give it back" covers it then.
+        # Money taken at the counter for this retail order goes back when
+        # it is cancelled (operating.counter); the dialog says how much
+        # and from where.
         ctx["cancel_give_back"] = None
-        if (self.object.is_retail_order and not ctx["cancel_needs_approval"]
-                and self.object.payment_links.exists()):
+        if self.object.is_retail_order and self.object.payment_links.exists():
+            from .counter import counter_cash_account
             taken = self.object.counter_takings()
             source = counter_cash_account(self.object) if taken > 0 else None
             if source is not None:
@@ -1217,14 +1216,7 @@ class OrderDetail(DetailView):
                 _g("Order cancelled — its reservations were released and its account "
                    "entry was removed."),
             )
-            # The cancel dialog's "Give back" tick: the money taken at the
-            # counter goes back out in the same step. Left unticked, the
-            # order page keeps its "Give it back" for later.
-            from erp.roles import sees_order_money
-            if request.POST.get("give_back") == "1" and sees_order_money(request.user):
-                gap = order.counter_gap()
-                if gap and gap[2] < 0:
-                    _counter_settled_message(request, order, settle_counter_gap(order, request.user))
+            _counter_settled_notice(request, order)
             return redirect("operating:order_detail", pk=order.pk)
 
         rejected_msg = rejected and (
@@ -1242,6 +1234,7 @@ class OrderDetail(DetailView):
                 _g("Order completed — stock was deducted and the entries were posted. "
                    "If something is wrong, undo it with 'Re-open & Fix'."),
             )
+            _counter_settled_notice(request, order)
         elif was_shipped and not now_shipped:
             # The optional reason from the "Geri Aç & Düzelt" prompt goes
             # straight into the order's change history so the audit trail
@@ -8611,9 +8604,10 @@ def settle_counter(request, pk):
     what it bills (Order.counter_gap): collect the rest, or give the
     difference back, through the cash account the sale went into.
 
-    Only on a person's say-so. An edited or cancelled order shows the gap
-    and this button; nothing settles it on its own — taking money
-    automatically is how order 286 was collected twice.
+    Completing, cancelling or returning a retail order settles it on its
+    own (operating.counter); this button is left for a gap that could not
+    be settled then — an order completed before that, or one whose cash
+    account is not known.
     """
     from django.utils.translation import gettext as _
 
@@ -8621,52 +8615,20 @@ def settle_counter(request, pk):
     if order.counter_gap() is None:
         messages.info(request, _("Nothing to settle: what was taken matches what the order bills."))
         return redirect("operating:order_detail", pk=order.pk)
+    from .counter import settle_counter_gap
     _counter_settled_message(request, order, settle_counter_gap(order, request.user))
     return redirect("operating:order_detail", pk=order.pk)
 
 
-def counter_cash_account(order):
-    """The cash account a retail order's counter money went into — the
-    latest confirmed payment linked to it — or None when it is not known."""
-    last = (order.payment_links.select_related("payment__cash_account", "payment__currency")
-            .filter(payment__status="confirmed").order_by("-payment__date", "-pk").first())
-    if last is None or last.payment.cash_account_id is None:
-        return None
-    return last.payment
-
-
-def settle_counter_gap(order, user):
-    """Collect or give back Order.counter_gap through the cash account the
-    sale went into. Returns (kind, amount, cash_account), or None when
-    there is no gap or the cash account is not known.
-
-    Called only on a person's say-so: the order page's "Collect it" /
-    "Give it back", or the "Give back" tick in the cancel dialog.
-    """
-    from datetime import date
-    from accounting.models import Payment
-    from accounting.views_payment import _next_payment_number
-    from .models import OrderPayment
-
-    gap = order.counter_gap()
-    first = counter_cash_account(order) if gap else None
-    if first is None:
-        return None
-    difference = gap[2]
-    kind = "collection" if difference > 0 else "refund_in"
-    with transaction.atomic():
-        pay = Payment.objects.create(
-            current_account=first.current_account, book=first.book,
-            number=_next_payment_number(first.book, kind),
-            type=kind, method="cash", status="draft", date=date.today(),
-            amount=abs(difference), currency=first.currency,
-            cash_account=first.cash_account,
-            description=(f"Rest collected at the counter for Order #{order.pk}" if kind == "collection"
-                         else f"Given back at the counter for Order #{order.pk}"),
-            notes=f"ORD-{order.pk}", created_by=getattr(user, "member", None))
-        OrderPayment.objects.create(order=order, payment=pay)
-        pay.confirm(user=user)
-    return kind, abs(difference), first.cash_account
+def _counter_settled_notice(request, order):
+    """Say what a status change settled at the counter, if anything
+    (apply_order_status_change leaves it on the order) — to whoever may
+    see the order's money."""
+    settled = getattr(order, "_counter_settled", None)
+    if settled:
+        from erp.roles import sees_order_money
+        if sees_order_money(request.user):
+            _counter_settled_message(request, order, settled)
 
 
 def _counter_settled_message(request, order, settled):

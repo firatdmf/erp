@@ -27,7 +27,9 @@ class VariantsHaveNoAttributesOfTheirOwn(TestCase):
     def test_the_variant_table_has_no_attributes_pop_up(self):
         page = self.client.get(reverse("marketing:product_edit", args=[self.product.pk]))
         self.assertEqual(page.status_code, 200)
-        self.assertNotContains(page, "variant_attributes_modal.js")
+        # No ".js": with DEBUG off the page would name a hashed copy,
+        # variant_attributes_modal.<hash>.js, and slip past the full name.
+        self.assertNotContains(page, "variant_attributes_modal")
         # The product's own attributes are still edited on the page.
         self.assertContains(page, 'id="product_attributes_section"')
 

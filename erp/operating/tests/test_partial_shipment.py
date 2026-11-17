@@ -12,6 +12,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 
@@ -171,12 +172,14 @@ class PlainOrder(PartialShipmentBase):
         self.assertContains(self.client.get(pack_url), f'href="{url}"')
         # The cargo receipt is picked, photographed or pasted (and shrunk)
         # by the same picker as on the order page.
-        self.assertContains(page, "operating/js/cargo_receipts.js")
+        # static(): with DEBUG off (CI, production) the page names the
+        # hashed copy, cargo_receipts.<hash>.js, never the plain path.
+        self.assertContains(page, static("operating/js/cargo_receipts.js"))
         self.assertContains(page, "paste it here")
         # The carrier is the order page's type-to-search field; a name not
         # on the list is added, as there.
         self.assertContains(page, '<select name="carrier" id="sp-carrier-select" hidden>', html=False)
-        self.assertContains(page, "operating/js/carrier_picker.js")
+        self.assertContains(page, static("operating/js/carrier_picker.js"))
         r = self.client.post(url, {"pack": [self.p1.pk], "tracking_number": "TRK-1",
                                    "carrier": "Sürat Kargo"})
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),

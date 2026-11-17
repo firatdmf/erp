@@ -183,6 +183,8 @@
 .co-box-topick{margin-left:auto;text-transform:none;letter-spacing:0;font-size:10.5px;font-weight:800;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:999px;}
 .co-box-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 6px 5px 9px;font-size:12px;background:#fff;border:1px solid #E2E8EE;border-radius:7px;}
 .co-box-row.taken{background:#ECFDF5;border-color:#A7F3D0;}
+.co-box-row[data-bc]{cursor:pointer;}
+.co-box-row[data-bc]:hover{border-color:#5EEAD4;background:#F0FDFA;}
 .co-box-row code{background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;}
 .co-box-where{flex:1;min-width:0;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .co-box-free{color:#0F766E;font-weight:600;white-space:nowrap;}
@@ -2363,15 +2365,21 @@
   // Under a counted product's code: how many are free, and what they
   // cost. Always there and always in the same place, so it is read at a
   // glance and never moves with the fields below it.
+  // Goods sold by count are whole: "59 pack", not "59.00 pack" — what
+  // marketing.units.format_amount prints for them on the server.
+  function coWhole(n) {
+    return (Math.round((parseFloat(n) || 0) * 100) / 100).toLocaleString('en-US');
+  }
+
   function coStockLineHtml(item) {
     if (item.rollsLoading) return '<span class="co-stockline">…</span>';
     var free = coCountedFree(item);
     var unit = esc(item.rollUnit || '');
     var held = (item.existingRolls || []).reduce(function (s, r) { return s + (parseFloat(r.quantity) || 0); }, 0);
     var text = free > 0
-      ? fmtNum(free) + ' ' + unit + ' {% trans "in stock" %}'
+      ? coWhole(free) + ' ' + unit + ' {% trans "in stock" %}'
       : '{% filter escapejs %}{% trans "none in stock" %}{% endfilter %}';
-    if (held > 0) text += ' · ' + fmtNum(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
+    if (held > 0) text += ' · ' + coWhole(held) + ' {% filter escapejs %}{% trans "already packed" %}{% endfilter %}';
     // The cost of what is on the shelf — a range where batches differ.
     // A sales rep is sent a price there instead and never the cost.
     var costs = (item.availableRolls || []).map(function (r) {
@@ -2561,13 +2569,16 @@
       var key = (p.barcode || '').toLowerCase();
       var n = held[key] || 0;
       var free = Math.floor(parseFloat(p.available) || 0);
-      return '<div class="co-box-row' + (n ? ' taken' : '') + '">' +
+      // A row taken from already is changed in its field, so a stray
+      // click cannot undo a pick; an untaken one is taken from by a click.
+      return '<div class="co-box-row' + (n ? ' taken' : '') + '"' +
+          (n ? '' : ' data-bc="' + escAttr(p.barcode || '') + '" onclick="coClickBox(' + i + ',this.dataset.bc)"') + '>' +
         '<code>' + esc(coRollLabel(p, item.itemNoun)) + '</code>' +
         '<span class="co-box-where">' + esc(p.warehouse || '') + coRollBookHtml(p) + '</span>' +
-        '<span class="co-box-free">' + fmtNum(free) + ' ' + unit + ' {% trans "free" %}</span>' +
+        '<span class="co-box-free">' + free + ' ' + unit + ' {% trans "free" %}</span>' +
         '<input type="number" class="form-input" inputmode="numeric" min="0" step="1"' +
           (free ? ' max="' + free + '"' : '') + ' value="' + (n || '') + '" placeholder="0"' +
-          ' data-bc="' + escAttr(p.barcode || '') + '" onfocus="this.select()"' +
+          ' data-bc="' + escAttr(p.barcode || '') + '" onclick="event.stopPropagation()" onfocus="this.select()"' +
           ' onchange="coTakeFromBox(' + i + ',this.dataset.bc,this.value)"' +
           ' onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
       '</div>';
@@ -2585,7 +2596,16 @@
   // Take `raw` of a counted line from this one box. What it takes goes
   // first to what the line still had to pick, so choosing the box for an
   // order that came in unpicked leaves its quantity as it was.
-  window.coTakeFromBox = function (i, bc, raw) {
+  // A click on a box nothing was taken from yet: it takes what the line
+  // still has to pick (as much as the box holds), or one more when nothing
+  // is left to pick — what a scan of the printed barcode means.
+  window.coClickBox = function (i, bc) {
+    var item = orderItems[i];
+    if (!item) return false;
+    return window.coTakeFromBox(i, bc, coToPick(item) || 1, true);
+  };
+
+  window.coTakeFromBox = function (i, bc, raw, quiet) {
     var item = orderItems[i];
     if (!item) return false;
     var key = (bc || '').toLowerCase();
@@ -2595,7 +2615,7 @@
     var n = Math.max(0, Math.floor(parseFloat(raw) || 0));
     if (cap && n > cap) {
       n = cap;
-      showToast('{% filter escapejs %}{% trans "Only %(n)s are free in this one." %}{% endfilter %}'.replace('%(n)s', cap), 'warning');
+      if (!quiet) showToast('{% filter escapejs %}{% trans "Only %(n)s are free in this one." %}{% endfilter %}'.replace('%(n)s', cap), 'warning');
     }
     var prev = (item.rolls || []).find(function (r) { return (r.barcode || '').toLowerCase() === key; });
     var had = prev ? (parseFloat(prev.quantity) || 0) : 0;

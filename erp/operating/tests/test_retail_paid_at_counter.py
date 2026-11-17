@@ -155,6 +155,44 @@ class PaidAtTheCounter(TestCase):
         self.client.post(reverse("operating:settle_counter", kwargs={"pk": order.pk}))
         self.assertEqual(order.counter_takings(), Decimal("0.00"))
 
+    # ── cancelling gives it back in the same step, when ticked ──
+    def _reopened(self):
+        order = self._made()
+        detail = reverse("operating:order_detail", kwargs={"pk": order.pk})
+        self.client.post(detail, {"action": "update_status", "order_status": "pending"})
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "pending")
+        return order, detail
+
+    def test_the_cancel_dialog_offers_to_give_it_back(self):
+        order, detail = self._reopened()
+        page = self.client.get(detail)
+        self.assertContains(page, 'id="odxGiveBack" checked')
+        self.assertContains(page, "Tenge")
+
+    def test_cancelling_with_the_tick_gives_it_all_back(self):
+        order, detail = self._reopened()
+        self.client.post(detail, {"action": "update_status", "order_status": "cancelled",
+                                  "cancel_reason": "trial", "give_back": "1"})
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        refund = Payment.objects.get(type="refund_in")
+        self.assertEqual((refund.amount, refund.cash_account, refund.status),
+                         (Decimal("20000.00"), self.tenge, "confirmed"))
+        self.assertIsNone(order.counter_gap())
+        counter = order.current_account
+        counter.refresh_from_db()
+        self.assertEqual(Decimal(str(counter.own_currency_balance() or 0)), Decimal("0"))
+
+    def test_cancelling_without_the_tick_leaves_it_for_later(self):
+        order, detail = self._reopened()
+        self.client.post(detail, {"action": "update_status", "order_status": "cancelled",
+                                  "cancel_reason": "kept as credit"})
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        self.assertFalse(Payment.objects.filter(type="refund_in").exists())
+        self.assertEqual(order.counter_gap()[2], Decimal("-20000.00"))
+
     def test_an_older_retail_order_never_linked_says_nothing(self):
         order = self._made()
         OrderPayment.objects.filter(order=order).delete()

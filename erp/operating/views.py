@@ -480,6 +480,17 @@ class OrderDetail(DetailView):
         ctx["cancel_needs_approval"] = (
             ctx["cancel_request"] is None
             and cancel_approval.needs_approval(self.request.user, self.object))
+        # Money taken at the counter for this retail order: the cancel
+        # dialog offers to give it back in the same step, ticked. Not when
+        # a book admin must approve the cancel — that happens later, and
+        # the order page's "Give it back" covers it then.
+        ctx["cancel_give_back"] = None
+        if (self.object.is_retail_order and not ctx["cancel_needs_approval"]
+                and self.object.payment_links.exists()):
+            taken = self.object.counter_takings()
+            source = counter_cash_account(self.object) if taken > 0 else None
+            if source is not None:
+                ctx["cancel_give_back"] = {"amount": taken, "box": source.cash_account.label}
         # "Attach a purchase" opens a new purchase draft bought for this
         # order — while it is open, has an account (whose book the purchase
         # lands in), and isn't frozen by a cancel request.
@@ -696,7 +707,7 @@ class OrderDetail(DetailView):
         if not sees_order_money(self.request.user):
             for key in ("current_account_recent_movements", "combined_totals",
                         "other_halves_total", "counter_gap", "counter_gap_abs",
-                        "order_changes_preview"):
+                        "cancel_give_back", "order_changes_preview"):
                 ctx.pop(key, None)
         return ctx
 
@@ -1206,6 +1217,14 @@ class OrderDetail(DetailView):
                 _g("Order cancelled — its reservations were released and its account "
                    "entry was removed."),
             )
+            # The cancel dialog's "Give back" tick: the money taken at the
+            # counter goes back out in the same step. Left unticked, the
+            # order page keeps its "Give it back" for later.
+            from erp.roles import sees_order_money
+            if request.POST.get("give_back") == "1" and sees_order_money(request.user):
+                gap = order.counter_gap()
+                if gap and gap[2] < 0:
+                    _counter_settled_message(request, order, settle_counter_gap(order, request.user))
             return redirect("operating:order_detail", pk=order.pk)
 
         rejected_msg = rejected and (
@@ -8596,27 +8615,45 @@ def settle_counter(request, pk):
     and this button; nothing settles it on its own — taking money
     automatically is how order 286 was collected twice.
     """
-    from datetime import date
     from django.utils.translation import gettext as _
+
+    order = get_object_or_404(Order, pk=pk)
+    if order.counter_gap() is None:
+        messages.info(request, _("Nothing to settle: what was taken matches what the order bills."))
+        return redirect("operating:order_detail", pk=order.pk)
+    _counter_settled_message(request, order, settle_counter_gap(order, request.user))
+    return redirect("operating:order_detail", pk=order.pk)
+
+
+def counter_cash_account(order):
+    """The cash account a retail order's counter money went into — the
+    latest confirmed payment linked to it — or None when it is not known."""
+    last = (order.payment_links.select_related("payment__cash_account", "payment__currency")
+            .filter(payment__status="confirmed").order_by("-payment__date", "-pk").first())
+    if last is None or last.payment.cash_account_id is None:
+        return None
+    return last.payment
+
+
+def settle_counter_gap(order, user):
+    """Collect or give back Order.counter_gap through the cash account the
+    sale went into. Returns (kind, amount, cash_account), or None when
+    there is no gap or the cash account is not known.
+
+    Called only on a person's say-so: the order page's "Collect it" /
+    "Give it back", or the "Give back" tick in the cancel dialog.
+    """
+    from datetime import date
     from accounting.models import Payment
     from accounting.views_payment import _next_payment_number
     from .models import OrderPayment
 
-    order = get_object_or_404(Order, pk=pk)
     gap = order.counter_gap()
-    if gap is None:
-        messages.info(request, _("Nothing to settle: what was taken matches what the order bills."))
-        return redirect("operating:order_detail", pk=order.pk)
-    _taken, _owed, difference = gap
-    last = (order.payment_links.select_related("payment__cash_account", "payment__currency")
-            .filter(payment__status="confirmed").order_by("-payment__date", "-pk").first())
-    if last is None or last.payment.cash_account_id is None:
-        messages.error(request, _("The cash account the sale went into is not known — "
-                                  "settle it from the current account instead."))
-        return redirect("operating:order_detail", pk=order.pk)
-    first = last.payment
+    first = counter_cash_account(order) if gap else None
+    if first is None:
+        return None
+    difference = gap[2]
     kind = "collection" if difference > 0 else "refund_in"
-    member = getattr(request.user, "member", None)
     with transaction.atomic():
         pay = Payment.objects.create(
             current_account=first.current_account, book=first.book,
@@ -8626,13 +8663,20 @@ def settle_counter(request, pk):
             cash_account=first.cash_account,
             description=(f"Rest collected at the counter for Order #{order.pk}" if kind == "collection"
                          else f"Given back at the counter for Order #{order.pk}"),
-            notes=f"ORD-{order.pk}", created_by=member)
+            notes=f"ORD-{order.pk}", created_by=getattr(user, "member", None))
         OrderPayment.objects.create(order=order, payment=pay)
-        pay.confirm(user=request.user)
-    if kind == "collection":
-        messages.success(request, _("%(amount)s collected into %(box)s.") % {
-            "amount": f"{order.currency_symbol}{abs(difference):,.2f}", "box": first.cash_account.label})
-    else:
-        messages.success(request, _("%(amount)s given back from %(box)s.") % {
-            "amount": f"{order.currency_symbol}{abs(difference):,.2f}", "box": first.cash_account.label})
-    return redirect("operating:order_detail", pk=order.pk)
+        pay.confirm(user=user)
+    return kind, abs(difference), first.cash_account
+
+
+def _counter_settled_message(request, order, settled):
+    from django.utils.translation import gettext as _
+    if settled is None:
+        messages.error(request, _("The cash account the sale went into is not known — "
+                                  "settle it from the current account instead."))
+        return
+    kind, amount, box = settled
+    text = (_("%(amount)s collected into %(box)s.") if kind == "collection"
+            else _("%(amount)s given back from %(box)s."))
+    messages.success(request, text % {
+        "amount": f"{order.currency_symbol}{amount:,.2f}", "box": box.label})

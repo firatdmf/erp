@@ -16541,3 +16541,8 @@ msgstr "Cari hesap ve müşteri yok"
 
 msgid "Set on whoever lacks the Accounts and customers permission."
 msgstr "Cari hesaplar ve müşteriler iznine sahip olmayanlara verilir."
+
+#: operating/templates/operating/order_detail.html
+#, python-format
+msgid "Give back <b>%(cur)s%(amount)s</b> from <b>%(box)s</b>"
+msgstr "<b>%(box)s</b> kasasından <b>%(cur)s%(amount)s</b> iade et"

@@ -575,16 +575,24 @@ def plan_lines(plan):
 def rebuild_draft_items(invoice, lines):
     """Replace a draft's invoice lines with `lines` and re-total it. A
     draft has no rolls pointing at its items, so there is nothing to
-    preserve by editing in place."""
-    invoice.items.all().delete()
-    for i, line in enumerate(lines, start=1):
-        InvoiceItem.objects.create(
-            invoice=invoice, line_no=i,
-            description=line["description"], quantity=line["quantity"],
-            unit=line["unit"], unit_price=line["unit_price"],
-            discount_rate=Decimal("0"), tax_rate=Decimal("0"),
-        )
-    invoice.recompute_totals(save=True)
+    preserve by editing in place.
+
+    One rebuild at a time per purchase, and all of it or none: two that
+    overlap would each delete only what the other had committed so far and
+    then both write, leaving the purchase with both sets of lines (PUR-115
+    went from 22 to 41 that way, on 2026-11-12). Holding the purchase's row
+    makes the second wait, and its delete then finds the first one's lines."""
+    with transaction.atomic():
+        Invoice.objects.select_for_update().only("pk").get(pk=invoice.pk)
+        invoice.items.all().delete()
+        for i, line in enumerate(lines, start=1):
+            InvoiceItem.objects.create(
+                invoice=invoice, line_no=i,
+                description=line["description"], quantity=line["quantity"],
+                unit=line["unit"], unit_price=line["unit_price"],
+                discount_rate=Decimal("0"), tax_rate=Decimal("0"),
+            )
+        invoice.recompute_totals(save=True)
     invoice.refresh_from_db()
 
 
@@ -597,9 +605,13 @@ def rewrite_draft_plan(invoice, plan):
         plan_lines(plan), invoice_currency_for(invoice.current_account),
         rates=plan.get("rates"), on_date=invoice.date,
     )
-    invoice.intake_plan = plan
-    invoice.save(update_fields=["intake_plan", "updated_at"])
-    rebuild_draft_items(invoice, lines)
+    # The plan and the lines built from it land together, so a purchase
+    # never reads one plan while holding another's lines.
+    with transaction.atomic():
+        Invoice.objects.select_for_update().only("pk").get(pk=invoice.pk)
+        invoice.intake_plan = plan
+        invoice.save(update_fields=["intake_plan", "updated_at"])
+        rebuild_draft_items(invoice, lines)
 
 
 def line_prefill_plan(order, line_pk, qty):

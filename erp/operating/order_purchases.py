@@ -36,6 +36,7 @@ import threading
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.utils.translation import gettext as _
 
 # While one side is writing the other, the OrderItem receivers that
@@ -1016,10 +1017,6 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
     purchase and the order never disagree about what the customer pays."""
     if is_syncing():
         return
-    from accounting.purchase_audit import diff_plans
-    from accounting.views_purchase import cancel_purchase_invoice, rewrite_draft_plan
-    from .audit import log_change
-
     order = item.order
     variant = item.product_variant
     sku = (variant.variant_sku if variant is not None else "").strip().lower()
@@ -1034,44 +1031,64 @@ def mirror_item_on_purchases(item, *, removed=False, user=None):
                .only("pk", "intake_plan")
                if sku in plan_variant_skus(inv.intake_plan)]
     one_source = len(sources) <= 1
-    for invoice in (order.supplier_purchases.filter(status="ordered")
-                    .select_related("current_account")):
-        before = copy.deepcopy(invoice.intake_plan or {})
-        plan = copy.deepcopy(before)
-        hit = False
-        for p_in in plan.get("products") or []:
-            kept = []
-            for v_in in p_in.get("variants") or []:
-                if (v_in.get("sku") or "").strip().lower() != sku:
-                    kept.append(v_in)
-                    continue
-                hit = True
-                if removed:
-                    continue
-                v_in["sale_price"] = str(item.price)
-                if one_source:
-                    _retops(v_in, _decimal(item.quantity))
-                kept.append(v_in)
-            p_in["variants"] = kept
-        if not hit:
-            continue
-        plan["products"] = [p for p in plan.get("products") or [] if p.get("variants")]
-        with syncing():
-            diff_plans(invoice, before, plan, origin="order", user=user)
-            if _plan_has_rows(plan):
-                rewrite_draft_plan(invoice, plan)
-            else:
-                # Nothing left to buy. The plan is kept as it was so the
-                # cancelled purchase still reads what it was for.
-                cancel_purchase_invoice(
-                    invoice.pk, user, origin="order", mirror_order=False,
-                    reason=_("Nothing left on it to buy — the lines were removed from order %(number)s")
-                    % {"number": order.order_number or order.pk})
-                log_change(order, "field", field="purchase",
-                           new=_("%(number)s cancelled — nothing left on it to buy")
-                           % {"number": invoice.number})
+    for pk in order.supplier_purchases.filter(status="ordered").values_list("pk", flat=True):
+        with transaction.atomic():
+            _mirror_onto_purchase(pk, order, item, sku, removed=removed,
+                                  one_source=one_source, user=user)
     if not removed:
         _mirror_sale_price_on_received(order, sku, item.price, user=user)
+
+
+def _mirror_onto_purchase(pk, order, item, sku, *, removed, one_source, user):
+    """mirror_item_on_purchases for one draft purchase, holding its row.
+
+    The plan is read under the lock, not before it: two order lines saved at
+    once (two requests) would otherwise each start from the same plan, and
+    the later write would quietly drop the earlier one's change."""
+    from accounting.models import Invoice
+    from accounting.purchase_audit import diff_plans
+    from accounting.views_purchase import cancel_purchase_invoice, rewrite_draft_plan
+    from .audit import log_change
+
+    invoice = (Invoice.objects.select_for_update(of=("self",))
+               .select_related("current_account")
+               .filter(pk=pk, status="ordered").first())
+    if invoice is None:          # received or cancelled while we waited
+        return
+    before = copy.deepcopy(invoice.intake_plan or {})
+    plan = copy.deepcopy(before)
+    hit = False
+    for p_in in plan.get("products") or []:
+        kept = []
+        for v_in in p_in.get("variants") or []:
+            if (v_in.get("sku") or "").strip().lower() != sku:
+                kept.append(v_in)
+                continue
+            hit = True
+            if removed:
+                continue
+            v_in["sale_price"] = str(item.price)
+            if one_source:
+                _retops(v_in, _decimal(item.quantity))
+            kept.append(v_in)
+        p_in["variants"] = kept
+    if not hit:
+        return
+    plan["products"] = [p for p in plan.get("products") or [] if p.get("variants")]
+    with syncing():
+        diff_plans(invoice, before, plan, origin="order", user=user)
+        if _plan_has_rows(plan):
+            rewrite_draft_plan(invoice, plan)
+        else:
+            # Nothing left to buy. The plan is kept as it was so the
+            # cancelled purchase still reads what it was for.
+            cancel_purchase_invoice(
+                invoice.pk, user, origin="order", mirror_order=False,
+                reason=_("Nothing left on it to buy — the lines were removed from order %(number)s")
+                % {"number": order.order_number or order.pk})
+            log_change(order, "field", field="purchase",
+                       new=_("%(number)s cancelled — nothing left on it to buy")
+                       % {"number": invoice.number})
 
 
 def _mirror_sale_price_on_received(order, sku, price, *, user=None):

@@ -159,6 +159,7 @@ urlpatterns = [
     owned("accounts/purchases/<int:pk>/edit/", views_purchase.GoodsReceipt.as_view(), "goods_receipt_edit", Invoice),
     owned("accounts/purchases/<int:pk>/cancel/", views_purchase.PurchaseCancel.as_view(), "purchase_cancel", Invoice),
     owned("accounts/purchases/<int:pk>/undo-receipt/", views_purchase.PurchaseUndoReceipt.as_view(), "purchase_undo_receipt", Invoice),
+    owned("accounts/<int:pk>/processing-roll/", views_purchase.ProcessingRoll.as_view(), "processing_roll", CurrentAccount),
     owned("accounts/<int:pk>/fx/post/", views_fx.FxPost.as_view(), "fx_post", CurrentAccount),
 
     owned("accounts/payments/<int:pk>/", views_payment.PaymentDetail.as_view(), "payment_detail", Payment),

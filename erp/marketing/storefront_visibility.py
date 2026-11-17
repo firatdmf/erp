@@ -8,7 +8,7 @@ them right — here, whenever stock, a variant's photos, a product or its
 group change (marketing/signals.py), and once an hour for whatever changed
 behind those signals' backs (product_images.housekeep_now_and_then).
 """
-from django.db.models import DecimalField, Exists, F, OuterRef, Subquery, Sum, Value
+from django.db.models import DecimalField, Exists, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 
 NO_STOCK = "no_stock"
@@ -22,9 +22,11 @@ def _with_stock_and_photo(variants):
 
     # Stock the storefront offers: a warehouse switched off it
     # (Warehouse.on_storefront) can't make a variant "in stock" there, and
-    # second-quality items are never offered, so what they hold comes off.
+    # second-quality items are never offered, nor items away being worked
+    # on (accounting.processing), so what they hold comes off.
     seconds = (WarehouseProductItem.objects
-               .filter(product=OuterRef("pk"), is_second=True,
+               .filter(Q(is_second=True) | Q(processing_line__isnull=False),
+                       product=OuterRef("pk"),
                        status__in=("in_stock", "partial"))
                .values("product").annotate(s=Sum("quantity_remaining")).values("s"))
     offered = (WarehouseProduct.objects

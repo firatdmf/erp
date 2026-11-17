@@ -458,6 +458,22 @@ site's menus and the page's own way back are left out.{% endcomment %}
     font: 500 12.5px var(--font-sans); color: var(--gray-600);
   }
   .np-gate.show { display: flex; }
+  /* Our own rolls sent to be worked on (accounting.processing). */
+  .np-work-add { display: flex; gap: 8px; margin-bottom: 10px; }
+  .np-work-add input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); }
+  .np-work-add input:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
+  .np-work-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.7fr) auto; gap: 10px; align-items: end; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8EE; border-radius: 10px; background: white; }
+  .np-work-roll b { font: 700 13px var(--font-mono, monospace); color: var(--ink); }
+  .np-work-roll div { font: 500 12px var(--font-sans); color: var(--gray-600); margin-top: 3px; }
+  .np-work-row label { display: block; font: 600 11px var(--font-sans); color: var(--gray-500); margin-bottom: 4px; }
+  .np-work-row select, .np-work-row input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); background: white; }
+  .np-work-row .bad { border-color: #D14343; }
+  .np-work-price { display: flex; align-items: center; gap: 6px; }
+  .np-work-price span { font: 600 12px var(--font-sans); color: var(--gray-500); white-space: nowrap; }
+  .np-work-x { border: none; background: none; color: var(--gray-400); cursor: pointer; height: 36px; width: 32px; padding: 0; }
+  .np-work-x:hover { color: #D14343; }
+  .np-work-problem { grid-column: 1 / -1; font: 500 12px var(--font-sans); color: #B42318; }
+  @media (max-width: 720px) { .np-work-row { grid-template-columns: 1fr; } .np-work-x { justify-self: end; } }
   .np-fx { margin: 0 0 12px; padding: 14px 16px; border: 1px solid #E2E8EE; border-radius: 12px; background: white; }
   .np-fx-head { display:flex; align-items:center; gap:8px; font: 500 12.5px var(--font-sans); color: var(--gray-600); margin-bottom: 10px; }
   .np-fx-head b { color: var(--ink); }
@@ -821,6 +837,26 @@ site's menus and the page's own way back are left out.{% endcomment %}
         <i class="fa fa-plus"></i> {% trans "Add product" %}
       </button>
     </section>
+
+    {% if not edit_invoice %}
+    <!-- ── 3. Our rolls this supplier works on (accounting.processing) ── -->
+    <section class="gr-sec" id="npWorkSec">
+      <div class="gr-sec-h">
+        <span class="gr-sec-n">3</span>
+        <span class="gr-sec-t">{% trans "Our rolls sent to be worked on" %}</span>
+        <span class="gr-sec-d">{% trans "Rolls of ours this supplier works on — crystals, pearls, embroidery. Saved, they are away and can't be picked; received, each becomes the variant chosen here and the work is billed per unit." %}</span>
+      </div>
+      <div class="np-work-add">
+        <input type="text" id="npWorkCode" autocomplete="off"
+               placeholder="{% trans 'Scan or type a roll barcode' %}"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); npWorkAdd(); }">
+        <button type="button" class="gr-btn" onclick="npWorkAdd()">
+          <i class="fa fa-plus"></i> {% trans "Add roll" %}
+        </button>
+      </div>
+      <div id="npWorkRows"></div>
+    </section>
+    {% endif %}
   </div>
 
   {% comment %}
@@ -1347,6 +1383,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
   const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' current_book.pk %}";
   const GR_ORDER_UPDATE_TPL = "{% url 'accounts:purchase_order_update' 0 %}";
   const GR_CONFIRM_TPL = "{% url 'accounts:purchase_order_confirm' 0 %}";
+  const GR_WORK_ROLL_TPL = "{% url 'accounts:processing_roll' 0 %}";
   const GR_PLAN = JSON.parse((document.getElementById('gr-plan-data') || {}).textContent || 'null');
   // Started from a customer order: once saved, back to that order — the
   // whole window, when the form sits in the order's purchase panel.
@@ -1443,7 +1480,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (wrap) wrap.style.display = ready ? '' : 'none';
     // The first card appears the moment the section opens, so answering
     // the two questions is the whole of getting started.
-    if (!npLoading && ready && wrap && !wrap.querySelector('.np-product-card')) {
+    if (!npLoading && ready && wrap && !wrap.querySelector('.np-product-card')
+        && !npWorkHasRows()) {
       npAddProduct();
       npSummaryUpdate();
     }
@@ -3352,9 +3390,162 @@ site's menus and the page's own way back are left out.{% endcomment %}
   // order (which stores it untouched and replays it on confirm) and the
   // receive endpoint (which acts on it now). Returns null after alerting
   // if anything is missing, so no half-typed batch is ever sent.
+  // ── Our own rolls sent to be worked on (accounting.processing) ──────
+  // Each row is one roll: what it is now, what it becomes, the price of
+  // the work per unit. Posted as the plan's "processing".
+  let npWorkPending = 0;   // rows of a saved plan still being looked up
+  window.npWorkHasRows = function () {
+    const rows = document.getElementById('npWorkRows');
+    return npWorkPending > 0 || !!(rows && rows.querySelector('.np-work-row'));
+  };
+  function npCardUntouched(card) {
+    if (card._npMode) return false;
+    const name = card.querySelector('.np-main-name');
+    if (name && (name.value || '').trim()) return false;
+    return !Array.prototype.some.call(card.querySelectorAll('.np-top-qty'),
+                                      function (q) { return (q.value || '').trim(); });
+  }
+  function npWorkFetch(code) {
+    const sel = document.getElementById('npSupplier');
+    const url = GR_WORK_ROLL_TPL.replace('/0/', '/' + sel.value + '/') +
+                '?code=' + encodeURIComponent(code) + (GR_ORDER_ID ? '&purchase=' + GR_ORDER_ID : '');
+    return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(npReadJson);
+  }
+  function npWorkRender(roll, saved) {
+    const wrap = document.getElementById('npWorkRows');
+    const row = document.createElement('div');
+    row.className = 'np-work-row';
+    row.dataset.barcode = roll.barcode;
+
+    const info = document.createElement('div');
+    info.className = 'np-work-roll';
+    const code = document.createElement('b');
+    code.textContent = roll.barcode;
+    const what = document.createElement('div');
+    what.textContent = roll.label + ' · ' + roll.quantity + ' ' + roll.unit + ' · ' + roll.warehouse;
+    info.appendChild(code); info.appendChild(what);
+
+    const toBox = document.createElement('div');
+    const toLabel = document.createElement('label');
+    toLabel.textContent = '{% filter escapejs %}{% trans "Becomes" %}{% endfilter %}';
+    const to = document.createElement('select');
+    to.className = 'np-work-to';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = roll.variants.length
+      ? '{% filter escapejs %}{% trans "Pick the variant…" %}{% endfilter %}'
+      : '{% filter escapejs %}{% trans "No other variant — add it on the product first" %}{% endfilter %}';
+    to.appendChild(blank);
+    roll.variants.forEach(function (v) {
+      const o = document.createElement('option');
+      o.value = v.id; o.textContent = v.label;
+      to.appendChild(o);
+    });
+    if (saved && saved.to_variant_id) to.value = String(saved.to_variant_id);
+    toBox.appendChild(toLabel); toBox.appendChild(to);
+
+    const priceBox = document.createElement('div');
+    const priceLabel = document.createElement('label');
+    priceLabel.textContent = '{% filter escapejs %}{% trans "Price per" %}{% endfilter %} ' + roll.unit;
+    const priceWrap = document.createElement('div');
+    priceWrap.className = 'np-work-price';
+    const price = document.createElement('input');
+    price.className = 'np-work-price-in';
+    price.inputMode = 'decimal';
+    price.value = (saved && saved.price) || '';
+    const cur = document.createElement('span');
+    cur.textContent = npBillingCurrency();
+    priceWrap.appendChild(price); priceWrap.appendChild(cur);
+    priceBox.appendChild(priceLabel); priceBox.appendChild(priceWrap);
+
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'np-work-x';
+    x.title = '{% filter escapejs %}{% trans "Take this roll off" %}{% endfilter %}';
+    x.innerHTML = '<i class="fa fa-times"></i>';
+    x.onclick = function () { row.remove(); window.npDirty = true; };
+
+    row.appendChild(info); row.appendChild(toBox); row.appendChild(priceBox); row.appendChild(x);
+    if (roll.problem) {
+      const p = document.createElement('div');
+      p.className = 'np-work-problem';
+      p.textContent = roll.problem;
+      row.appendChild(p);
+    }
+    wrap.appendChild(row);
+    return row;
+  }
+  window.npWorkAdd = function () {
+    const input = document.getElementById('npWorkCode');
+    const code = (input.value || '').trim();
+    if (!code) { input.focus(); return; }
+    if (!npGateReady()) {
+      alert('{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}');
+      return;
+    }
+    const taken = Array.prototype.some.call(document.querySelectorAll('#npWorkRows .np-work-row'),
+      function (r) { return (r.dataset.barcode || '').toUpperCase() === code.toUpperCase(); });
+    if (taken) { alert('{% filter escapejs %}{% trans "This roll is already on the list." %}{% endfilter %}'); return; }
+    npWorkFetch(code).then(function (d) {
+      if (!d || !d.ok) { alert((d && d.error) || '{% trans "Could not save." %}'); return; }
+      if (d.roll.problem) { alert(d.roll.problem); return; }
+      // The card the page opened with is not needed for work alone.
+      document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
+        if (npCardUntouched(card)) card.remove();
+      });
+      const row = npWorkRender(d.roll, null);
+      input.value = '';
+      window.npDirty = true;
+      row.querySelector('.np-work-to').focus();
+    }).catch(npFailed);
+  };
+  // A saved order's rows, looked up again so each shows what it is now.
+  function npWorkLoad(rows) {
+    if (!rows.length) return;
+    let chain = Promise.resolve();
+    rows.forEach(function (saved) {
+      chain = chain.then(function () {
+        return npWorkFetch(saved.barcode).then(function (d) {
+          if (d && d.ok) npWorkRender(d.roll, saved);
+          else alert((d && d.error) || saved.barcode);
+        });
+      }).catch(npFailed).then(function () { npWorkPending -= 1; });
+    });
+  }
+  // The rows as the plan carries them; null (after saying why) when one
+  // isn't finished.
+  function npWorkCollect() {
+    const out = [];
+    const rows = document.querySelectorAll('#npWorkRows .np-work-row');
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const to = row.querySelector('.np-work-to');
+      const price = row.querySelector('.np-work-price-in');
+      to.classList.toggle('bad', !to.value);
+      const n = parseFloat((price.value || '').replace(',', '.'));
+      price.classList.toggle('bad', !(isFinite(n) && n >= 0));
+      if (!to.value) {
+        alert('{% filter escapejs %}{% trans "Say what each roll sent to be worked on becomes." %}{% endfilter %}');
+        to.focus(); return null;
+      }
+      if (!(isFinite(n) && n >= 0)) {
+        alert('{% filter escapejs %}{% trans "Enter the price of the work for each roll." %}{% endfilter %}');
+        price.focus(); return null;
+      }
+      out.push({ barcode: row.dataset.barcode, to_variant_id: parseInt(to.value, 10),
+                 price: String(n), currency: npBillingCurrency() });
+    }
+    return out;
+  }
+
   function npCollect() {
-    const cards = document.querySelectorAll('#npProducts .np-product-card');
-    if (!cards.length) { alert('{% trans "Add at least one product." %}'); return null; }
+    const work = npWorkCollect();
+    if (work === null) return null;
+    // A purchase of work on our own rolls may bring no goods: the card the
+    // page opened with, left untouched, is not a product.
+    const cards = Array.prototype.filter.call(
+      document.querySelectorAll('#npProducts .np-product-card'),
+      function (card) { return !(work.length && npCardUntouched(card)); });
+    if (!cards.length && !work.length) { alert('{% trans "Add at least one product." %}'); return null; }
 
     // The stock has to land somewhere — and the POST URL itself is built
     // from this, so it's checked before anything else.
@@ -3564,7 +3755,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
       // page showed. Without these the server falls back to the published
       // rate and the total that posts is not the total that was agreed to.
       rates: npFxRates,
-      products: products
+      products: products,
+      processing: work
     };
   }
 
@@ -3660,7 +3852,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   // is what creates the customer's order the rolls are then reserved for
   // (or, opened from an existing order, links it to that one).
   window.npReceiveNow = function () {
-    if (!GR_ORDER_ID && !npCustomer && !GR_FOR_ORDER_ID) { npSave(); return; }
+    // Work on our rolls is received against a saved order, so a new one
+    // is saved first, like a purchase bought for a customer.
+    if (!GR_ORDER_ID && !npCustomer && !GR_FOR_ORDER_ID && !npWorkHasRows()) { npSave(); return; }
     const btn = document.getElementById('npSaveBtn');
     const payload = npOrderPayload();
     if (!payload) return;
@@ -3998,8 +4192,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
   npUpdatePrefix();
   if (GR_EDIT_ID) {
     npLoadForEdit(GR_EDIT_ID);
-  } else if (GR_PLAN && (GR_PLAN.products || []).length) {
+  } else if (GR_PLAN && ((GR_PLAN.products || []).length || (GR_PLAN.processing || []).length)) {
+    npWorkPending = (GR_PLAN.processing || []).length;
     npLoadFromPlan(GR_PLAN);
+    npWorkLoad(GR_PLAN.processing || []);
     // A purchase pre-filled from a customer order has no account yet, so
     // its cards wait behind the gate until one is picked.
     npGateUpdate();

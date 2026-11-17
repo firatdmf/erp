@@ -1363,6 +1363,10 @@ def _roll_available_meters(roll, exclude_reservation_id=None, exclude_order_id=N
     """
     from .models import OrderStockReservation
     from django.db.models import Sum
+    # Away at a supplier being worked on (accounting.processing): nothing
+    # on it can be promised until it is back.
+    if roll.processing_line_id is not None:
+        return _PDecimal("0")
     phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
     phys = phys or _PDecimal("0")
     qs = OrderStockReservation.objects.filter(stock_item=roll, consumed=False)
@@ -1388,6 +1392,13 @@ def _roll_unavailable_response(roll, exclude_order_id=None):
     reservations are different problems for the staff scanning it, so
     the reserved case names the holding order(s)."""
     from .models import OrderStockReservation
+    if roll.processing_line_id is not None:
+        return JsonResponse({
+            "ok": False, "kind": "away",
+            "error": _gettext("This stock item is away being worked on (purchase %(number)s) — "
+                              "it can be picked once it is back.")
+                     % {"number": roll.processing_line.invoice.display_number},
+        }, status=409)
     phys = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
     phys = phys or _PDecimal("0")
     if phys > 0:
@@ -1503,6 +1514,8 @@ def _batches_by_printed_barcode(code, books=None, first_book=None):
           .select_related("product", "product__catalog_variant__product",
                           "product__warehouse__accounting_book")
           .filter(status__in=["in_stock", "partial"])
+          # Away being worked on (accounting.processing): not on the shelf.
+          .filter(processing_line__isnull=True)
           .filter(Q(product__barcode__iexact=code)
                   | Q(product__catalog_variant__variant_barcode__iexact=code))
           .filter(product__catalog_variant__product__tracking="variant"))
@@ -3110,6 +3123,8 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
                         "product__warehouse__accounting_book",
                         "product__catalog_variant__product")
         .filter(status__in=["in_stock", "partial"])
+        # Away being worked on (accounting.processing): not on the shelf.
+        .filter(processing_line__isnull=True)
         # Its two siblings — the product search and order_create_barcode_check
         # — narrow to the working book; this one never did, so it offered
         # another business's shelf to anyone who knew the SKU. Ordering by

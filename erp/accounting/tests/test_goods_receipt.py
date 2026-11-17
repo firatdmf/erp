@@ -161,11 +161,11 @@ class GoodsReceiptPageTest(TestCase):
         self.assertContains(r, reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[inv.pk]))
 
-    def test_warehouse_page_sends_intake_to_the_form(self):
+    def test_warehouse_page_leaves_purchases_to_the_purchases_list(self):
+        # Purchases are started from the purchases list only (2026-11-17).
         r = self.client.get(reverse("operating:warehouse_detail", args=[self.depot.pk]))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(
-            r, f'{reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk})}?warehouse={self.depot.pk}')
+        self.assertNotContains(r, reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}))
         # The sidebar it replaced is gone for good.
         self.assertNotContains(r, "newProductOverlay")
 

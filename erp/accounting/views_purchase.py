@@ -172,6 +172,8 @@ class PurchaseOrderDetail(View):
                     queryset=ProductVariantAttributeValue.objects.select_related(
                         "product_variant_attribute"),
                 ),
+                # Our own rolls a line billed work on (accounting.processing).
+                "processing_lines",
             )
             .order_by("line_no")
         )
@@ -202,6 +204,14 @@ class PurchaseOrderDetail(View):
             it.pack_type = pack_type
             it.unit_short = units.unit_short(it.unit)
             it.pack_count = len(rolls) or len(it.planned_rolls)
+            # Work on our own rolls: those rolls, not goods coming in.
+            worked = list(it.processing_lines.all())
+            it.work_rolls = ([{"barcode": l.barcode, "quantity": l.quantity} for l in worked]
+                             if worked else
+                             (it.planned_rolls if plan and plan.get("processing") else []))
+            if it.work_rolls:
+                it.planned_rolls = []
+                it.pack_count = len(it.work_rolls)
             it.pack_one, it.pack_many = units.pack_nouns(pack_type)
             it.pack_noun = units.pack_noun(pack_type, it.pack_count)
         # What the whole delivery comes to in goods, beside what it costs:
@@ -232,6 +242,9 @@ class PurchaseOrderDetail(View):
             "total_pack_noun": total_pack_noun,
             "warehouse_id": warehouse_id,
             "is_order": invoice.status == "ordered",
+            # A received purchase of work on our rolls is changed by
+            # undoing its receipt, not on the form (perform_purchase_edit).
+            "has_work": any(it.work_rolls for it in items),
             "can_confirm": can_confirm_purchase(request.user),
             "changes": decorate_changes(
                 list(invoice.change_logs.select_related("created_by"))),
@@ -569,6 +582,9 @@ def plan_lines(plan):
                     for a in (v_in.get("attributes") or [])
                     if isinstance(a, dict) and str(a.get("value") or "").strip()],
             })
+    # Our own rolls sent to be worked on bill too, after the goods.
+    from .processing import plan_lines as processing_plan_lines
+    lines.extend(processing_plan_lines(plan))
     return lines
 
 
@@ -759,6 +775,14 @@ class PurchaseOrderSave(View):
 
         lines = plan_lines(data)
         if not lines:
+            # Rolls to be worked on that bill nothing: say which and why.
+            from .processing import ProcessingError, plan_rows, resolve
+            if plan_rows(data):
+                try:
+                    resolve(data, book=current_account.book,
+                            invoice=Invoice.objects.filter(pk=pk).first() if pk else None)
+                except ProcessingError as exc:
+                    return JsonResponse({"success": False, "error": str(exc)}, status=400)
             return JsonResponse(
                 {"success": False, "error": _gettext("Enter a quantity on at least one product.")}, status=400)
 
@@ -856,6 +880,13 @@ class PurchaseOrderSave(View):
                 invoice.intake_plan = data
                 invoice.save(update_fields=["intake_plan", "updated_at"])
 
+                # Our rolls it sends to be worked on are away from now on.
+                from .processing import ProcessingError, save_draft_lines
+                try:
+                    save_draft_lines(invoice, data, user=request.user)
+                except ProcessingError as exc:
+                    raise _SaveRefused(str(exc))
+
                 # Rebuilt from the plan every save — a draft has no rolls pointing
                 # at its items, so there is nothing to preserve by editing in place.
                 rebuild_draft_items(invoice, lines)
@@ -942,7 +973,8 @@ class PurchaseOrderConfirm(View):
                 {"success": False, "error": _gettext("This purchase is already confirmed.")}, status=400)
         plan = invoice.intake_plan or {}
         warehouse = invoice.intake_warehouse
-        if not plan.get("products") or warehouse is None:
+        from .processing import plan_rows
+        if not (plan.get("products") or plan_rows(plan)) or warehouse is None:
             return JsonResponse(
                 {"success": False,
                  "error": _gettext("This order has no goods-receipt details — edit it and save again.")}, status=400)
@@ -1098,6 +1130,20 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
                 % {"rolls": rolls_on_orders(rolls)},
                 blockers,
             )
+        # Our own rolls it sent to be worked on come home as they were:
+        # a draft's simply stop being away, a received one's go back to
+        # the variant and cost they had — refused if one has been used.
+        from .processing import release_lines, unreceive_lines, unreceive_problems
+        problems = unreceive_problems(invoice)
+        if problems:
+            raise PurchaseCancelBlocked(
+                _gettext("Rolls this purchase had worked on have been used since, so they "
+                         "can't go back to what they were: %(rolls)s")
+                % {"rolls": "; ".join(problems)},
+                [{"barcode": p.split(":")[0], "order_ids": []} for p in problems],
+            )
+        unreceive_lines(invoice, user=user, keep_away=False)
+        release_lines(invoice)
 
         _remove_purchase_rolls(rolls, reason="Purchase cancelled", user=user)
 
@@ -1234,7 +1280,9 @@ def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
             .select_for_update(of=("self",))
             .select_related("product", "product__warehouse")
         )
-        if not rolls:
+        from .processing import unreceive_lines, unreceive_problems
+        worked = invoice.processing_lines.exists()
+        if not rolls and not worked:
             raise ValueError(_gettext("This purchase's stock links are missing, so its receipt "
                                       "can't be undone — cancel it instead."))
         blockers = []
@@ -1242,6 +1290,8 @@ def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
             why = _roll_in_use(roll, invoice.for_order_id)
             if why:
                 blockers.append(f"{roll.barcode}: {why}")
+        # Our rolls it had worked on go back to what they were.
+        blockers.extend(unreceive_problems(invoice))
         if blockers:
             raise PurchaseUndoBlocked(
                 _gettext("Some of this purchase's stock has been used since it came in, so "
@@ -1249,7 +1299,7 @@ def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
 
         # What was received, read before it goes: the order's plan.
         products, unit = received_purchase_products(invoice)
-        warehouse = invoice.intake_warehouse or rolls[0].product.warehouse
+        warehouse = invoice.intake_warehouse or (rolls[0].product.warehouse if rolls else None)
         plan = dict(invoice.intake_plan or {})
         plan.update({
             "warehouse_id": str(warehouse.pk),
@@ -1262,6 +1312,8 @@ def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
         })
 
         _remove_purchase_rolls(rolls, reason="Purchase receipt undone", user=user)
+        # Away again: the purchase is an order for that work once more.
+        unreceive_lines(invoice, user=user, keep_away=True)
         invoice.unreceive(user=user)
         invoice.intake_warehouse = warehouse
         invoice.save(update_fields=["intake_warehouse", "updated_at"])
@@ -1359,3 +1411,28 @@ class PurchaseCancel(View):
         if getattr(invoice, "order_note", None):
             messages.warning(request, invoice.order_note)
         return JsonResponse({"success": True, "invoice_id": invoice.pk})
+
+
+@method_decorator(login_required, name="dispatch")
+class ProcessingRoll(View):
+    """GET ?code=&purchase= — one of our rolls as the purchase form shows it
+    before sending it to this account to be worked on (processing.lookup):
+    what it is, what it can become, and why it can't go, if it can't. The
+    account's book is the one the roll must be in."""
+
+    def get(self, request, pk):
+        from .processing import lookup
+        account = get_object_or_404(CurrentAccount, pk=pk)
+        code = (request.GET.get("code") or "").strip()
+        if not code:
+            return JsonResponse({"ok": False, "error": _gettext("Scan or type a roll barcode.")},
+                                status=400)
+        purchase = (request.GET.get("purchase") or "").strip()
+        invoice = (Invoice.objects.filter(pk=int(purchase), type="purchase").first()
+                   if purchase.isdigit() else None)
+        found = lookup(code, book=account.book, invoice=invoice)
+        if found is None:
+            return JsonResponse({"ok": False,
+                                 "error": _gettext("No roll has barcode %(code)s.") % {"code": code}},
+                                status=404)
+        return JsonResponse({"ok": True, "roll": found})

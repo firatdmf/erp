@@ -2481,6 +2481,15 @@ class WarehouseProductItem(models.Model):
         help_text="Unit cost when received, in the owning book's base currency",
         validators=[MinValueValidator(Decimal("0"))],
     )
+    # Set while the roll is away at a supplier being worked on (crystals,
+    # embroidery, …): the open processing line of the purchase that sent
+    # it. Still ours and still valued, but no order can pick it and the
+    # storefront doesn't offer it. Cleared when it comes back or the
+    # purchase is cancelled. See accounting.processing.
+    processing_line = models.ForeignKey(
+        "accounting.ProcessingLine", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+",
+    )
 
     def save(self, *args, **kwargs):
         """A stock item is born knowing what it cost: every item carries a
@@ -2497,6 +2506,10 @@ class WarehouseProductItem(models.Model):
                 raise ValidationError(_("A stock item needs its cost: %(item)s has none.")
                                       % {"item": self.barcode or self.product_id})
         super().save(*args, **kwargs)
+
+    @property
+    def is_away(self):
+        return self.processing_line_id is not None
 
     class Meta:
         ordering = ["-scanned_at"]

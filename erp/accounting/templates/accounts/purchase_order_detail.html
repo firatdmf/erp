@@ -129,7 +129,7 @@
         <i class="fa fa-file-excel"></i> {% trans "Invoice Excel" %}
       </a>
       {% if invoice.status != 'cancelled' %}
-        {% if is_order or warehouse_id %}
+        {% if is_order or warehouse_id and not has_work %}
           <a class="po-back" href="{% url 'accounts:goods_receipt_edit' invoice.pk %}">
             <i class="fa fa-pen"></i> {% trans "Edit" %}
           </a>
@@ -258,7 +258,22 @@
     </dl>
     {% endif %}
 
-    {% if it.planned_rolls %}
+    {% if it.work_rolls %}
+    {% comment %}Our own rolls this line pays for work on (accounting.processing):
+       away while the purchase is an order, the variant they became once received.{% endcomment %}
+    <div class="po-rolls-h">
+      <i data-lucide="layers"></i>
+      {% if is_order %}{% trans "Our rolls away being worked on" %}{% else %}{% trans "Our rolls worked on" %}{% endif %}
+    </div>
+    <div class="po-rolls">
+      {% for r in it.work_rolls %}
+      <div class="po-roll">
+        <code>{{ r.barcode|default:"—" }}</code>
+        <span class="m">{{ r.quantity|floatformat:"2g" }} {{ it.unit_short }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif it.planned_rolls %}
     {% comment %}Not received yet: the rolls the order expects, at the meters the
        supplier quoted — the real ones replace them on confirmation.{% endcomment %}
     <div class="po-rolls-h">

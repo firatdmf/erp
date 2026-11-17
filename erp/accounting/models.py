@@ -1373,3 +1373,6 @@ from .models_ledger import *  # noqa: E402,F401,F403
 # Goods handed between two books. After both: it points at an Invoice and
 # is the source of a JournalEntry.
 from .models_transfer import *  # noqa: E402,F401,F403
+
+# Our own rolls sent to a supplier to be worked on, as purchase lines.
+from .models_processing import *  # noqa: E402,F401,F403

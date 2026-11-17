@@ -2822,11 +2822,13 @@ def get_products(request):
                                               WHERE wp0.catalog_variant_id = marketing_productvariant.id)
                            THEN COALESCE((SELECT SUM(wp.quantity - COALESCE((
                                   -- Second-quality stock is never offered
-                                  -- on the storefront: what its items hold
-                                  -- comes off the warehouse figure.
+                                  -- on the storefront, nor stock away
+                                  -- being worked on: what their items
+                                  -- hold comes off the warehouse figure.
                                   SELECT SUM(si.quantity_remaining)
                                     FROM operating_warehouseproductitem si
-                                   WHERE si.product_id = wp.id AND si.is_second
+                                   WHERE si.product_id = wp.id
+                                     AND (si.is_second OR si.processing_line_id IS NOT NULL)
                                      AND si.status IN ('in_stock', 'partial')), 0))
                               FROM operating_warehouseproduct wp
                               JOIN operating_warehouse w ON w.id = wp.warehouse_id
@@ -3101,11 +3103,13 @@ def get_product(request):
                                   WHERE pv0.product_id = p.id)
                 THEN COALESCE((SELECT SUM(wp.quantity - COALESCE((
                                   -- Second-quality stock is never offered
-                                  -- on the storefront: what its items hold
-                                  -- comes off the warehouse figure.
+                                  -- on the storefront, nor stock away
+                                  -- being worked on: what their items
+                                  -- hold comes off the warehouse figure.
                                   SELECT SUM(si.quantity_remaining)
                                     FROM operating_warehouseproductitem si
-                                   WHERE si.product_id = wp.id AND si.is_second
+                                   WHERE si.product_id = wp.id
+                                     AND (si.is_second OR si.processing_line_id IS NOT NULL)
                                      AND si.status IN ('in_stock', 'partial')), 0))
                    FROM operating_warehouseproduct wp
                    JOIN marketing_productvariant pv ON pv.id = wp.catalog_variant_id
@@ -3186,11 +3190,13 @@ def get_product(request):
                                               WHERE wp0.catalog_variant_id = marketing_productvariant.id)
                            THEN COALESCE((SELECT SUM(wp.quantity - COALESCE((
                                   -- Second-quality stock is never offered
-                                  -- on the storefront: what its items hold
-                                  -- comes off the warehouse figure.
+                                  -- on the storefront, nor stock away
+                                  -- being worked on: what their items
+                                  -- hold comes off the warehouse figure.
                                   SELECT SUM(si.quantity_remaining)
                                     FROM operating_warehouseproductitem si
-                                   WHERE si.product_id = wp.id AND si.is_second
+                                   WHERE si.product_id = wp.id
+                                     AND (si.is_second OR si.processing_line_id IS NOT NULL)
                                      AND si.status IN ('in_stock', 'partial')), 0))
                               FROM operating_warehouseproduct wp
                               JOIN operating_warehouse w ON w.id = wp.warehouse_id

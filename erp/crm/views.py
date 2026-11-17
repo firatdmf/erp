@@ -5,14 +5,14 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
 from .models import (
-    Attachment, Contact, Company, DuplicateName, Note, CompanyFollowUp, Supplier,
+    Attachment, Contact, Company, DuplicateName, Note, CompanyFollowUp,
     content_type_for, of_books_in_reach, validate_attachment_size, validate_attachment_type,
 )
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _gettext
 from todo.models import Task
 from erp.search_utils import unaccent_icontains
-from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm, SupplierForm
+from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from itertools import chain
 from operator import attrgetter
@@ -504,6 +504,9 @@ class ContactDetail(generic.DetailView):
         # what it comes to.
         from operating.split_orders import order_rows
         orders = of_books_in_reach(Order.objects.filter(contact=contact), "current_account__book")
+        # What we buy from them, beside what they buy from us.
+        from .purchase_history import purchase_history
+        context["purchases"] = purchase_history(contact=contact)
         # Each row opens onto its lines (attach_lines).
         from operating.bought_items import attach_lines, bought_items, items_with_variant
         context["orders"] = attach_lines(order_rows(Order.with_pre_order_flag(
@@ -682,6 +685,9 @@ class CompanyDetail(generic.DetailView):
         # what it comes to.
         from operating.split_orders import order_rows
         orders = of_books_in_reach(Order.objects.filter(company=company), "current_account__book")
+        # What we buy from them, beside what they buy from us.
+        from .purchase_history import purchase_history
+        context["purchases"] = purchase_history(company=company)
         # Each row opens onto its lines (attach_lines).
         from operating.bought_items import attach_lines, bought_items, items_with_variant
         context["orders"] = attach_lines(order_rows(Order.with_pre_order_flag(
@@ -1626,354 +1632,13 @@ def toggle_email_campaign(request, pk):
     
     return HttpResponse(html)
 
-class SupplierList(generic.ListView):
-    model = Supplier
-    template_name = "crm/supplier_list.html"
-    context_object_name = "suppliers"
-    ordering = ['company_name']
-    paginate_by = 25
-
-    def get_queryset(self):
-        queryset = Supplier.objects.here().order_by(*self.ordering)
-        search_query = self.request.GET.get('search', '').strip()
-        
-        if search_query:
-            queryset = queryset.filter(
-                unaccent_icontains(
-                    search_query,
-                    'company_name', 'contact_name', 'country',
-                ) |
-                Q(email__icontains=search_query) |
-                Q(phone__icontains=search_query)
-            )
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['search_query'] = self.request.GET.get('search', '')
-        return context
-
-class SupplierCreate(generic.CreateView):
-    model = Supplier
-    form_class = SupplierForm
-    template_name = "crm/supplier_form.html"
-    success_url = reverse_lazy('crm:supplier_list')
-
-class SupplierUpdate(generic.UpdateView):
-    """The full-page form, and — when asked for over XHR — the slide-in
-    edit panel on the supplier detail page, the way ContactUpdate serves
-    the contact one: the partial on GET, JSON on POST."""
-    model = Supplier
-    form_class = SupplierForm
-    template_name = "crm/supplier_form.html"
-
-    def _is_ajax(self):
-        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
-    def dispatch(self, request, *args, **kwargs):
-        """Admins edit anything; everyone else edits what they created.
-
-        Suppliers made before created_by existed are NULL and so are
-        admin-only — see erp.ownership.can_edit. The same rule as on
-        contacts and companies.
-        """
-        from erp.ownership import can_edit
-
-        obj = self.get_object()
-        if not can_edit(request.user, obj):
-            message = "You can only edit records you created."
-            if self._is_ajax():
-                return JsonResponse({"success": False, "error": message}, status=403)
-            messages.error(request, message)
-            return redirect("crm:supplier_detail", pk=obj.pk)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_template_names(self):
-        if self._is_ajax():
-            return ["crm/_supplier_edit_form.html"]
-        return [self.template_name]
-
-    def form_valid(self, form):
-        if self._is_ajax():
-            self.object = form.save()
-            return JsonResponse({"success": True, "redirect_url": self.get_success_url()})
-        return super().form_valid(form)
-
-    def form_invalid(self, form):
-        if self._is_ajax():
-            errors = {field: errs.get_json_data() for field, errs in form.errors.items()}
-            return JsonResponse({"success": False, "errors": errors}, status=400)
-        return super().form_invalid(form)
-
-    def get_success_url(self):
-        # Back to the record that was edited, not the list: the sidebar
-        # opens from the detail page, and the full form links there too.
-        return reverse("crm:supplier_detail", kwargs={"pk": self.object.pk})
-
-class SupplierDelete(generic.DeleteView):
-    model = Supplier
-    template_name = "crm/supplier_confirm_delete.html"
-    success_url = reverse_lazy('crm:supplier_list')
-
-def create_supplier_partial(request):
-    if request.method == 'POST':
-        form = SupplierForm(request.POST, request.FILES)
-        if form.is_valid():
-            supplier = form.save()
-            return JsonResponse({
-                'success': True,
-                'message': f'Supplier "{supplier.company_name}" added successfully.',
-                # Expose the new supplier so callers (e.g. product_form's
-                # inline + button) can insert + select it client-side
-                # without reloading the parent page.
-                'supplier_id': supplier.pk,
-                'supplier_name': supplier.company_name,
-                'redirect_url': reverse('crm:supplier_list'),
-            })
-        else:
-             return JsonResponse({
-                'success': False,
-                'errors': form.errors.as_json()
-            })
-    else:
-        form = SupplierForm()
-
-    return render(request, 'crm/supplier_form_partial.html', {'form': form})
-
-
-class SupplierDetail(generic.DetailView):
-    """Detail page for a single Supplier — mirrors Contact/Company
-    detail: title, meta, tasks (filtered to current member), notes
-    history, plus inline add/edit/delete actions."""
-    model = Supplier
-    template_name = "crm/supplier_detail.html"
-    context_object_name = "supplier"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        supplier = self.get_object()
-        current_member = self.request.user.member if hasattr(self.request.user, "member") else None
-        context["notes"] = Note.objects.filter(supplier=supplier).order_by("-created_at")
-        context["note_form"] = NoteForm()
-        context["tasks"] = Task.objects.filter(supplier=supplier, member=current_member)
-        # Combined history: notes + completed tasks for this supplier
-        completed_tasks = Task.objects.filter(completed=True, supplier=supplier).order_by("-completed_at")
-        history = list(context["notes"]) + list(completed_tasks)
-        history.sort(
-            key=lambda x: x.created_at if hasattr(x, "created_at") and x.created_at else x.completed_at,
-            reverse=True,
-        )
-        context["history_entries"] = history
-        context["task_form"] = TaskForm(
-            initial={"supplier": supplier.pk},
-            hide_fields=True,
-            current_member=current_member,
-        )
-        # The Attached items card shows only the open ones, and needs a
-        # count for its group header.
-        context["open_tasks"] = context["tasks"].filter(completed=False)
-
-        # ── Purchase history ───────────────────────────────────
-        # What the contact page shows as Order history, seen from the
-        # other side of the counter: the purchases we have written
-        # against this supplier, in every book. A purchase is an
-        # Invoice(type=purchase) on one of the supplier's current
-        # accounts, so the link runs through the account. A cancelled
-        # purchase is not part of what we bought from them, so it is left out.
-        from accounting.models_accounts import CurrentAccount, Invoice
-        purchases = list(
-            of_books_in_reach(Invoice.objects.filter(
-                type__in=("purchase", "purchase_return"),
-                current_account__supplier=supplier,
-            ).exclude(status="cancelled"))
-            .select_related("book", "currency")
-            .order_by("-date", "-id")[:25]
-        )
-        # The row's colour, in the order-status palette the card already
-        # has: blue while it is on its way, green once received.
-        pill = {"ordered": "scheduled", "received": "confirmed"}
-        for inv in purchases:
-            inv.pill = pill.get(inv.status, "scheduled")
-        context["purchases"] = purchases
-
-        # ── Ledger accounts across every book ─────────────────
-        # Same rule as ContactDetail: what we owe a supplier is not a
-        # sales rep's to read, and the account pages behind these rows
-        # are closed to the role anyway.
-        from erp.roles import is_sales_rep
-        context["current_account_accounts"] = accounts = [] if is_sales_rep(self.request.user) else list(
-            of_books_in_reach(CurrentAccount.objects.filter(supplier=supplier))
-            .select_related("book", "default_currency")
-            .order_by("book__name")
-        )
-        context.update(_accounts_total(accounts))
-        return context
-
-    def post(self, request, *args, **kwargs):
-        """Mirrors ContactDetail.post — supports `?action=add_note` and
-        `?action=add_task` via HTMX so the supplier detail page can
-        attach notes/tasks just like the other CRM detail pages."""
-        self.object = self.get_object()
-        supplier = self.object
-        action = request.GET.get("action", "")
-        is_htmx = request.headers.get("HX-Request") == "true"
-
-        if action == "add_note":
-            note_form = NoteForm(request.POST)
-            if note_form.is_valid():
-                note = note_form.save(commit=False)
-                note.supplier = supplier
-                note.save()
-                if is_htmx:
-                    return HttpResponse(status=200)
-                return redirect("crm:supplier_detail", pk=supplier.pk)
-
-        if action == "add_task":
-            task_form = TaskForm(request.POST)
-            if task_form.is_valid():
-                task = task_form.save(commit=False)
-                task.supplier = supplier
-                task.created_by = request.user.member if hasattr(request.user, "member") else None
-                if not task.member:
-                    task.member = request.user.member
-                task.save()
-                if is_htmx:
-                    current_member = request.user.member if hasattr(request.user, "member") else None
-                    tasks = Task.objects.filter(supplier=supplier, member=current_member, completed=False).order_by("-due_date")
-                    # The same markup the page renders on load (the
-                    # .od-task rows in supplier_detail.html), so the
-                    # group count and the inline edit keep finding them.
-                    from django.utils.html import escape
-                    html = ""
-                    for t in tasks:
-                        delta = (t.due_date - date.today()).days
-                        if delta < 0:
-                            days_display = f"{abs(delta)}d"
-                        elif delta == 0:
-                            days_display = "today"
-                        else:
-                            days_display = None
-                        overdue_html = f'<span class="pill overdue task-overdue">{days_display}</span>' if days_display else ""
-                        member_html = f'<span class="pill task-member"><i class="fa fa-user"></i>{escape(str(t.member))}</span>' if t.member else ""
-                        desc_html = f'<p class="od-task-desc task-description">{escape(t.description)}</p>' if t.description else ""
-                        html += f'''<div class="od-task" id="task-{t.id}">
-                            <div class="task-content" id="task-content-{t.id}" style="flex:1; min-width:0;">
-                                <div class="od-task-body">
-                                    <h3 class="od-task-name task-name">{escape(t.name)}</h3>
-                                    {desc_html}
-                                    <div class="od-task-meta task-meta">
-                                        <span class="pill due task-due"><i class="fa fa-calendar"></i>{t.due_date.strftime("%b %d, %Y")}</span>
-                                        {overdue_html}
-                                        {member_html}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="od-task-actions task-actions">
-                                <button type="button" class="od-icon-btn ok btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {t.id})"><i class="fa fa-check"></i></button>
-                                <button type="button" class="od-icon-btn btn-icon-minimal" title="Edit" onclick="editTask({t.id}, '{escape(t.name)}', '{escape(t.description or "")}', '{t.due_date.strftime("%Y-%m-%d")}')"><i class="fa fa-edit"></i></button>
-                                <button type="button" class="od-icon-btn del btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {t.id})"><i class="fa fa-trash"></i></button>
-                            </div>
-                        </div>'''
-                    if not tasks:
-                        html = '<p class="od-empty-mute empty-state" style="padding: 8px 2px;">No tasks available.</p>'
-                    return HttpResponse(html)
-                return redirect("crm:supplier_detail", pk=supplier.pk)
-
-        # Fallback: re-render with errors
-        context = self.get_context_data()
-        return self.render_to_response(context)
-
-
-def get_supplier_notes_partial(request, pk):
-    """Return just the notes/history block for a supplier — used by
-    the HTMX refresh after add-note in the supplier detail page."""
-    from django.template.loader import render_to_string
-    from django.middleware.csrf import get_token
-
-    supplier = get_object_or_404(Supplier, pk=pk)
-    notes = Note.objects.filter(supplier=supplier).order_by("-created_at")
-    completed_tasks = Task.objects.filter(completed=True, supplier=supplier).order_by("-completed_at")
-    history_entries = list(notes) + list(completed_tasks)
-    history_entries.sort(
-        key=lambda x: x.created_at if hasattr(x, "created_at") and x.created_at else x.completed_at,
-        reverse=True,
-    )
-    history_html = render_to_string(
-        "crm/components/history.html",
-        {
-            "company": None,
-            "contact": None,
-            "supplier": supplier,
-            "note_form": NoteForm(),
-            "csrf_token": get_token(request),
-            "history_entries": history_entries,
-            "current_url": request.path,
-        },
-    )
-    return HttpResponse(f'<div id="notesSection">{history_html}</div>')
-
-
-def supplier_search_companies(request):
-    """JSON autocomplete for the linked_company picker on the
-    supplier form. Returns up to 12 companies matching the query.
-    Empty `q` returns no results — the front-end only opens the
-    dropdown after the user starts typing."""
-    q = (request.GET.get("q") or "").strip()
-    if not q:
-        return JsonResponse({"results": []})
-    qs = (
-        Company.objects.here()
-        .filter(unaccent_icontains(q, "name"))
-        .order_by("name")[:12]
-    )
-    results = [
-        {
-            "id": c.pk,
-            "name": c.name,
-            "subtitle": (c.get_status_display() if hasattr(c, "get_status_display") else "") or "",
-        }
-        for c in qs
-    ]
-    return JsonResponse({"results": results})
-
-
-def supplier_search_contacts(request):
-    """JSON autocomplete for the linked_contact picker on the
-    supplier form. Returns up to 12 contacts matching the query."""
-    q = (request.GET.get("q") or "").strip()
-    if not q:
-        return JsonResponse({"results": []})
-    qs = (
-        Contact.objects.here().select_related("company")
-        .filter(unaccent_icontains(q, "name", "job_title", "company__name"))
-        .order_by("name")[:12]
-    )
-    results = []
-    for c in qs:
-        bits = []
-        if getattr(c, "job_title", None):
-            bits.append(c.job_title)
-        if getattr(c, "company_id", None) and c.company:
-            bits.append(c.company.name)
-        results.append({
-            "id": c.pk,
-            "name": c.name,
-            "subtitle": " · ".join(bits),
-        })
-    return JsonResponse({"results": results})
-
-
-
-
 # ── CRM attachments ───────────────────────────────────────────
-# Files hung off a contact, company or supplier. One set of views
-# serves all three: the record kind travels in the URL, so the
+# Files hung off a contact or company. One set of views serves both: the record kind travels in the URL, so the
 # Attached items card on every detail page talks to the same
 # endpoints.
 ATTACHMENT_OWNERS = {
     "contact": Contact,
     "company": Company,
-    "supplier": Supplier,
 }
 
 
@@ -1987,7 +1652,7 @@ def _attachment_owner(kind, pk):
 
 @login_required
 def share_record(request, kind, pk):
-    """Share a company, contact or supplier with another business's
+    """Share a company or contact with another business's
     list, or stop — the "Share…" dialog on the record's page.
 
     A superuser's to do, and nobody else's: what one business may see of
@@ -2006,7 +1671,7 @@ def share_record(request, kind, pk):
             "the same customer entered twice and need merging first."
         ) % {"list": directory.name, "name": str(record)})
     return redirect(request.META.get("HTTP_REFERER")
-                    or reverse(f"crm:{'supplier_detail' if kind == 'supplier' else kind + '_detail'}",
+                    or reverse(f"crm:{kind}_detail",
                                args=[record.pk]))
 
 

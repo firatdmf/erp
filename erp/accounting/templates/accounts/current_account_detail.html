@@ -655,17 +655,6 @@
               </div>
             </div>
             {% endif %}
-            {% if current_account.supplier %}
-            <div class="row" style="grid-column: 1/-1;">
-              <div class="lbl">{% trans "Supplier" %}</div>
-              <div class="val">
-                <a class="cd-crm-link" href="{% url 'crm:supplier_detail' current_account.supplier.pk %}"
-                   target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
-                  {{ current_account.supplier }}<i data-lucide="external-link"></i>
-                </a>
-              </div>
-            </div>
-            {% endif %}
           </div>
           <form method="post" action="{% url 'accounts:crm_link' current_account.pk %}"
                 class="cd-crm-detach"

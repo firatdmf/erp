@@ -60,7 +60,6 @@ NAV_SECTIONS = [
                 {"label": _("Product"),   "icon": "tag",           "url": "marketing:product_create"},
                 {"label": _("Order"),     "icon": "shopping-cart", "action": "openOrderSidebar"},
                 {"label": _("Blog post"), "icon": "book-open",     "url": "marketing:blog_create"},
-                {"label": _("Supplier"),  "icon": "truck",         "action": "openAddSupplierSidebar"},
                 {"label": _("Warehouse"), "icon": "warehouse",     "action": "openWarehouseSidebar", "admin": True},
             ]},
         ],
@@ -208,10 +207,6 @@ NAV_SECTIONS = [
             {"title": _("PURCHASING"), "items": [
                 {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},
                 {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:legacy_purchase_order_list"},
-            ]},
-            {"title": _("SUPPLIERS"), "items": [
-                {"label": _("Supplier list"), "icon": "truck",       "url": "crm:supplier_list"},
-                {"label": _("Add supplier"),  "icon": "plus-circle", "action": "openAddSupplierSidebar"},
             ]},
         ],
     },

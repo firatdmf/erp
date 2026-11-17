@@ -290,9 +290,8 @@ TEMPLATES = [
                 # Which book the reader is in — the sidebar prints it and
                 # every book-scoped link is built from it.
                 "accounting.book_scope.current_book",
-                # Removed: product_categories and suppliers - not used in base.html
+                # Removed: product_categories - not used in base.html
                 # "erp.context_processors.product_categories",
-                # "erp.context_processors.suppliers",
             ],
         },
     },

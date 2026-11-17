@@ -384,7 +384,9 @@ class CurrentAccountList(View):
 class CurrentAccountCreate(View):
     template_name = "accounts/current_account_form.html"
 
-    ENTITY_TYPES = ("company", "contact", "supplier")
+    # Who the account is in the CRM. There is no supplier kind: an account
+    # we buy from is a company or contact like any other (CR14).
+    ENTITY_TYPES = ("company", "contact")
 
     def get(self, request):
         from .services_accounts import new_customer_currency as _new_customer_currency
@@ -402,13 +404,12 @@ class CurrentAccountCreate(View):
 
     def post(self, request):
         # A current account is never a floating record any more — creating one here
-        # always creates the matching CRM entity (company/contact) or
-        # Supplier alongside it (the same "supplier gets a current account" rule
-        # applied uniformly), so there's one job instead of two.
-        from crm.models import Company, Contact, Supplier
+        # always creates the matching CRM company or contact alongside it,
+        # so there's one job instead of two.
+        from crm.models import Company, Contact
         from .services_accounts import (
             get_or_create_current_account_for_company,
-            get_or_create_current_account_for_contact, get_or_create_current_account_for_supplier,
+            get_or_create_current_account_for_contact,
         )
 
         entity_type = request.POST.get("entity_type", "company")
@@ -438,7 +439,7 @@ class CurrentAccountCreate(View):
         linked = None
         if link_kind:
             if link_kind not in _CRM_KINDS:
-                messages.error(request, _g("Pick a contact, company or supplier."))
+                messages.error(request, _g("Pick a contact or company."))
                 return redirect("accounts:create", book_id=request.book.pk)
             linked = _crm_model(link_kind).objects.filter(
                 pk=request.POST.get("link_id") or None).first()
@@ -463,7 +464,6 @@ class CurrentAccountCreate(View):
                 creator = {
                     "company": get_or_create_current_account_for_company,
                     "contact": get_or_create_current_account_for_contact,
-                    "supplier": get_or_create_current_account_for_supplier,
                 }[link_kind]
                 current_account = creator(linked, member=member, book=request.book)
                 current_account.name = name
@@ -483,7 +483,7 @@ class CurrentAccountCreate(View):
                 )
                 current_account = get_or_create_current_account_for_company(
                     entity, member=member, book=request.book)
-            elif entity_type == "contact":
+            else:
                 entity = Contact.objects.create(
                     directory=request.book.directory,
                     name=name,
@@ -493,18 +493,6 @@ class CurrentAccountCreate(View):
                     country=country,
                 )
                 current_account = get_or_create_current_account_for_contact(
-                    entity, member=member, book=request.book)
-            else:
-                entity = Supplier.objects.create(
-                    directory=request.book.directory,
-                    company_name=name,
-                    email=email, phone=phone,
-                    address=address, country=country,
-                )
-                # The post_save signal on Supplier already creates the
-                # current account unconditionally — this call is idempotent and
-                # just fetches that same row.
-                current_account = get_or_create_current_account_for_supplier(
                     entity, member=member, book=request.book)
         except Exception as exc:
             messages.error(request, _g("Could not create record: %(error)s") % {"error": exc})
@@ -632,7 +620,9 @@ class CurrentAccountEdit(View):
 # One list, defined on the model beside the fields themselves — this used
 # to be spelled out again here, and two copies of "which three FKs" is how
 # a fourth would end up honoured in one place and not the other.
-_CRM_KINDS = CurrentAccount.CRM_FIELDS
+# The model still carries the retired supplier link until its column is
+# dropped; nothing offers it any more (CR14, 2026-11-17).
+_CRM_KINDS = tuple(k for k in CurrentAccount.CRM_FIELDS if k != "supplier")
 
 
 def _crm_subtitle(obj):
@@ -654,8 +644,8 @@ def _crm_subtitle(obj):
 
 
 def _crm_model(kind):
-    from crm.models import Company, Contact, Supplier
-    return {"contact": Contact, "company": Company, "supplier": Supplier}[kind]
+    from crm.models import Company, Contact
+    return {"contact": Contact, "company": Company}[kind]
 
 
 def _rename_record(record, name):
@@ -685,7 +675,7 @@ _CRM_SEARCH_LIMIT = 8
 def _crm_candidates(book, q, exclude=None):
     """CRM records matching `q`, each saying which account in `book`
     already holds it (see CurrentAccountCrmSearch)."""
-    from crm.models import Company, Contact, Supplier
+    from crm.models import Company, Contact
 
     q = (q or "").strip()
     if not q:
@@ -701,14 +691,6 @@ def _crm_candidates(book, q, exclude=None):
         "company": list(
             Company.objects.of_book(book).annotate(_f=tr_fold_expr("name"))
             .filter(_f__contains=needle).order_by("name")[:limit]
-        ),
-        # A supplier is named by whichever of the two columns is
-        # filled — __str__ prefers company_name — so both are searched.
-        "supplier": list(
-            Supplier.objects.of_book(book).annotate(_fc=tr_fold_expr("company_name"),
-                                      _fn=tr_fold_expr("contact_name"))
-            .filter(Q(_fc__contains=needle) | Q(_fn__contains=needle))
-            .order_by("company_name", "contact_name")[:limit]
         ),
     }
 
@@ -798,7 +780,7 @@ class CurrentAccountCrmLink(View):
 
         kind = (request.POST.get("kind") or "").strip()
         if kind not in _CRM_KINDS:
-            messages.error(request, _g("Pick a contact, company or supplier."))
+            messages.error(request, _g("Pick a contact or company."))
             return redirect("accounts:detail", pk=current_account.pk)
 
         if action == "create":
@@ -851,7 +833,7 @@ class CurrentAccountCrmLink(View):
 
         Returns the object, or None after reporting why not.
         """
-        from crm.models import Company, Contact, Supplier
+        from crm.models import Company, Contact
 
         name = (request.POST.get("name") or current_account.name or "").strip()
         if not name:
@@ -879,13 +861,10 @@ class CurrentAccountCrmLink(View):
             obj = Company(name=name, email=[email] if email else [],
                           phone=[phone] if phone else [],
                           address=address, country=country)
-        elif kind == "contact":
+        else:
             obj = Contact(name=name, email=[email] if email else [],
                           phone=[phone] if phone else [],
                           address=address, country=country)
-        else:
-            obj = Supplier(company_name=name, email=email, phone=phone,
-                           address=address, country=country)
         # Filed with the account it is made for, in that book's directory.
         obj.directory = current_account.book.directory
 
@@ -1370,12 +1349,10 @@ class CurrentAccountDetail(View):
             "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
             # Buttons on the CRM picker, in the order the CRM itself
-            # thinks about people: a person, the firm they work for, then
-            # someone we buy from.
+            # thinks about people: a person, then the firm they work for.
             "crm_new_kinds": [
                 ("contact",  _("New contact")),
                 ("company",  _("New company")),
-                ("supplier", _("New supplier")),
             ],
         }
         return render(request, self.template_name, ctx)

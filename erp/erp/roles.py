@@ -117,7 +117,6 @@ NAV_ACTION_ENDPOINTS = {
     "openCompanySidebar":            "crm:create_company",
     "openOrderSidebar":              "operating:create_order",
     "openTaskSidebar":               "todo:create_task",
-    "openAddSupplierSidebar":        "crm:create_supplier_partial",
     "openWarehouseSidebar":          "operating:create_warehouse_partial",
     "openBookSidebar":               "accounting:create_book",
     "openRawMaterialSidebar":        "operating:create_raw_material_good_json",

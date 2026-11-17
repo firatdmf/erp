@@ -1123,15 +1123,6 @@
     </div>
   </div>
 
-  <!-- Add Supplier Sidebar Modal -->
-  <div id="addSupplierSidebarOverlay" class="sidebar-overlay" onclick="closeAddSupplierSidebar()">
-    <div class="sidebar-modal" onclick="event.stopPropagation();">
-      <div id="addSupplierSidebarContent" style="display: contents;">
-        <!-- Content loaded via HTMX -->
-      </div>
-    </div>
-  </div>
-
   <!-- Create Purchase Request Sidebar Modal -->
   <div id="purchaseRequestSidebarOverlay" class="sidebar-overlay" onclick="closePurchaseRequestSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation();">
@@ -3512,23 +3503,6 @@
     </div>
   </div>
 
-  <div id="addSupplierSidebarOverlay" class="sidebar-overlay" onclick="closeAddSupplierSidebar()">
-    <div class="sidebar-modal" onclick="event.stopPropagation();">
-      <div class="sidebar-header">
-        <button class="sidebar-close" onclick="closeAddSupplierSidebar()">
-          <i class="fas fa-times"></i> Close
-        </button>
-        <div class="sidebar-title">
-          <i class="fas fa-truck text-primary"></i>
-          <h2>{% trans "Add Supplier" %}</h2>
-        </div>
-      </div>
-      <div class="sidebar-content" id="addSupplierSidebarContent">
-        <!-- HTMX loading target -->
-      </div>
-    </div>
-  </div>
-
   <!-- Toast Notification -->
   <div id="toastNotification" class="toast-notification-global">
     <div class="toast-content-global">
@@ -4731,71 +4705,6 @@
           });
       }
 
-      // Add Supplier Sidebar Functions
-      function openAddSupplierSidebar() {
-        const overlay = document.getElementById('addSupplierSidebarOverlay');
-        const content = document.getElementById('addSupplierSidebarContent');
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
-        htmx.ajax('GET', '{% url "crm:create_supplier_partial" %}', { target: '#addSupplierSidebarContent', swap: 'innerHTML' });
-      }
-
-      function closeAddSupplierSidebar() {
-        document.getElementById('addSupplierSidebarOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-      }
-
-      function submitAddSupplierForm(event) {
-        event.preventDefault();
-        const form = document.getElementById('addSupplierForm');
-        const submitBtn = document.getElementById('btnSaveSupplier');
-        const btnText = submitBtn.querySelector('.btn-text');
-        const btnSpinner = submitBtn.querySelector('.spinner-border');
-
-        if (btnText) btnText.style.display = 'none';
-        if (btnSpinner) btnSpinner.classList.remove('d-none');
-        submitBtn.disabled = true;
-
-        const formData = new FormData(form);
-        fetch('{% url "crm:create_supplier_partial" %}', {
-          method: 'POST',
-          body: formData,
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              const toast = document.getElementById('toastNotification');
-              toast.querySelector('.toast-message-global').textContent = data.message || 'Supplier added successfully!';
-              toast.classList.add('show');
-              setTimeout(() => toast.classList.remove('show'), 3000);
-              closeAddSupplierSidebar();
-              // Page-level hook: a host page (e.g. product_form) can
-              // register window.onSupplierAdded(data) to keep its own
-              // dropdown in sync without a full reload.
-              if (typeof window.onSupplierAdded === 'function') {
-                try { window.onSupplierAdded(data); } catch (e) { console.error(e); }
-              } else if (data.redirect_url) {
-                window.location.href = data.redirect_url;
-              } else {
-                window.location.reload();
-              }
-            } else {
-              alert('Error: ' + JSON.stringify(data.errors));
-              if (btnText) btnText.style.display = 'inline';
-              if (btnSpinner) btnSpinner.classList.add('d-none');
-              submitBtn.disabled = false;
-            }
-          })
-          .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred.');
-            if (btnText) btnText.style.display = 'inline';
-            if (btnSpinner) btnSpinner.classList.add('d-none');
-            submitBtn.disabled = false;
-          });
-      }
     </script>
     <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
 

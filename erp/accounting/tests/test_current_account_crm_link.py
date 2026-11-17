@@ -122,15 +122,16 @@ class CrmLinkPicker(TestCase):
         self.assertEqual(company.phone, ["5551234567"])
         self.assertEqual(company.country, "Romania")
 
-    def test_creating_a_contact_and_a_supplier_too(self):
+    def test_creating_a_contact_but_never_a_supplier_record(self):
         self._link(action="create", kind="contact", name="Gürhan")
         self.current_account.refresh_from_db()
         self.assertEqual(self.current_account.contact.name, "Gürhan")
 
+        # Someone we buy from is a company or contact like anyone (CR14).
         self._link(action="create", kind="supplier", name="Karven Mensucat")
         self.current_account.refresh_from_db()
-        self.assertIsNone(self.current_account.contact_id)
-        self.assertEqual(self.current_account.supplier.company_name, "Karven Mensucat")
+        self.assertEqual(self.current_account.contact.name, "Gürhan")
+        self.assertFalse(Supplier.objects.exists())
 
     def test_a_duplicate_company_name_is_refused_not_silently_reused(self):
         """Company.name is unique. Attaching to someone else's company
@@ -206,12 +207,12 @@ class CrmLinkPicker(TestCase):
         labels = [r["label"] for r in self._search("gurhan")]
         self.assertIn("GÜRHAN TEKSTİL", labels)
 
-    def test_search_covers_all_three_kinds(self):
+    def test_search_covers_contacts_and_companies(self):
         Contact.objects.create(name="Karven Ahmet")
         Company.objects.create(name="Karven Tekstil")
         Supplier.objects.create(company_name="Karven Mensucat")
         kinds = {r["kind"] for r in self._search("karven")}
-        self.assertEqual(kinds, {"contact", "company", "supplier"})
+        self.assertEqual(kinds, {"contact", "company"})
 
     def test_search_names_the_account_already_holding_a_candidate(self):
         company = Company.objects.create(name="MARKİSS TEKSTİL")
@@ -282,10 +283,9 @@ class CreateLinkedToExistingRecord(TestCase):
         self.assertEqual(current_account.tax_number, "123")
 
     def test_the_link_decides_the_kind(self):
-        supplier = Supplier.objects.create(company_name="Gürhan İplik")
-        CurrentAccount.objects.filter(supplier=supplier).delete()  # the signal's own
-        self._create(entity_type="company", link_kind="supplier", link_id=supplier.pk)
-        self.assertTrue(CurrentAccount.objects.filter(book=self.book, supplier=supplier).exists())
+        contact = Contact.objects.create(name="Gürhan İplik")
+        self._create(entity_type="company", link_kind="contact", link_id=contact.pk)
+        self.assertTrue(CurrentAccount.objects.filter(book=self.book, contact=contact).exists())
         self.assertEqual(Company.objects.count(), 1)
 
     def test_a_record_that_already_has_an_account_here_is_not_overwritten(self):

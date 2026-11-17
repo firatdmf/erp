@@ -312,11 +312,18 @@ follow-up email campaign while it is still a prospect.
           </div>
         </section>
 
-        <!-- ORDER HISTORY -->
-        {% if sees_orders %}
+        <!-- ORDER HISTORY — what they buy from us. Left out for one we
+             only buy from, whose page is its purchases (below). -->
+        {% if sees_orders and orders or sees_orders and not purchases %}
         {% trans "No orders yet for this company." as no_orders_text %}
         {% include "crm/components/_order_history_card.html" with empty_text=no_orders_text %}
         {% include "crm/components/_bought_items_card.html" %}
+        {% endif %}
+
+        <!-- PURCHASE HISTORY — what we buy from them. Supplier prices, so
+             not for sales reps. -->
+        {% if purchases and not is_sales_rep %}
+        {% include "crm/components/_purchase_history_card.html" %}
         {% endif %}
 
         <!-- SAMPLES SENT -->

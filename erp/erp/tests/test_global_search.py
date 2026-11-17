@@ -23,16 +23,9 @@ class GlobalSearchSupplierTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return json.loads(response.content)["results"]
 
-    def test_finds_a_supplier_by_name_ignoring_diacritics(self):
-        for q, type_ in (("sise", "all"), ("iplik", "contacts"), ("ahmet", "all")):
-            with self.subTest(q=q, type=type_):
-                suppliers = [r for r in self._results(q, type_) if r["type"] == "Supplier"]
-                self.assertEqual([r["url"] for r in suppliers],
-                                 [f"/crm/supplier/detail/{self.supplier.pk}/"])
-
-    def test_finds_a_supplier_by_email(self):
-        names = [r["name"] for r in self._results("satis@") if r["type"] == "Supplier"]
-        self.assertEqual(names, ["Şişe İplik"])
+    def test_the_retired_supplier_record_is_not_searched(self):
+        # A supplier is a company or contact now (CR14), found as one.
+        self.assertNotIn("Supplier", {r["type"] for r in self._results("sise")})
 
     def test_suppliers_stay_out_of_the_products_tab(self):
         self.assertNotIn("Supplier", {r["type"] for r in self._results("sise", "products")})

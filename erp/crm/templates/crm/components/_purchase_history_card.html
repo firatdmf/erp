@@ -1,0 +1,36 @@
+{% load i18n accounts_tags %}
+{% comment %}
+  What we have bought from this record, newest first, each a link to its
+  purchase. Shown wherever there are purchases: the role follows what an
+  account does, not the kind of record (crm.purchase_history).
+
+  Expects: purchases.
+{% endcomment %}
+<section class="od-card">
+  <div class="od-card-h">
+    <i class="fa fa-truck card-ico"></i>
+    <h3>{% trans "Purchase history" %}</h3>
+    <span class="od-card-sub">{{ purchases|length }} {% blocktrans count counter=purchases|length %}purchase{% plural %}purchases{% endblocktrans %}</span>
+  </div>
+  <div class="od-order-list">
+    {% for inv in purchases %}
+      {% comment %} A purchase has its own page; a purchase return only has
+         the old invoice address, which sends it on to its account. {% endcomment %}
+      <a class="od-order-row"
+         href="{% if inv.type == 'purchase' %}{% url 'accounts:purchase_order_detail' inv.pk %}{% else %}{% url 'accounts:invoice_detail' inv.pk %}{% endif %}">
+        <div class="od-order-id">
+          <div class="od-order-num">{{ inv.display_number }}</div>
+          <div class="od-order-date">{{ inv.date|date:"M d, Y" }} · {{ inv.book.name }}</div>
+        </div>
+        <span class="ord-status {{ inv.pill }}">
+          <span class="ord-status-dot"></span>
+          {% if inv.type == 'purchase_return' %}{{ inv.get_type_display }}{% else %}{{ inv.get_status_display }}{% endif %}
+        </span>
+        <div class="od-order-total">
+          <span>{{ inv.currency.symbol|default:inv.currency.code }}</span>{{ inv.total|money }}
+        </div>
+        <i class="fa fa-chevron-right od-order-chev"></i>
+      </a>
+    {% endfor %}
+  </div>
+</section>

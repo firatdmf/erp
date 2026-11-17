@@ -85,10 +85,11 @@
   .cf-toggle .lbl-w b { font: 600 13px var(--font-sans); color: var(--ink); }
   .cf-toggle .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
 
-  /* Entity-type segmented control — what this account IS: a company, a
-     person, or a supplier. Picking one decides which CRM record gets
-     created alongside the account, so it comes before everything else. */
-  .cf-etype { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  /* Entity-type segmented control — what this account IS: a company or a
+     person. Picking one decides which CRM record gets created alongside
+     the account, so it comes before everything else. Whether it is a
+     customer or a supplier follows from what we do with it. */
+  .cf-etype { display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
   .cf-etype-btn { display:flex; flex-direction: column; align-items:center; gap: 6px; padding: 14px 10px; border: 1.5px solid #E0E6EE; border-radius: 10px; background: white; cursor: pointer; transition: all 140ms; }
   .cf-etype-btn i { width: 20px; height: 20px; color: var(--gray-500); }
   .cf-etype-btn b { font: 700 12.5px var(--font-sans); color: var(--ink); }
@@ -174,7 +175,7 @@
           <div class="cf-crm-search" id="cf-crm-searchbox">
             <i data-lucide="search"></i>
             <input type="text" id="cf-crm-q" autocomplete="off"
-                   placeholder="{% trans 'Already in the CRM? Search contacts, companies, suppliers…' %}">
+                   placeholder="{% trans 'Already in the CRM? Search contacts and companies…' %}">
           </div>
           <div id="cf-crm-results" class="cf-crm-results" hidden></div>
           <div id="cf-crm-chip" class="cf-crm-chip" hidden>
@@ -189,9 +190,6 @@
           </div>
           <div class="cf-etype-btn" data-etype="contact" onclick="cfPickEtype('contact')">
             <i data-lucide="user"></i><b>{% trans "Person" %}</b>
-          </div>
-          <div class="cf-etype-btn" data-etype="supplier" onclick="cfPickEtype('supplier')">
-            <i data-lucide="truck"></i><b>{% trans "Supplier" %}</b>
           </div>
         </div>
         <div class="cf-etype-hint" id="cf-etype-hint">{% trans "A matching CRM record is created together with the account — this decides which kind." %}</div>
@@ -389,8 +387,7 @@
 
   var CF_LABELS = {
     company:  { label: "{% trans 'Company Name' %}",  placeholder: "{% trans 'e.g., Acme Inc.' %}" },
-    contact:  { label: "{% trans 'Full Name' %}",      placeholder: "{% trans 'e.g., Jane Doe' %}" },
-    supplier: { label: "{% trans 'Supplier Name' %}",  placeholder: "{% trans 'e.g., Acme Fabrics' %}" }
+    contact:  { label: "{% trans 'Full Name' %}",      placeholder: "{% trans 'e.g., Jane Doe' %}" }
   };
   window.cfPickEtype = function (etype) {
     var input = document.getElementById('cf-entity-type');
@@ -423,8 +420,7 @@
     var etype = document.getElementById('cf-etype');
     var KIND = {
       contact: {icon: 'user', label: '{% trans "Contact" %}'},
-      company: {icon: 'building-2', label: '{% trans "Company" %}'},
-      supplier: {icon: 'truck', label: '{% trans "Supplier" %}'}
+      company: {icon: 'building-2', label: '{% trans "Company" %}'}
     };
     var timer = null, token = 0, filledName = null;
 

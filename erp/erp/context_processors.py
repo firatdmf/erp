@@ -1,4 +1,4 @@
-from crm.models import Contact, Company, ClientGroup, Supplier
+from crm.models import Contact, Company, ClientGroup
 from marketing.models import ProductCategory
 from authentication.models import Member
 from itertools import chain
@@ -94,14 +94,6 @@ def product_categories(request):
         categories = list(ProductCategory.objects.all())
         cache.set('product_categories_list', categories, 300)  # 5 minutes
     return {'product_categories': categories}
-
-def suppliers(request):
-    """Cached suppliers - 5 minute cache"""
-    suppliers_list = cache.get('suppliers_list')
-    if suppliers_list is None:
-        suppliers_list = list(Supplier.objects.all())
-        cache.set('suppliers_list', suppliers_list, 300)  # 5 minutes
-    return {'suppliers': suppliers_list}
 
 def all_members(request):
     """Cached members for task assignment — 5 min TTL. Evaluated eagerly

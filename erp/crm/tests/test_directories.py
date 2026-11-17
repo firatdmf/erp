@@ -224,8 +224,7 @@ class ThePagesKeepTheWall(TwoBusinesses):
 
     def test_the_lists(self):
         for route, own in (("crm:contact_list", "Dana Akhmet"),
-                           ("crm:company_list", "Steppe Home"),
-                           ("crm:supplier_list", "Shymkent Cotton")):
+                           ("crm:company_list", "Steppe Home")):
             response = self.client.get(reverse(route))
             self.assertEqual(response.status_code, 200, route)
             self._assert_none_of_theirs(response, route)
@@ -240,8 +239,6 @@ class ThePagesKeepTheWall(TwoBusinesses):
             ("get", "crm:task_attach_search", {"q": "a"}),
             ("get", "crm:customer_autocomplete", {"customer": "a"}),
             ("get", "crm:customer_autocomplete", {"customer": "o"}),
-            ("get", "crm:supplier_search_companies", {"q": "o"}),
-            ("get", "crm:supplier_search_contacts", {"q": "a"}),
             ("get", "global_search", {"q": "a"}),
             ("get", "global_search", {"q": "o"}),
         )
@@ -260,8 +257,6 @@ class ThePagesKeepTheWall(TwoBusinesses):
         "delete_contact": "contact", "contact_detail": "contact",
         "update_contact": "contact", "get_contact_notes_partial": "contact",
         "delete_company_from_contact": "contact",
-        "supplier_detail": "supplier", "supplier_update": "supplier",
-        "supplier_delete": "supplier", "get_supplier_notes_partial": "supplier",
         "update_note": "note", "update_note_ajax": "note", "delete_note": "note",
         "download_attachment": "attachment", "delete_attachment": "attachment",
     }
@@ -289,7 +284,7 @@ class ThePagesKeepTheWall(TwoBusinesses):
                 urls.append(reverse(f"crm:{name}", args=[self.woodline.pk, self.dana.pk]))
                 urls.append(reverse(f"crm:{name}", args=[self.steppe.pk, self.ayse.pk]))
             elif set(params) == {"kind", "pk"}:
-                for kind in ("company", "contact", "supplier"):
+                for kind in ("company", "contact"):
                     urls.append(reverse(f"crm:{name}", args=[kind, self._theirs(kind).pk]))
             else:
                 self.fail(f"crm:{name} takes {sorted(params)} — teach the sweep about it")
@@ -329,8 +324,7 @@ class ThePagesKeepTheWall(TwoBusinesses):
         # The sweep above would pass on a site that refused everybody.
         self.client.force_login(self.cuma)
         for route, record in (("crm:contact_detail", self.ayse),
-                              ("crm:company_detail", self.woodline),
-                              ("crm:supplier_detail", self.ozce)):
+                              ("crm:company_detail", self.woodline)):
             response = self.client.get(reverse(route, args=[record.pk]))
             self.assertEqual(response.status_code, 200, route)
 
@@ -567,8 +561,7 @@ class OneBooksListAtATime(TwoBusinesses):
     def test_a_page_opened_by_id_opens_whichever_book_they_are_in(self):
         self.client.force_login(self.owner)
         for route, record in (("crm:contact_detail", self.dana),
-                              ("crm:company_detail", self.steppe),
-                              ("crm:supplier_detail", self.kz_supplier)):
+                              ("crm:company_detail", self.steppe)):
             response = self.client.get(reverse(route, args=[record.pk]))
             self.assertEqual(response.status_code, 200, route)
 

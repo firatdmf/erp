@@ -240,13 +240,13 @@
     } else {
       rowsEl.innerHTML = order.map(function (id) {
         var r = rolls[id];
-        if (r.problem) { bad++; } else { good++; totalQty += r.quantity; totalValue += (r.value || 0); }
+        if (r.problem) { bad++; } else { good++; totalQty += r.quantity; totalValue += r.value; }
         return '<tr class="' + (r.problem ? 'bad' : '') + '">' +
           '<td class="mono">' + esc(r.barcode) + '</td>' +
           '<td>' + esc(r.name) + (r.sku ? ' <span class="mono" style="color:#6B7280;">' + esc(r.sku) + '</span>' : '') +
             (r.problem ? '<div class="tr-bad"><i class="fa fa-triangle-exclamation"></i> ' + esc(r.problem) + '</div>' : '') + '</td>' +
           '<td class="num">' + qty(r.quantity) + ' ' + esc(r.unit) + '</td>' +
-          '<td class="num">' + (r.unit_cost == null ? '—' : Number(r.unit_cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})) + '</td>' +
+          '<td class="num">' + Number(r.unit_cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4}) + '</td>' +
           '<td class="num">' + money(r.value) + '</td>' +
           '<td class="num"><button type="button" class="tr-x" data-id="' + id + '" title="{% trans "Remove" %}"><i class="fa fa-xmark"></i></button></td>' +
         '</tr>';

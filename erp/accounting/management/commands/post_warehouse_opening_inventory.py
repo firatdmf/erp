@@ -110,16 +110,16 @@ class Command(BaseCommand):
                     f"date to post on. Pass --date.")
             date = date.date()
 
-        value, unvalued_n, unvalued_qty = _inventory_value(book, warehouse)
+        value = _inventory_value(book, warehouse)
         if value <= Decimal("0.00"):
             w(self.style.NOTICE(
-                f"{warehouse.name} holds nothing valued — nothing to post."))
+                f"{warehouse.name} holds no stock — nothing to post."))
             return
 
         # The one way this could do harm: posting shelves the book-wide
         # cutover entry already counted. Compare against the whole book, not
         # this warehouse, because that is the figure 1300 is reconciled to.
-        shelves, _n, _q = _inventory_value(book)
+        shelves = _inventory_value(book)
         ledger = _ledger_inventory(book)
         if ledger + value > shelves:
             raise CommandError(
@@ -137,16 +137,10 @@ class Command(BaseCommand):
         w("")
         w(f"    Dr 1300 Inventory                {value:>14}")
         w(f"        Cr {opts['contra']} {_name(opts['contra']):<26}{value:>14}")
-        if unvalued_n:
-            w(self.style.WARNING(
-                f"\n  {unvalued_n} item(s) ({unvalued_qty}) in this warehouse "
-                f"carry no cost and are outside that figure — they are outside "
-                f"the balance sheet's figure too, so this does not create a "
-                f"difference, it leaves one."))
 
         try:
             with transaction.atomic():
-                entry, _n, _q = post_opening_inventory(
+                entry = post_opening_inventory(
                     book, date=date, warehouse=warehouse,
                     contra=opts["contra"],
                     reference=f"LEDGER-OB-WH{warehouse.pk}")

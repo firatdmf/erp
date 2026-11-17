@@ -807,22 +807,16 @@
                 {% endif %}
               </td>
               {% comment %}What THIS item cost when it was received, not what
-              the SKU costs today — see WarehouseProductItem.unit_cost_base. An
-              item taken in before the field existed shows a dash rather than a
-              zero: unpriced and free are not the same thing.{% endcomment %}
+              the SKU costs today — see WarehouseProductItem.unit_cost_base.{% endcomment %}
               <td>
-                {% if r.unit_cost_base is not None and is_sales_rep %}
+                {% if is_sales_rep %}
                   {% comment %}A sales rep does not read cost: they see the
                   price derived from this item's cost, and not the line value,
                   which is cost times what is left.{% endcomment %}
                   <span class="roll-cost">{{ cost_sign }}{{ r.unit_cost_base|sales_rep_price|money }}</span>
-                {% elif r.unit_cost_base is not None %}
-                  <span class="roll-cost">{{ cost_sign }}{{ r.unit_cost_base|money }}</span>
-                  {% if r.line_value is not None %}
-                    <div style="font-size:10.5px;color:var(--gray-500);margin-top:2px;">{{ cost_sign }}{{ r.line_value|money }}</div>
-                  {% endif %}
                 {% else %}
-                  <span style="color:#C5CCD3;" title="{% blocktrans with n=product.item_noun %}No cost recorded for this {{ n }}.{% endblocktrans %}">—</span>
+                  <span class="roll-cost">{{ cost_sign }}{{ r.unit_cost_base|money }}</span>
+                  <div style="font-size:10.5px;color:var(--gray-500);margin-top:2px;">{{ cost_sign }}{{ r.line_value|money }}</div>
                 {% endif %}
               </td>
               <td>
@@ -864,7 +858,7 @@
                           data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
                           data-purchase="{{ r.purchase_number }}"
                           {% if not is_sales_rep %}
-                          data-cost="{% if r.posting_cost is not None %}{{ r.posting_cost|stringformat:'.6f' }}{% endif %}"
+                          data-cost="{{ r.unit_cost_base|stringformat:'.6f' }}"
                           data-purchase-price="{% if r.purchase_price is not None %}{{ r.purchase_price|stringformat:'.6f' }}{% endif %}"
                           data-purchase-currency="{{ r.purchase_currency }}"
                           {% endif %}
@@ -1517,7 +1511,6 @@
   let _rePurchasePrice = null;
   let _rePurchaseCurrency = '';
   const RE_COST_SIGN = "{{ cost_sign|escapejs }}";
-  const RE_SHOW_AMOUNTS = {% if is_sales_rep %}false{% else %}true{% endif %};
   const RE_ACC = {
     inventory: '1300 {% trans "Inventory" %}',
     marketing: '5110 {% trans "Marketing Expenses" %}',
@@ -1694,17 +1687,11 @@
     const flip = r.dir === 'any' && _reWhyDir === 'up';
     const dr = RE_ACC[flip ? r.cr : r.dr], cr = RE_ACC[flip ? r.dr : r.cr];
     const qty = Math.abs(_reDelta);
-    let amount = '', uncosted = false;
+    let amount = '';
     if (r.value === 'supplier') {
       if (_rePurchasePrice != null) amount = fmtNum(qty * _rePurchasePrice) + ' ' + _rePurchaseCurrency;
     } else if (_reCost != null) {
       amount = RE_COST_SIGN + fmtNum(qty * _reCost);
-    } else if (RE_SHOW_AMOUNTS) {
-      uncosted = true;
-    }
-    if (uncosted) {
-      body.innerHTML = '<p style="margin:0;">{% trans "This item has no cost on record, so the stock changes and nothing is posted." %}</p>';
-      return;
     }
     body.innerHTML =
       '<table>' +

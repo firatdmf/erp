@@ -647,8 +647,7 @@ class BookDetail(generic.DetailView):
         the cash boxes, customer accounts and shelves, is answered by the
         control-account checks shown under it (services_ledger.reconcile).
         """
-        from .services_ledger import (_inventory_value, balance_sheet,
-                                      cash_by_currency, reconcile)
+        from .services_ledger import balance_sheet, cash_by_currency, reconcile
 
         sheet = balance_sheet(book)
         groups = sheet["groups"]
@@ -696,7 +695,6 @@ class BookDetail(generic.DetailView):
                                "amount": c["base"]}
                               for c in cash_by_currency(book)]
 
-        _value, unvalued_items, unvalued_qty = _inventory_value(book)
         checks = reconcile(book)["rows"]
         return {
             "eq_assets_lines": asset_lines,
@@ -710,8 +708,6 @@ class BookDetail(generic.DetailView):
             "eq_balanced": sheet["balanced"],
             "eq_checks": checks,
             "eq_checks_ok": all(c["reconciled"] for c in checks),
-            "eq_unvalued_items": unvalued_items,
-            "eq_unvalued_qty": unvalued_qty,
         }
 
     def get_object(self):

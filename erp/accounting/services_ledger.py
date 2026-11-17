@@ -392,10 +392,7 @@ def subsidiary_equation(book):
     """Assets, liabilities and equity as the subsidiary ledgers have them.
 
     Every figure is base currency. Inventory is the stock standing in the
-    warehouses this book owns, valued at the purchase-invoice line where
-    there is one and the product's cost_usd otherwise; the rolls with
-    neither are counted beside the value, so an unvalued asset cannot
-    quietly read as a zero one.
+    warehouses this book owns, each item at its own cost (_inventory_value).
     """
     from django.contrib.contenttypes.models import ContentType
     from django.db.models import Count, F, DecimalField, ExpressionWrapper, Q
@@ -414,7 +411,7 @@ def subsidiary_equation(book):
     payable = -(current_account.filter(cached_balance__lt=0).aggregate(
         t=Sum("cached_balance"))["t"] or ZERO)
 
-    inventory, unvalued_rolls, unvalued_meters = _inventory_value(book)
+    inventory = _inventory_value(book)
     fixed = AssetFixedAsset.objects.filter(book=book).aggregate(
         t=Sum("value"))["t"] or ZERO
 
@@ -472,8 +469,6 @@ def subsidiary_equation(book):
         "receivable": receivable,
         "payable": payable,
         "inventory": inventory,
-        "unvalued_rolls": unvalued_rolls,
-        "unvalued_meters": unvalued_meters,
         "fixed": fixed,
         "assets": assets,
         "liabilities": payable,
@@ -493,23 +488,11 @@ def subsidiary_equation(book):
     }
 
 
-def _inventory_unit_cost():
-    """What one unit of a WarehouseProductItem is carried at on the
-    balance sheet: its own stamp, else its purchase-invoice line, else the
-    product's current cost. NULL when none says — uncosted, not zero.
-    stock_unit_cost in services_posting is the same rule for one item."""
-    from django.db.models import DecimalField, F
-    from django.db.models.functions import Coalesce
-    return Coalesce(F("unit_cost_base"),
-                    F("purchase_invoice_item__unit_price"),
-                    F("product__cost_usd"),
-                    output_field=DecimalField(max_digits=18, decimal_places=6))
-
-
 def _inventory_line_value():
-    """quantity_remaining × _inventory_unit_cost, per item."""
+    """quantity_remaining × unit_cost_base, per item: what it is carried
+    at on the balance sheet."""
     from django.db.models import DecimalField, ExpressionWrapper, F
-    return ExpressionWrapper(F("quantity_remaining") * _inventory_unit_cost(),
+    return ExpressionWrapper(F("quantity_remaining") * F("unit_cost_base"),
                              output_field=DecimalField(max_digits=18, decimal_places=6))
 
 
@@ -518,16 +501,13 @@ def inventory_average_cost(items):
     exactly the cost the balance sheet carries them at.
 
     Live items in a warehouse that belongs to a book only, so the value
-    here is a slice of some book's Inventory line. Items with no cost
-    basis stay out of both halves — counted in the divisor they would
-    pass for free stock. None when nothing costed is on the floor.
+    here is a slice of some book's Inventory line. None when nothing is
+    on the floor.
     """
     from django.db.models import DecimalField
     valued = (items.filter(status__in=("in_stock", "partial"),
                            product__warehouse__accounting_book__isnull=False)
-              .exclude(quantity_remaining=None)
-              .annotate(_unit_cost=_inventory_unit_cost())
-              .exclude(_unit_cost=None))
+              .exclude(quantity_remaining=None))
     totals = valued.aggregate(
         value=Sum(_inventory_line_value()),
         quantity=Sum("quantity_remaining",
@@ -538,7 +518,7 @@ def inventory_average_cost(items):
 
 
 def _inventory_value(book, warehouse=None):
-    """(value, unvalued roll count, unvalued meters) for a book's stock.
+    """The value of a book's stock, in base currency.
 
     `warehouse` narrows the same figure to one set of shelves. The book-wide
     answer is the sum of its warehouses, so scoping here is what lets a
@@ -555,16 +535,13 @@ def _inventory_value(book, warehouse=None):
     company carries a purchase_invoice_item, so the filter matched
     nothing and 100,888 meters of real fabric read as $0.00.
 
-    Cost is what the item itself was stamped with at intake, falling
-    back to the purchase-invoice line and then to the product's current
-    cost for items received before the stamp existed. The item's own
-    figure comes first because it is the only one that cannot move:
-    cost_usd is a last-purchase price and the intake path rewrites it on
-    every new batch, so valuing old stock by it revalues goods nobody
-    re-bought.
+    Cost is what the item itself was stamped with at intake
+    (unit_cost_base, which every item carries). It is the only figure that
+    cannot move: cost_usd is a last-purchase price and the intake path
+    rewrites it on every new batch, so valuing old stock by it revalues
+    goods nobody re-bought.
 
-    Only live items count — a consumed one is not an asset — and items
-    with no cost basis at all are counted, not guessed at.
+    Only live items count — a consumed one is not an asset.
 
     The value is not rounded to the cent. The ledger carries stock at the
     same precision (JournalLine.debit), and the two are compared exactly;
@@ -573,7 +550,7 @@ def _inventory_value(book, warehouse=None):
     try:
         from operating.models import WarehouseProductItem
     except ImportError:          # operating not installed — inventory is 0
-        return ZERO, 0, ZERO
+        return ZERO
 
     live = (WarehouseProductItem.objects
             .filter(product__warehouse__accounting_book=book,
@@ -583,14 +560,7 @@ def _inventory_value(book, warehouse=None):
         live = live.filter(product__warehouse=warehouse)
 
     total = live.aggregate(v=Sum(_inventory_line_value()))["v"] or ZERO
-
-    unvalued = live.filter(unit_cost_base=None, purchase_invoice_item=None,
-                           product__cost_usd=None)
-    return (
-        Decimal(total).quantize(EXACT),
-        unvalued.count(),
-        unvalued.aggregate(m=Sum("quantity_remaining"))["m"] or ZERO,
-    )
+    return Decimal(total).quantize(EXACT)
 
 
 # ---------------------------------------------------------------------------
@@ -681,7 +651,7 @@ def reconcile(book, date_to=None):
     def balance(code):
         return by_code.get(code, ZERO)
 
-    inventory, _unvalued, _meters = _inventory_value(book)
+    inventory = _inventory_value(book)
 
     rows = [
         {

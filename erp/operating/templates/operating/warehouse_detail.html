@@ -2916,7 +2916,7 @@
       amount = RS_COST_SIGN + fmtNum(qty * rsMatched.cost);
       note = ' {% filter escapejs %}{% trans "Valued at what this product already costs." %}{% endfilter %}';
     } else if (RS_SHOW_AMOUNTS) {
-      body.innerHTML = '<p style="margin:0;">{% filter escapejs %}{% trans "No cost is known for this item, so it is added to the stock and nothing is posted. Type a price to value it." %}{% endfilter %}</p>';
+      body.innerHTML = '<p style="margin:0;">{% filter escapejs %}{% trans "No cost is known for this item yet. Type its purchase price to add it." %}{% endfilter %}</p>';
       return;
     }
     body.innerHTML =

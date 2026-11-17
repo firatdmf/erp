@@ -48,12 +48,8 @@ page — the line itself has no single page to open.{% endcomment %}
         </div>
 
         <div class="wh-roll-cost">
-          {% if r.unit_cost_base is not None %}
-            {# A sales rep sees the price derived from the roll's cost, not the cost. #}
-            {% if is_sales_rep %}{{ cost_sign }}{{ r.unit_cost_base|sales_rep_price|money }}{% else %}{{ cost_sign }}{{ r.unit_cost_base|money }}{% endif %}
-          {% else %}
-            <span style="color:#C5CCD3;" title="{% blocktrans with n=product.item_noun %}No cost recorded for this {{ n }}.{% endblocktrans %}">&mdash;</span>
-          {% endif %}
+          {# A sales rep sees the price derived from the roll's cost, not the cost. #}
+          {% if is_sales_rep %}{{ cost_sign }}{{ r.unit_cost_base|sales_rep_price|money }}{% else %}{{ cost_sign }}{{ r.unit_cost_base|money }}{% endif %}
         </div>
 
         <div class="wh-roll-state">

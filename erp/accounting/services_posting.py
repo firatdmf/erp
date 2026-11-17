@@ -255,10 +255,7 @@ def _purchase_stock_value(movement, owed):
         return None
     value = ZERO
     for roll in rolls:
-        unit = stock_unit_cost(roll)
-        if unit is None:
-            return None
-        value += Decimal(roll.quantity or 0) * unit
+        value += Decimal(roll.quantity or 0) * Decimal(roll.unit_cost_base)
     lines = InvoiceItem.objects.filter(invoice_id=movement.source_id).count()
     gap = owed - value
     if gap == ZERO or abs(gap) > _HALF_CENT * lines:
@@ -552,7 +549,7 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
 
     Valued exactly as the balance sheet values it — each item at what it
     cost — so the ledger and _inventory_value cannot report two different
-    inventories. Items with no cost basis are outside both figures.
+    inventories.
 
     The contra is Opening Balance Equity, not a purchase: this stock was
     bought before the ledger existed and there is no payable left to
@@ -567,9 +564,9 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
     """
     from .services_ledger import _inventory_value
 
-    value, unvalued_count, unvalued_qty = _inventory_value(book, warehouse)
+    value = _inventory_value(book, warehouse)
     if value <= ZERO:
-        return None, unvalued_count, unvalued_qty
+        return None
     if description is None:
         description = ("Opening inventory" if warehouse is None
                        else f"Opening inventory — {warehouse.name}")
@@ -581,7 +578,7 @@ def post_opening_inventory(book, *, date, reference="", warehouse=None,
         source=source,
         reference=reference,
     )
-    return entry, unvalued_count, unvalued_qty
+    return entry
 
 
 class GoodsNotCapital(ValidationError):
@@ -597,7 +594,7 @@ def goods_capital_value(book, warehouse):
     less what its ledger holds, and never more than this warehouse has.
 
     Raises GoodsNotCapital, with the reason, where it cannot: the shelves
-    are empty or unvalued, or their stock is already in Inventory (1300)
+    are empty, or their stock is already in Inventory (1300)
     — bought through a purchase, or counted by an earlier entry — and
     booking it again would put the ledger above what exists.
     """
@@ -606,13 +603,13 @@ def goods_capital_value(book, warehouse):
     from .models_ledger import JournalLine
     from .services_ledger import _inventory_value
 
-    value, _n, _q = _inventory_value(book, warehouse)
+    value = _inventory_value(book, warehouse)
     if value <= ZERO:
         raise GoodsNotCapital(
             _g("%(warehouse)s holds no stock with a cost, so there is nothing "
                "to book. Add the goods to the warehouse first.")
             % {"warehouse": warehouse.name})
-    shelves, _n, _q = _inventory_value(book)
+    shelves = _inventory_value(book)
     rows = JournalLine.objects.filter(entry__book=book, account__code="1300")
     totals = rows.aggregate(d=Sum("debit"), c=Sum("credit"))
     ledger = (totals["d"] or ZERO) - (totals["c"] or ZERO)
@@ -1208,23 +1205,18 @@ UNPURCHASED_STOCK_CONTRA = {
 def stock_unit_cost(item, product=None):
     """What one unit of this stock cost, or None when nothing says.
 
-    The same precedence the balance sheet values stock at
-    (services_ledger._inventory_value), so the cost taken out on a sale is
-    the cost that was carried: the item's own stamp first, because it
-    cannot move, then the purchase line it arrived on, then the product's
-    current cost for items received before the stamp existed.
+    An item's cost is its own unit_cost_base, which every item carries —
+    the figure the balance sheet values it at (services_ledger
+    ._inventory_value), so the cost taken out on a sale is the cost that
+    was carried.
 
-    None means uncosted. Nothing is posted for those rather than a zero
-    being invented — the balance sheet counts them the same way, and the
-    unvalued count beside it is what says how much stock that is.
+    With no item — a movement logged against the stock row alone, or one
+    whose item has since been deleted — it is the product's current cost,
+    and None when the product has none: nothing is posted rather than a
+    zero being invented.
     """
     if item is not None:
-        if item.unit_cost_base is not None:
-            return Decimal(item.unit_cost_base)
-        line = item.purchase_invoice_item
-        if line is not None and line.unit_price is not None:
-            return Decimal(line.unit_price)
-        product = product or item.product
+        return Decimal(item.unit_cost_base)
     if product is not None and product.cost_usd is not None:
         return Decimal(product.cost_usd)
     return None

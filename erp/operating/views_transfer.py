@@ -22,7 +22,6 @@ from django.views import View
 
 from accounting.models_transfer import StockTransfer
 from accounting.services_accounts import member_books, member_can_use_book
-from accounting.services_posting import stock_unit_cost
 from accounting.services_stock_transfer import (
     TransferError, receiving_account, roll_problem, transfer_stock, undo_stock_transfer,
 )
@@ -65,7 +64,7 @@ def _targets(request, warehouse):
 def _roll_row(roll):
     left = roll.quantity_remaining if roll.quantity_remaining is not None else roll.quantity
     left = Decimal(left or 0)
-    cost = stock_unit_cost(roll)
+    cost = roll.unit_cost_base
     problem = roll_problem(roll)
     return {
         "id": roll.pk,
@@ -74,8 +73,8 @@ def _roll_row(roll):
         "name": roll.product.name or "",
         "quantity": float(left),
         "unit": roll.product.unit_short,
-        "unit_cost": float(cost) if cost is not None else None,
-        "value": float(left * cost) if cost is not None else None,
+        "unit_cost": float(cost),
+        "value": float(left * cost),
         "problem": str(problem) if problem else "",
     }
 

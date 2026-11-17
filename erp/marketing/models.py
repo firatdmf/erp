@@ -1004,31 +1004,29 @@ class ProductVariant(models.Model):
     @property
     def live_cost(self):
         """What this variant costs now: the stock's average while there is
-        priced stock, the stored cost otherwise. None if neither."""
+        stock, the stored cost otherwise. None if neither."""
         stock = self.stock_cost
         return stock if stock is not None else self.variant_cost
 
 
-def _priced_stock():
-    """The stock items a cost can be read from: on the floor, with a cost.
-    The same rule as WarehouseProduct._stock_cost_exprs — quantity with no
-    cost in the divisor would report stock cheaper than anything held."""
+def _stock_on_hand():
+    """The stock items a cost is read from: the ones on the floor.
+    The same rule as WarehouseProduct._stock_cost_exprs."""
     from django.apps import apps
     return (apps.get_model("operating", "WarehouseProductItem").objects
             .filter(status__in=("in_stock", "partial"),
-                    unit_cost_base__isnull=False,
                     quantity_remaining__gt=0))
 
 
 def stock_costs(variant_ids):
-    """{variant_id: weighted average cost of its priced stock on hand},
+    """{variant_id: weighted average cost of its stock on hand},
     across every warehouse that holds it. Variants with none are absent.
 
     In base currency, as each item's unit_cost_base is — every book is USD
     today, which is what lets two books' rolls be averaged at all."""
     from django.db.models import DecimalField, F, Sum
     _dec = DecimalField(max_digits=20, decimal_places=6)
-    rows = (_priced_stock()
+    rows = (_stock_on_hand()
             .filter(product__catalog_variant_id__in=list(variant_ids))
             .values("product__catalog_variant_id")
             .annotate(value=Sum(F("quantity_remaining") * F("unit_cost_base"), output_field=_dec),
@@ -1056,7 +1054,7 @@ def live_cost_expr(path=""):
     from django.db.models.functions import Coalesce
     _dec = DecimalField(max_digits=20, decimal_places=6)
     key = f"{path}pk" if path else "pk"
-    held = (_priced_stock().filter(product__catalog_variant=OuterRef(key))
+    held = (_stock_on_hand().filter(product__catalog_variant=OuterRef(key))
             .values("product__catalog_variant")
             .annotate(c=Sum(F("quantity_remaining") * F("unit_cost_base"), output_field=_dec)
                       / Sum("quantity_remaining", output_field=_dec))

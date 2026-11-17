@@ -9728,6 +9728,9 @@ msgstr "Alış fiyatını yazın: %(sku)s için henüz maliyet yok."
 msgid "A stock item needs its cost: %(item)s has none."
 msgstr "Her stok kaleminin maliyeti olmalı: %(item)s için maliyet yok."
 
+msgid "No cost is known for this item yet. Type its purchase price to add it."
+msgstr "Bu kalemin henüz maliyeti yok. Eklemek için alış fiyatını yazın."
+
 #, python-format
 msgid "product %(n)s"
 msgstr "ürün %(n)s"

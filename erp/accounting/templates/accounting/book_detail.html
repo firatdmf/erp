@@ -446,8 +446,7 @@
       {% for c in eq_checks %}
       <div class="eq-check {% if c.reconciled %}ok{% else %}bad{% endif %}">
         <i class="fas {% if c.reconciled %}fa-check-circle{% else %}fa-circle-exclamation{% endif %}"></i>
-        <span class="eq-check-label">{% trans c.label %}{% if c.label == "Inventory" and eq_unvalued_items %}
-          <small>({% blocktrans count counter=eq_unvalued_items %}{{ counter }} unpriced{% plural %}{{ counter }} unpriced{% endblocktrans %})</small>{% endif %}</span>
+        <span class="eq-check-label">{% trans c.label %}</span>
         <span class="eq-check-figs">
           {% trans "ledger" %} {{ c.ledger|format_money }} · {% trans "records" %} {{ c.subsidiary|format_money }}
           {% if not c.reconciled %}· <strong>{% trans "off by" %} {{ c.difference|format_money }}</strong>{% endif %}

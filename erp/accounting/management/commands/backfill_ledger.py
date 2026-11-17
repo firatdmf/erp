@@ -118,9 +118,9 @@ class Command(BaseCommand):
                     w(f"  posted {cash_posted} cash event(s)")
 
                 inv = reclass = None
-                unvalued_n, unvalued_qty, reclass_n = 0, 0, 0
+                reclass_n = 0
                 if "Opening inventory" not in already:
-                    inv, unvalued_n, unvalued_qty = post_opening_inventory(
+                    inv = post_opening_inventory(
                         book, date=cutover, reference=ref)
                 if "Reclassify credit balances to accounts payable" not in already:
                     reclass, reclass_n = reclassify_payables(
@@ -133,10 +133,6 @@ class Command(BaseCommand):
                         f"in services_posting.CONTRA_BY_TYPE"))
                 if inv:
                     w(f"  opening inventory: {inv.lines.first().debit}")
-                if unvalued_n:
-                    w(self.style.WARNING(
-                        f"  {unvalued_n} items ({unvalued_qty}) carry no cost "
-                        f"and are outside that figure"))
                 if reclass:
                     w(f"  reclassified {reclass_n} credit-balance accounts")
 

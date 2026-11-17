@@ -7267,7 +7267,6 @@ class WarehouseProductDetail(View):
         # Aggregate quick stats — in/out totals in a single query.
         from django.db.models import Sum, Q as _Q
         from decimal import Decimal as _Dec
-        from accounting.services_posting import stock_unit_cost
         from .models import OrderStockReservation
         _io = product.movements.aggregate(
             i=Sum("quantity", filter=_Q(movement_type="in")),
@@ -7310,21 +7309,14 @@ class WarehouseProductDetail(View):
             _purchase = _purchase_behind(r)
             r.purchase_number = _purchase.display_number if _purchase else ""
             # What the edit box needs to show the entry a change will post
-            # before it is saved: the cost the ledger will take the item at
-            # (the same lookup the posting makes), and for a supplier's
-            # correction the price the purchase bills it at.
-            r.posting_cost = stock_unit_cost(r, product)
+            # before it is saved, besides the item's own cost: for a
+            # supplier's correction, the price the purchase bills it at.
             r.purchase_price = r.purchase_invoice_item.unit_price if _purchase else None
             r.purchase_currency = _purchase.currency.code if _purchase else ""
             # What the quantity still on this item is worth, at what the
-            # item itself cost. None where no cost was ever recorded — the
-            # template shows a dash there, because an item nobody priced
-            # is not an item worth nothing.
+            # item itself cost.
             _left = r.quantity_remaining if r.quantity_remaining is not None else r.quantity
-            r.line_value = (
-                (_left or _Dec("0")) * r.unit_cost_base
-                if r.unit_cost_base is not None else None
-            )
+            r.line_value = (_left or _Dec("0")) * r.unit_cost_base
 
         return render(request, self.template_name, {
             "warehouse": warehouse,

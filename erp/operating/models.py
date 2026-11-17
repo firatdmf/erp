@@ -1998,13 +1998,6 @@ class Warehouse(models.Model):
         shelf, and the headline moved without a meter going anywhere. This
         is the same expression accounting.services_ledger._inventory_value
         counts, so the warehouse page and the balance sheet cannot drift.
-
-        Items with no cost are left out rather than valued through the
-        product's purchase_price, which is what the old expression did —
-        that made 21 items across the install carry a value the ledger
-        would not recognise. They are counted as unvalued on the balance
-        sheet instead, where a missing cost is visible rather than
-        guessed at.
         """
         from decimal import Decimal
         from django.db.models import Sum, F, DecimalField
@@ -2013,7 +2006,6 @@ class Warehouse(models.Model):
         return WarehouseProductItem.objects.filter(
             product__warehouse_id__in=self.scope_ids(),
             status__in=("in_stock", "partial"),
-            unit_cost_base__isnull=False,
             quantity_remaining__isnull=False,
         ).aggregate(
             usd=Coalesce(
@@ -2259,32 +2251,27 @@ class WarehouseProduct(models.Model):
         A stored average would fall out of step with the shelf at the
         first one anybody forgot, which is the failure this whole
         exercise exists to end. Derived, it cannot.
-
-        Only priced items count, in both halves: quantity with no cost
-        in the denominator would report stock cheaper than anything
-        actually on the floor.
         """
         from django.db.models import DecimalField, F, OuterRef, Subquery, Sum
         _dec = DecimalField(max_digits=20, decimal_places=4)
-        priced = (WarehouseProductItem.objects
-                  .filter(product=OuterRef("pk"),
-                          status__in=("in_stock", "partial"),
-                          unit_cost_base__isnull=False,
-                          quantity_remaining__isnull=False)
-                  .values("product"))
+        on_floor = (WarehouseProductItem.objects
+                    .filter(product=OuterRef("pk"),
+                            status__in=("in_stock", "partial"),
+                            quantity_remaining__isnull=False)
+                    .values("product"))
         value = Subquery(
-            priced.annotate(v=Sum(F("quantity_remaining") * F("unit_cost_base"),
+            on_floor.annotate(v=Sum(F("quantity_remaining") * F("unit_cost_base"),
                                   output_field=_dec)).values("v")[:1],
             output_field=_dec)
         meters = Subquery(
-            priced.annotate(m=Sum("quantity_remaining", output_field=_dec))
+            on_floor.annotate(m=Sum("quantity_remaining", output_field=_dec))
                   .values("m")[:1],
             output_field=_dec)
         return value, meters
 
     @staticmethod
     def _last_cost_expr():
-        """What the most recently received priced item cost, whatever its
+        """What the most recently received item cost, whatever its
         status — sold and consumed items keep their unit_cost_base.
 
         Shown in place of the average once nothing is left on the floor,
@@ -2294,7 +2281,7 @@ class WarehouseProduct(models.Model):
         from django.db.models import DecimalField, OuterRef, Subquery
         return Subquery(
             WarehouseProductItem.objects
-            .filter(product=OuterRef("pk"), unit_cost_base__isnull=False)
+            .filter(product=OuterRef("pk"))
             .order_by("-scanned_at", "-id")
             .values("unit_cost_base")[:1],
             output_field=DecimalField(max_digits=20, decimal_places=4))

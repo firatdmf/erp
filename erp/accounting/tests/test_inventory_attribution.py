@@ -42,7 +42,6 @@ class InventoryAttribution(TestCase):
         self._roll(self.fabrika, Decimal("100.00"), Decimal("3.7350"))
         subs = subsidiary_equation(self.ergene)
         self.assertEqual(subs["inventory"], Decimal("373.50"))
-        self.assertEqual(subs["unvalued_rolls"], 0)
 
     def test_stock_belongs_to_the_warehouse_owner_only(self):
         self._roll(self.fabrika, Decimal("100.00"), Decimal("3.7350"))

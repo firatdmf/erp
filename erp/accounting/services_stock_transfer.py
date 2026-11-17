@@ -59,16 +59,12 @@ def _left(roll):
 
 def roll_problem(roll):
     """Why this roll can't be transferred, or None when it can."""
-    from .services_posting import stock_unit_cost
-
     if roll.status == "consumed" or _left(roll) <= 0:
         return _("used up")
     if _left(roll) != Decimal(roll.quantity or 0) or roll.movements.filter(movement_type="out").exists():
         return _("part of it has been used")
     if roll.reservations.exists():
         return _("held for an order")
-    if stock_unit_cost(roll) is None:
-        return _("has no cost")
     return None
 
 
@@ -108,7 +104,7 @@ def transfer_stock(from_warehouse, to_warehouse, roll_ids, *, user=None, member=
     from operating.views_warehouse import _move_roll
     from .purchase_audit import log_purchase
     from .services_accounts import create_purchase_invoice_for_intake, invoice_currency_for
-    from .services_posting import post_movement, post_stock_transfer, stock_unit_cost
+    from .services_posting import post_movement, post_stock_transfer
 
     from_book = from_warehouse.accounting_book
     to_book = to_warehouse.accounting_book
@@ -165,7 +161,7 @@ def transfer_stock(from_warehouse, to_warehouse, roll_ids, *, user=None, member=
         source_wp = roll.product
         if source_wp.pk not in targets:
             targets[source_wp.pk] = _target_product(source_wp, to_warehouse)
-        cost = stock_unit_cost(roll)
+        cost = roll.unit_cost_base
         groups.setdefault((source_wp.pk, cost), []).append(roll)
 
     purchase_lines = []

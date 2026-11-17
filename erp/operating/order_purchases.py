@@ -236,9 +236,8 @@ def known_line_costs_for(orders):
     orders in a few queries (a report reads hundreds):
 
       1. the rolls held for the line (its reservations, kept after the
-         order ships), each at its own cost — the ledger's rule
-         (services_posting.stock_unit_cost), so the order shows the cost
-         its shipping posts;
+         order ships), each at its own unit_cost_base — what its
+         shipping posts;
       2. what a purchase still on its way in for an open order brings for
          the line's variant, at that purchase's price turned into base as
          the receipt will stamp it on the rolls (views_warehouse.
@@ -246,12 +245,11 @@ def known_line_costs_for(orders):
          published rate). Several purchases are weighted by quantity.
 
     line_unit_cost takes these in turn up to the line's quantity and
-    prices whatever is left at the variant's catalog cost. A roll or a
-    purchase row with no cost, or no rate into base, is left out.
+    prices whatever is left at the variant's catalog cost. A purchase row
+    with no cost, or no rate into base, is left out.
     `orders` are Order instances or pks."""
     from accounting.models_accounts import Invoice
     from accounting.services_accounts import invoice_currency_for
-    from accounting.services_posting import stock_unit_cost
     from .models import Order, OrderItem, OrderStockReservation
     from .views_warehouse import _PurchaseRates, _purchase_costs, _purchase_price
 
@@ -265,12 +263,11 @@ def known_line_costs_for(orders):
 
     held = (OrderStockReservation.objects
             .filter(order_id__in=ids, order_item_id__isnull=False)
-            .select_related("stock_item__purchase_invoice_item", "stock_item__product"))
+            .select_related("stock_item"))
     for r in held:
-        cost = stock_unit_cost(r.stock_item)
-        if r.order_item_id not in parts or cost is None or not r.quantity or r.quantity <= 0:
+        if r.order_item_id not in parts or not r.quantity or r.quantity <= 0:
             continue
-        parts[r.order_item_id].append((r.quantity, cost))
+        parts[r.order_item_id].append((r.quantity, Decimal(r.stock_item.unit_cost_base)))
         covered[r.order_item_id] += r.quantity
 
     open_ids = (Order.objects.filter(pk__in=ids)

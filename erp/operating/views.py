@@ -3031,10 +3031,9 @@ def free_rolls_response(request, books):
             # What the quantity and the cost are counted in: meters for
             # cloth, but a box of ready-made curtains is packs.
             "unit": roll.product.unit_short if roll.product else "",
-            **({"unit_cost": float(roll.unit_cost) if roll.unit_cost is not None else None}
+            **({"unit_cost": float(roll.unit_cost)}
                if show_cost else
-               {"unit_price": (float(sales_rep_price(roll.unit_cost))
-                               if roll.unit_cost is not None else None)}),
+               {"unit_price": float(sales_rep_price(roll.unit_cost))}),
         })
     from accounting.models_accounts import _base_currency_symbol
     # One card is one SKU, so what is true of its first stock item is
@@ -3075,8 +3074,8 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
     leaves second-quality items out;
     `first_book`'s shelves come before the rest, oldest first within
     each, so the cap never hides that book's stock behind another's."""
-    from django.db.models import DecimalField, F, Q
-    from django.db.models.functions import Coalesce, TruncDate
+    from django.db.models import F, Q
+    from django.db.models.functions import TruncDate
     from .models import WarehouseProductItem
     # OLDEST first — FIFO. Fabric that has sat longest goes out first
     # instead of ageing on the shelf behind items scanned last week.
@@ -3101,15 +3100,10 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
     # genuinely are not interchangeable.
     #
     # Cost breaks what is left — two items entered the same day with no
-    # barcode on either — and the basis is the one the balance sheet
-    # values this item at (see accounting.services_ledger
-    # ._inventory_value) — the purchase-invoice line where there is one,
-    # the product's cost otherwise — so the list and the books never
-    # disagree about what an item costs.
-    unit_cost = Coalesce(
-        F("unit_cost_base"), F("purchase_invoice_item__unit_price"),
-        F("product__cost_usd"),
-        output_field=DecimalField(max_digits=18, decimal_places=6))
+    # barcode on either — and the basis is the item's own unit_cost_base,
+    # what the balance sheet values it at (accounting.services_ledger
+    # ._inventory_value), so the list and the books never disagree about
+    # what an item costs.
     rolls = (
         WarehouseProductItem.objects
         .select_related("product", "product__warehouse",
@@ -3124,13 +3118,13 @@ def free_stock_items(sku, books, exclude_order_id=None, limit=None, on_storefron
         # the cheapest-first list put the other book's stock first.
         .filter(product__warehouse__accounting_book__in=books)
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
-        .annotate(unit_cost=unit_cost)
+        .annotate(unit_cost=F("unit_cost_base"))
     )
     if on_storefront:
         # Second-quality items are sold in person, never offered online.
         rolls = rolls.filter(product__warehouse__on_storefront=True, is_second=False)
     order = [TruncDate("scanned_at"), F("barcode").asc(nulls_last=True),
-             F("unit_cost").asc(nulls_last=True), "pk"]
+             "unit_cost", "pk"]
     if first_book:
         order.insert(0, _book_first(first_book))
     rolls = rolls.order_by(*order)

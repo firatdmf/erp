@@ -114,7 +114,7 @@ def attach_live_prices(products):
 def book_costs(variant_ids):
     """{(variant_id, book_id): weighted-average unit cost of that book's
     stock of the variant}, valued exactly as that book's balance sheet
-    carries it (services_ledger._inventory_unit_cost). One query.
+    carries it (services_ledger._inventory_line_value). One query.
 
     An order is billed to one book and ships off that book's shelves, so
     its price is worked out from what THAT book's stock cost — Laleli's
@@ -122,15 +122,13 @@ def book_costs(variant_ids):
     prices (decided 2026-10-15).
     """
     from django.db.models import DecimalField, Sum
-    from accounting.services_ledger import _inventory_line_value, _inventory_unit_cost
+    from accounting.services_ledger import _inventory_line_value
     from operating.models import WarehouseProductItem
     rows = (WarehouseProductItem.objects
             .filter(product__catalog_variant_id__in=list(variant_ids),
                     status__in=("in_stock", "partial"),
                     product__warehouse__accounting_book__isnull=False)
             .exclude(quantity_remaining=None)
-            .annotate(_unit_cost=_inventory_unit_cost())
-            .exclude(_unit_cost=None)
             .values("product__catalog_variant_id", "product__warehouse__accounting_book_id")
             .annotate(value=Sum(_inventory_line_value()),
                       quantity=Sum("quantity_remaining",

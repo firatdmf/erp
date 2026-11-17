@@ -513,7 +513,7 @@ class AWarehouseOpenedAfterTheCutover(TestCase):
 
     def test_the_gap_is_the_unposted_warehouse(self):
         from accounting.services_ledger import _inventory_value
-        shelves, _n, _q = _inventory_value(self.book)
+        shelves = _inventory_value(self.book)
         self.assertEqual(shelves - self._inventory(), Decimal("150.00"))
 
     def test_a_dry_run_writes_nothing(self):
@@ -526,7 +526,7 @@ class AWarehouseOpenedAfterTheCutover(TestCase):
         from accounting.services_ledger import _inventory_value
         self._run("--warehouse", str(self.readymade.pk),
                   "--date", "2026-09-08", "--apply")
-        shelves, _n, _q = _inventory_value(self.book)
+        shelves = _inventory_value(self.book)
         self.assertEqual(self._inventory(), shelves)
         self.assertEqual(self._inventory(), Decimal("550.00"))
 

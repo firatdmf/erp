@@ -278,16 +278,15 @@ def _subsidiary_ledgers(book, rec):
     ]
 
     # ── Warehouse stock: one line per warehouse this book owns ───────
-    stock_lines, unvalued = [], 0
+    stock_lines = []
     try:
         from operating.models import Warehouse
         warehouses = Warehouse.objects.filter(accounting_book=book).order_by("name")
     except ImportError:
         warehouses = []
     for warehouse in warehouses:
-        value, missing, _qty = _inventory_value(book, warehouse=warehouse)
-        unvalued += missing
-        if value or missing:
+        value = _inventory_value(book, warehouse=warehouse)
+        if value:
             stock_lines.append({
                 "label": warehouse.name, "amount": value,
                 "url": reverse("operating:warehouse_detail", args=[warehouse.pk]),
@@ -315,7 +314,6 @@ def _subsidiary_ledgers(book, rec):
              what=_("Every stock item on the shelves, at its cost."),
              controls=[("1300", names.get("1300", ""))],
              lines=stock_lines,
-             unvalued=unvalued,
              url=reverse("operating:warehouse_list"),
              url_label=_("Open the warehouses")),
     ]

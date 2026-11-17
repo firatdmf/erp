@@ -166,7 +166,7 @@ class ProductCostFieldTest(TestCase):
 
     def test_the_figure_is_the_balance_sheet_value_over_the_quantity(self):
         from accounting.services_ledger import _inventory_value
-        value, _n, _q = _inventory_value(Book.objects.get(name="Laleli Fabric"))
+        value = _inventory_value(Book.objects.get(name="Laleli Fabric"))
         self.assertEqual(self._form(self.product).variants_cost,
                          (value / Decimal("400")).quantize(Decimal("0.0001")))
 

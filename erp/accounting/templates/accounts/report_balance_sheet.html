@@ -256,15 +256,6 @@ They are never totalled into an equation of their own: they hold no equity.
         {{ l.why }}
       </div>
       {% endif %}
-      {% if l.unvalued %}
-      <div class="bs-sl-gap">
-        {% blocktrans trimmed count n=l.unvalued %}
-          {{ n }} stock item has no cost and is counted at zero.
-        {% plural %}
-          {{ n }} stock items have no cost and are counted at zero.
-        {% endblocktrans %}
-      </div>
-      {% endif %}
 
       <a class="bs-sl-open" href="{{ l.url }}">{{ l.url_label }}<i data-lucide="arrow-right"></i></a>
     </div>

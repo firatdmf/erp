@@ -47,9 +47,10 @@ jobs:
       DB_PORT: "5432"
 
     steps:
-      - uses: actions/checkout@v4
+      # Both on Node.js 24; their v4/v5 ran on Node.js 20, which GitHub retires.
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # Pinned to erp/runtime.txt, which is what Railway builds with.
           python-version: "3.12.1"

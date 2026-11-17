@@ -218,6 +218,31 @@ class PaidAtTheCounter(TestCase):
         self.assertIsNone(order.counter_gap())
         self._square(order)
 
+    def test_saving_the_edit_completes_it_again_and_settles(self):
+        # A retail sale is over when it is saved, as when it was made: no
+        # separate Complete to forget, nothing left on Retail Sales.
+        order, _detail = self._reopened()
+        item = order.items.get()
+        self.client.post(reverse("operating:edit_order", kwargs={"pk": order.pk}), {
+            "customer_type": "retail", "book": self.book.pk,
+            "product_json_input": json.dumps([{
+                "item_no": 1, "item_id": item.pk, "product": {"sku": EAN, "variant": True},
+                "description": "", "quantity": 2, "outsourced": 0, "price": 10000,
+                "is_custom_curtain": False,
+                # The form sends the line's whole set of holds, kept ones too.
+                "rolls": [{"barcode": f"#{self.batch.pk}", "quantity": 2, "book": self.book.pk}],
+            }]),
+            "adjustments_json": json.dumps([{"label": "Discount", "amount": "-1500"}]),
+        })
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.billable_value(), Decimal("18500.00"))
+        refund = Payment.objects.get(type="refund_in")
+        self.assertEqual((refund.amount, refund.cash_account), (Decimal("1500.00"), self.tenge))
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.quantity_remaining, Decimal("3"))
+        self._square(order)
+
     def test_completing_again_unchanged_moves_no_money(self):
         order, detail = self._reopened()
         self.client.post(detail, {"action": "update_status", "order_status": "shipped"})

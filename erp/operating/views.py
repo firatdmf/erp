@@ -5273,6 +5273,25 @@ class OrderEdit(UpdateView):
                     messages.warning(self.request, f"Order updated but current account sync had an issue: {_e}")
 
                 messages.success(self.request, "Order updated successfully.")
+
+                # A retail sale is over when it is saved, as when it was
+                # made (OrderCreate): a reopened one is completed again
+                # here, and its counter money settled with it — nothing
+                # left half-edited, nothing left on Retail Sales.
+                if (self.object.is_retail_order
+                        and self.object.order_status not in _SHIPPED_CLASS):
+                    from django.utils.translation import gettext as _g
+                    from .views_warehouse import apply_order_status_change
+                    done, code = apply_order_status_change(
+                        self.object, "shipped", user=self.request.user,
+                        require_cargo_for_ship=False)
+                    if done:
+                        messages.success(self.request, _g("Retail sale completed again."))
+                        _counter_settled_notice(self.request, self.object)
+                    else:
+                        messages.warning(self.request, _g(
+                            "The retail sale was saved but not completed (%(reason)s) — "
+                            "complete it from the order page.") % {"reason": code})
                 if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return JsonResponse({
                         "success": True,

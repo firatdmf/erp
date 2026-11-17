@@ -16546,3 +16546,16 @@ msgstr "Cari hesaplar ve müşteriler iznine sahip olmayanlara verilir."
 #, python-format
 msgid "<b>%(cur)s%(amount)s</b> is given back from <b>%(box)s</b>"
 msgstr "<b>%(cur)s%(amount)s</b> <b>%(box)s</b> kasasından iade edilir"
+
+#: operating/views.py
+msgid "Retail sale completed again."
+msgstr "Perakende satış yeniden tamamlandı."
+
+#: operating/views.py
+#, python-format
+msgid ""
+"The retail sale was saved but not completed (%(reason)s) — complete it from "
+"the order page."
+msgstr ""
+"Perakende satış kaydedildi ama tamamlanmadı (%(reason)s) — sipariş "
+"sayfasından tamamlayın."

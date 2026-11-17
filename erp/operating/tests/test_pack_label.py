@@ -111,6 +111,37 @@ class PackLabel(TestCase):
         self.assertEqual(resp.status_code, 200)
         return drawn, [call.args[0] for call in brand_name_for.call_args_list]
 
+    def _right_aligned(self, url):
+        """The texts a label print link draws right-aligned."""
+        from reportlab.pdfgen.canvas import Canvas
+        drawn = []
+        real = Canvas.drawRightString
+
+        def spy(canvas, x, y, text, *args, **kwargs):
+            drawn.append(text)
+            return real(canvas, x, y, text, *args, **kwargs)
+
+        with patch.object(Canvas, "drawRightString", spy):
+            self.assertEqual(self.client.get(url).status_code, 200)
+        return drawn
+
+    def test_a_weighed_package_label_carries_its_weight(self):
+        self.pack1.gross_kg = Decimal("24.5")
+        self.pack1.save(update_fields=["gross_kg"])
+        url = reverse("operating:order_pack_labels", kwargs={"pk": self.order.pk})
+        drawn = self._right_aligned(url)
+        self.assertIn("24.50 kg", drawn)
+        # The package not weighed shows no weight at all, not "0 kg".
+        self.assertEqual([t for t in drawn if t.endswith(" kg")], ["24.50 kg"])
+
+    def test_a_heavy_package_of_many_still_shows_its_whole_weight(self):
+        self.pack1.gross_kg = Decimal("999.99")
+        self.pack1.pack_number = 99
+        self.pack1.save(update_fields=["gross_kg", "pack_number"])
+        drawn = self._right_aligned(
+            reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk}))
+        self.assertIn("999.99 kg", drawn)
+
     def test_a_package_label_carries_the_business_name(self):
         url = reverse("operating:pack_label", kwargs={"pack_pk": self.pack1.pk})
         self.assertIn("Karven", self._printed(url)[0])

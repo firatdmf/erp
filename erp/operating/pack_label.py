@@ -218,8 +218,25 @@ def labels_pdf_bytes(packs, title, link=None, brand=None):
                 c.setFont(bold, size)
                 c.drawString(x, top - 4.3 * mm, fit(parts[0], bold, size, room))
                 c.drawString(x, top - 6.7 * mm, fit(parts[1], bold, size, room))
-            c.setFont(bold, 11)
-            c.drawString(x, top - 13 * mm, f"{pack.pack_number} / {of}")
+            # The package's weight on the scale, right of "3 / 12": it is
+            # the package's, not any product's in it. Packages are weighed
+            # before their label prints; one not weighed shows nothing,
+            # never "0 kg". Too little room shrinks the weight, then the
+            # number, and never cuts the weight off.
+            of_text = f"{pack.pack_number} / {of}"
+            num_size = 11
+            if pack.gross_kg is not None:
+                kg_text = f"{pack.gross_kg:.2f} kg"
+                gap = 1.5 * mm
+                kg_size = shrink(kg_text, bold, 7.5,
+                                 room - gap - c.stringWidth(of_text, bold, num_size), 5.5)
+                while num_size > 7 and (c.stringWidth(of_text, bold, num_size) + gap
+                                        + c.stringWidth(kg_text, bold, kg_size)) > room:
+                    num_size -= 0.25
+                c.setFont(bold, kg_size)
+                c.drawRightString(PW - M, top - 13 * mm, kg_text)
+            c.setFont(bold, num_size)
+            c.drawString(x, top - 13 * mm, of_text)
 
             rule = top - qsize - 1.4 * mm
             c.setLineWidth(0.5)

@@ -19,7 +19,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from crm.models import Company, Contact, Supplier
+from crm.models import Company, Contact
 
 
 class CrmLinkPicker(TestCase):
@@ -131,7 +131,6 @@ class CrmLinkPicker(TestCase):
         self._link(action="create", kind="supplier", name="Karven Mensucat")
         self.current_account.refresh_from_db()
         self.assertEqual(self.current_account.contact.name, "Gürhan")
-        self.assertFalse(Supplier.objects.exists())
 
     def test_a_duplicate_company_name_is_refused_not_silently_reused(self):
         """Company.name is unique. Attaching to someone else's company
@@ -210,7 +209,6 @@ class CrmLinkPicker(TestCase):
     def test_search_covers_contacts_and_companies(self):
         Contact.objects.create(name="Karven Ahmet")
         Company.objects.create(name="Karven Tekstil")
-        Supplier.objects.create(company_name="Karven Mensucat")
         kinds = {r["kind"] for r in self._search("karven")}
         self.assertEqual(kinds, {"contact", "company"})
 
@@ -342,9 +340,3 @@ class CrmLinkFilter(TestCase):
 
     def test_unfiltered_shows_both(self):
         self.assertEqual(self._codes(), {"00554", "00555"})
-
-    def test_a_supplier_link_counts_as_linked_too(self):
-        CurrentAccount.objects.create(
-            book=self.book, code="00556", name="Mill", default_currency=self.usd,
-            supplier=Supplier.objects.create(company_name="Mill"))
-        self.assertEqual(self._codes(crm="linked"), {"00555", "00556"})

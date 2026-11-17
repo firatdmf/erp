@@ -18,7 +18,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounting.models_accounts import CurrentAccount
-from crm.models import Contact, Note, Supplier
+from crm.models import Contact, Note
 
 # Single-valued fields the survivor adopts only where it has nothing of
 # its own. `name` is deliberately absent — pass --name to change it.
@@ -86,8 +86,6 @@ class Command(BaseCommand):
 
             moved_accounts = CurrentAccount.objects.filter(contact=dup).update(contact=survivor)
             moved_notes = Note.objects.filter(contact=dup).update(contact=survivor)
-            moved_suppliers = Supplier.objects.filter(
-                linked_contact=dup).update(linked_contact=survivor)
 
             filled = []
             for field in FILL_FIELDS:
@@ -104,7 +102,7 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 f"  #{dup.pk} {dup.name!r}: accounts {moved_accounts}, notes {moved_notes}, "
-                f"suppliers {moved_suppliers}, adopted {sorted(set(filled)) or 'nothing'}"
+                f"adopted {sorted(set(filled)) or 'nothing'}"
             )
             dup.delete()
 

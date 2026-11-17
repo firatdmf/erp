@@ -62,12 +62,12 @@ def _pass_name_to_accounts(sender, instance, **kwargs):
     name = (getattr(instance, instance.unique_name_field) or "").strip()
     if not name:
         return
-    field = {"Contact": "contact", "Company": "company", "Supplier": "supplier"}[sender.__name__]
+    field = {"Contact": "contact", "Company": "company"}[sender.__name__]
     (CurrentAccount.objects.filter(**{field: instance}).exclude(name=name)
      .update(name=name))
 
 
-for _model in ("Contact", "Company", "Supplier"):
+for _model in ("Contact", "Company"):
     post_save.connect(_pass_name_to_accounts, sender=f"crm.{_model}",
                       dispatch_uid=f"pass_name_to_accounts_{_model}")
 

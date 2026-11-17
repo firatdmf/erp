@@ -142,7 +142,7 @@ def dashboard_component(csrf_token,path,member):
                 .filter(completed=False)
                 .filter(Q(member=member)
                         | (Q(team__isnull=False) & (Q(assignees=member) | Q(created_by=member))))
-                .select_related('company', 'contact', 'supplier', 'member__user', 'team', 'created_by__user')
+                .select_related('company', 'contact', 'member__user', 'team', 'created_by__user')
                 .distinct()
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
@@ -176,7 +176,7 @@ def dashboard_component(csrf_token,path,member):
                 Task.objects
                 .filter(assignees=member, completed=False)
                 .exclude(member=member)
-                .select_related('company', 'contact', 'supplier', 'member__user', 'team', 'created_by__user')
+                .select_related('company', 'contact', 'member__user', 'team', 'created_by__user')
                 .distinct()
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
@@ -193,7 +193,7 @@ def dashboard_component(csrf_token,path,member):
                 else:
                     aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
                 assignee = t.member.user.first_name if (t.member and t.member.user and t.member.user.first_name) else (t.member.user.username if (t.member and t.member.user) else '?')
-                # Linked entity (company / contact / supplier) — show whichever is set
+                # Linked entity (company / contact) — show whichever is set
                 entity_name = ''
                 entity_type = ''
                 if t.company_id and t.company:
@@ -202,13 +202,6 @@ def dashboard_component(csrf_token,path,member):
                 elif t.contact_id and t.contact:
                     entity_name = getattr(t.contact, 'name', '') or str(t.contact)
                     entity_type = 'contact'
-                elif t.supplier_id and t.supplier:
-                    entity_name = (
-                        getattr(t.supplier, 'company_name', '')
-                        or getattr(t.supplier, 'contact_name', '')
-                        or str(t.supplier)
-                    )
-                    entity_type = 'supplier'
                 if t.team_id:
                     # A team task shows its team, and who handed it out.
                     entity_name, entity_type = t.team.name, 'team'
@@ -287,13 +280,13 @@ def dashboard_component(csrf_token,path,member):
                         | _Q_cmpl(assignees=member)
                         | _Q_cmpl(created_by=member)
                     )
-                    .select_related('company', 'contact', 'supplier', 'member__user', 'team')
+                    .select_related('company', 'contact', 'member__user', 'team')
                     .distinct()
                     .order_by('-completed_at', '-due_date', 'id')[:100]
                 )
                 _user_for_can = getattr(member, 'user', None) if member else None
                 for t in completed_qs:
-                    # Linked entity (company / contact / supplier)
+                    # Linked entity (company / contact)
                     c_entity_name = ''
                     c_entity_type = ''
                     if t.company_id and t.company:
@@ -302,13 +295,6 @@ def dashboard_component(csrf_token,path,member):
                     elif t.contact_id and t.contact:
                         c_entity_name = getattr(t.contact, 'name', '') or str(t.contact)
                         c_entity_type = 'contact'
-                    elif t.supplier_id and t.supplier:
-                        c_entity_name = (
-                            getattr(t.supplier, 'company_name', '')
-                            or getattr(t.supplier, 'contact_name', '')
-                            or str(t.supplier)
-                        )
-                        c_entity_type = 'supplier'
                     if t.team_id:
                         c_entity_name, c_entity_type = t.team.name, 'team'
                     c_assignee = (
@@ -365,13 +351,6 @@ def dashboard_component(csrf_token,path,member):
                 elif t.contact_id and t.contact:
                     entity_name = getattr(t.contact, 'name', '') or str(t.contact)
                     entity_type = 'contact'
-                elif t.supplier_id and t.supplier:
-                    entity_name = (
-                        getattr(t.supplier, 'company_name', '')
-                        or getattr(t.supplier, 'contact_name', '')
-                        or str(t.supplier)
-                    )
-                    entity_type = 'supplier'
                 if t.team_id:
                     entity_name, entity_type = t.team.name, 'team'
                 _can_edit_d = bool(

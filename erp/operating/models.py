@@ -16,9 +16,6 @@ from crm.models import Contact, Company
 # )
 from marketing import units
 from marketing.models import Product, ProductVariant
-# Straight from crm — marketing used to re-export Supplier as a side effect
-# of Product.supplier, which is now a current account account instead.
-from crm.models import Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _, pgettext_lazy
@@ -111,23 +108,12 @@ class RawMaterialGood(models.Model):
 class RawMaterialGoodReceipt(models.Model):
     from accounting.models import Book, CurrencyCategory
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["supplier", "receipt_number"],
-                name="unique_supplier_receipt_number",
-            )
-        ]
-
     # should be approved by accounting, and operating supervisor for quality.
     book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True, blank=True)
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, null=True, blank=True
     )
     date = models.DateField(blank=True, null=True)
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=False, blank=False
-    )
     receipt_number = models.CharField(blank=True, null=True, max_length=50)
     invoice_number = models.CharField(blank=True, null=True, max_length=50)
     # approved = models.BooleanField(default=False)
@@ -138,7 +124,7 @@ class RawMaterialGoodReceipt(models.Model):
         return sum(item.quantity * item.unit_cost for item in self.items.all())
 
     def __str__(self):
-        return f"{self.book} | on: {self.date} From: {self.supplier} with Receipt #: {self.receipt_number}"
+        return f"{self.book} | on: {self.date} Receipt #: {self.receipt_number}"
 
 
 class RawMaterialGoodItem(models.Model):

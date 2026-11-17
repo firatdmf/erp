@@ -26,7 +26,7 @@ PurchaseRequestItemFormSet = inlineformset_factory(
 class PurchaseOrderForm(WalledChoicesMixin, forms.ModelForm):
     class Meta:
         model = PurchaseOrder
-        fields = ['supplier', 'expected_delivery_date', 'shipping_address', 'currency']
+        fields = ['expected_delivery_date', 'shipping_address', 'currency']
         widgets = {
             'expected_delivery_date': forms.DateInput(attrs={'type': 'date'}),
             'shipping_address': forms.Textarea(attrs={'rows': 3}),

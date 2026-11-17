@@ -141,8 +141,6 @@ class PurchaseOrderListView(LoginRequiredMixin, ListView):
         
         if search_query:
             queryset = queryset.filter(
-                Q(supplier__company_name__icontains=search_query) |
-                Q(supplier__contact_name__icontains=search_query) |
                 Q(status__icontains=search_query)
             )
         return queryset

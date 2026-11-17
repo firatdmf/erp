@@ -8,9 +8,8 @@ from accounting.models import Book, CurrencyCategory
 from accounting.services_accounts import (
     get_or_create_current_account_for_company,
     get_or_create_current_account_for_contact,
-    get_or_create_current_account_for_supplier,
 )
-from crm.models import Company, Contact, Supplier
+from crm.models import Company, Contact
 
 
 class TheAccountsCountryIsTheCustomers(TestCase):
@@ -44,8 +43,3 @@ class TheAccountsCountryIsTheCustomers(TestCase):
         contact = Contact.objects.create(name="Nobody Knows")
         account = get_or_create_current_account_for_contact(contact, member=self.member)
         self.assertEqual(account.billing_country, "")
-
-    def test_a_supplier_too(self):
-        supplier = Supplier.objects.create(company_name="Bursa Mill", country="Türkiye")
-        account = get_or_create_current_account_for_supplier(supplier, member=self.member)
-        self.assertEqual(account.billing_country, "Türkiye")

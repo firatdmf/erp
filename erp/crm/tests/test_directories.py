@@ -2,7 +2,7 @@
 
 Two books of one business share a directory and so a customer list; a
 third book has a directory to itself. Its people must not find the
-others' companies, contacts or suppliers — in a list, in a search box,
+others' companies or contacts — in a list, in a search box,
 or by typing an id — and the others must not find theirs.
 """
 from contextlib import contextmanager
@@ -16,8 +16,7 @@ from django.urls import reverse
 from accounting.forms import BookForm
 from accounting.models import Book
 from crm import urls as crm_urls
-from crm.models import (Attachment, Company, Contact, Directory, DuplicateName,
-                        Note, Supplier)
+from crm.models import Attachment, Company, Contact, Directory, DuplicateName, Note
 from operating import audit
 
 
@@ -61,18 +60,15 @@ class TwoBusinesses(TestCase):
 
         cls.woodline = Company.objects.create(name="Woodline", directory=cls.main)
         cls.ayse = Contact.objects.create(name="Ayse Kaya", company=cls.woodline)
-        cls.ozce = Supplier.objects.create(company_name="Ozce Tekstil", directory=cls.main)
         cls.note = Note.objects.create(contact=cls.ayse, content="Pays late")
         cls.file = Attachment.objects.create(company=cls.woodline, name="contract.pdf")
 
         cls.steppe = Company.objects.create(
             name="Steppe Home", directory=cls.almaty.directory)
         cls.dana = Contact.objects.create(name="Dana Akhmet", company=cls.steppe)
-        cls.kz_supplier = Supplier.objects.create(
-            company_name="Shymkent Cotton", directory=cls.almaty.directory)
 
-    THEIRS = ("Woodline", "Ayse Kaya", "Ozce Tekstil")
-    OURS = ("Steppe Home", "Dana Akhmet", "Shymkent Cotton")
+    THEIRS = ("Woodline", "Ayse Kaya")
+    OURS = ("Steppe Home", "Dana Akhmet")
 
 
 class ABookAndItsDirectory(TwoBusinesses):
@@ -134,7 +130,6 @@ class WhoSeesWhat(TwoBusinesses):
         with acting_as(self.aigerim):
             self.assertEqual(self._names(Company), {"Steppe Home"})
             self.assertEqual(self._names(Contact), {"Dana Akhmet"})
-            self.assertEqual(self._names(Supplier, "company_name"), {"Shymkent Cotton"})
             self.assertFalse(Note.objects.exists())
             self.assertFalse(Attachment.objects.exists())
             self.assertFalse(self.woodline.contacts.exists())
@@ -160,7 +155,6 @@ class WhoSeesWhat(TwoBusinesses):
         with acting_as(nobody):
             self.assertFalse(Company.objects.exists())
             self.assertFalse(Contact.objects.exists())
-            self.assertFalse(Supplier.objects.exists())
 
     def test_the_owner_and_work_nobody_is_signed_in_for_see_everything(self):
         with acting_as(self.owner):
@@ -178,7 +172,6 @@ class NamesAreUniquePerDirectory(TwoBusinesses):
         with acting_as(self.aigerim):
             Contact.objects.create(name="ayse kaya")
             Company.objects.create(name="WOODLINE")
-            Supplier.objects.create(company_name="Ozce Tekstil")
 
     def test_a_second_of_a_name_in_one_directory_is_still_refused(self):
         with acting_as(self.mustafa), self.assertRaises(DuplicateName):
@@ -263,7 +256,7 @@ class ThePagesKeepTheWall(TwoBusinesses):
 
     def _theirs(self, kind):
         return {"company": self.woodline, "contact": self.ayse,
-                "supplier": self.ozce, "note": self.note,
+                "note": self.note,
                 "attachment": self.file}[kind]
 
     def _swept_urls(self):
@@ -314,8 +307,6 @@ class ThePagesKeepTheWall(TwoBusinesses):
             "companies": list(Company.everywhere.order_by("pk").values_list("pk", "name")),
             "contacts": list(Contact.everywhere.order_by("pk")
                              .values_list("pk", "name", "company_id")),
-            "suppliers": list(Supplier.everywhere.order_by("pk")
-                              .values_list("pk", "company_name")),
             "notes": list(Note.everywhere.order_by("pk").values_list("pk", "content")),
             "files": list(Attachment.everywhere.order_by("pk").values_list("pk", "name")),
         }
@@ -330,14 +321,13 @@ class ThePagesKeepTheWall(TwoBusinesses):
 
 
 class WhatNamesACustomerKeepsTheWallToo(TwoBusinesses):
-    """An order, a task or a purchase order is not a CRM record, but its
-    pages print one's name."""
+    """An order or a task is not a CRM record, but its pages print one's
+    name."""
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         from operating.models import Order
-        from operating.models_procurement import PurchaseOrder
         from todo.models import Task
 
         cls.order = Order.objects.create(company=cls.woodline)
@@ -345,8 +335,6 @@ class WhatNamesACustomerKeepsTheWallToo(TwoBusinesses):
         cls.task = Task.objects.create(
             name="Call about the velvet", contact=cls.ayse, due_date=today)
         cls.loose_task = Task.objects.create(name="Sweep the floor", due_date=today)
-        cls.purchase = PurchaseOrder.objects.create(
-            supplier=cls.ozce, created_by=cls.owner)
 
     ORDER_ROUTES = ("operating:order_customer_card", "operating:order_print",
                     "operating:order_changes", "operating:order_excel",
@@ -387,15 +375,6 @@ class WhatNamesACustomerKeepsTheWallToo(TwoBusinesses):
             reverse("todo:task_detail_ajax", args=[self.task.pk]))
         self.assertEqual(response.status_code, 404)
 
-    def test_a_purchase_order_with_their_supplier_is_not_listed_or_opened(self):
-        self.client.force_login(self.aigerim)
-        body = self.client.get(
-            reverse("operating:purchase_order_list")).content.decode()
-        self.assertNotIn("Ozce Tekstil", body)
-        response = self.client.get(
-            reverse("operating:purchase_order_detail", args=[self.purchase.pk]))
-        self.assertEqual(response.status_code, 404)
-
     def test_the_order_analytics_rank_only_customers_in_reach(self):
         self.client.force_login(self.aigerim)
         response = self.client.get(reverse("operating:order_analytics"))
@@ -411,7 +390,6 @@ class ACustomerOfBoth(TwoBusinesses):
         with acting_as(self.aigerim):
             self.assertTrue(Company.objects.filter(pk=self.woodline.pk).exists())
             self.assertTrue(Contact.objects.filter(pk=self.ayse.pk).exists())
-            self.assertFalse(Supplier.objects.filter(pk=self.ozce.pk).exists())
             self.assertIn(self.woodline, Company.objects.here())
         # Still one record, at home where it was.
         self.assertEqual(Company.everywhere.filter(name="Woodline").count(), 1)

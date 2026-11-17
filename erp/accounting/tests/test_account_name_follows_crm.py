@@ -16,7 +16,7 @@ from django.urls import reverse
 
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
-from crm.models import Company, Contact, Supplier
+from crm.models import Company, Contact
 
 
 class AccountNameFollowsCrm(TestCase):
@@ -49,14 +49,6 @@ class AccountNameFollowsCrm(TestCase):
         for account in (laleli, ergene):
             account.refresh_from_db()
             self.assertEqual(account.name, "Tatyana")
-
-    def test_a_supplier_passes_on_the_name_it_goes_by(self):
-        supplier = Supplier.objects.create(company_name="Pearlins LLC", contact_name="Ann")
-        account = self._account(self.ergene, "ACC-016", "x", supplier=supplier)
-        supplier.company_name = "Pearlins Linen"
-        supplier.save()
-        account.refresh_from_db()
-        self.assertEqual(account.name, "Pearlins Linen")
 
     def test_attaching_an_account_gives_it_the_records_name(self):
         account = self._account(self.laleli, "00554", "GÜRHAN ROMANYA")

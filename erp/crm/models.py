@@ -10,13 +10,13 @@ from django.utils.translation import gettext_lazy as _
 
 
 class DuplicateName(ValueError):
-    """A second company, contact or supplier under a name CRM already has."""
+    """A second company or contact under a name CRM already has."""
 
 
 class Directory(models.Model):
     """One list of customers and suppliers, kept apart from the others.
 
-    Every company, contact and supplier is in exactly one directory, and
+    Every company and contact is in exactly one directory, and
     every book reads exactly one (accounting.Book.directory). Books that
     are one business under two ledgers — a factory and its shop — point
     at the same directory and so share their customers; a branch that
@@ -108,7 +108,7 @@ def working_directory():
 
 
 def reachable_from(model, directory_ids):
-    """Q over `model` (a company, contact or supplier): the records
+    """Q over `model` (a company or contact): the records
     someone reading `directory_ids` has — those at home in one of them,
     and those of another directory that have been shared with one.
 
@@ -178,7 +178,7 @@ class OwnedRecordManager(models.Manager):
 
     These carry no directory of their own; they are their owner's. So
     they are walled by it: an id typed into a note or download URL finds
-    nothing unless the company, contact or supplier behind it is one the
+    nothing unless the company or contact behind it is one the
     reader may open.
     """
 
@@ -189,13 +189,12 @@ class OwnedRecordManager(models.Manager):
             return qs
         return qs.filter(
             Q(contact__in=Contact.everywhere.filter(reachable_from(Contact, ids)))
-            | Q(company__in=Company.everywhere.filter(reachable_from(Company, ids)))
-            | Q(supplier__in=Supplier.everywhere.filter(reachable_from(Supplier, ids))))
+            | Q(company__in=Company.everywhere.filter(reachable_from(Company, ids))))
 
 
 def record_in_reach(*records):
     """Whether the reader may see every one of `records` (companies,
-    contacts or suppliers; a None among them is nobody, and passes).
+    or contacts; a None among them is nobody, and passes).
 
     For a single row already in hand — a label about to be printed —
     where `within_directories` is for a queryset.
@@ -213,7 +212,7 @@ def record_in_reach(*records):
 
 def within_directories(queryset, *paths):
     """`queryset` without the rows that name somebody the reader may not
-    see — for a model that POINTS AT a company, contact or supplier.
+    see — for a model that POINTS AT a company or contact.
 
     Each of `paths` is a foreign key to one of them ("contact",
     "order__company"). A row passes where that key is empty or its
@@ -292,8 +291,7 @@ class UniqueNameMixin:
     side.
 
     `unique_name_field` is the column checked; `unique_name_scope` narrows
-    the records it is checked against (a supplier known by its contact's
-    name is only compared with other such suppliers).
+    the records it is checked against.
     """
 
     unique_name_field = "name"
@@ -587,93 +585,6 @@ class Contact(UniqueNameMixin, models.Model):
         ]
 
 
-class Supplier(UniqueNameMixin, models.Model):
-    duplicate_name_message = _("A supplier with this name already exists.")
-
-    # Who raised this record — the same column, stamp and reading as on
-    # Contact above (erp.ownership). NULL on rows older than the column.
-    created_by = models.ForeignKey(
-        "auth.User",
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="created_%(class)ss",
-        editable=False,
-    )
-
-    # A supplier goes by its company name, or by its contact's when it has
-    # none (see __str__) — and that name is unique among suppliers.
-    directory = directory_field("suppliers")
-    shared_with = shared_with_field("shared_suppliers")
-    company_name = models.CharField(max_length=300, null=True, blank=True)
-    contact_name = models.CharField(max_length=300, null=True, blank=True)
-    email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=15, blank=True)
-    website = models.CharField(max_length=200, blank=True)
-    address = models.CharField(max_length=255, blank=True)
-    country = models.CharField(max_length=100, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    # Optional links to existing CRM contact / company records so a
-    # supplier can be associated with the same person/org you already
-    # track elsewhere. Both blank — supplier may stand alone.
-    linked_contact = models.ForeignKey(
-        "Contact",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="linked_suppliers",
-    )
-    linked_company = models.ForeignKey(
-        "Company",
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="linked_suppliers",
-    )
-
-    objects = DirectoryManager()
-    everywhere = models.Manager()
-
-    @property
-    def unique_name_field(self):
-        return "company_name" if (self.company_name or "").strip() else "contact_name"
-
-    def unique_name_scope(self, directory_id=None):
-        # A contact's name is only the supplier's name where there is no
-        # company name: two companies may both be reached through "Ahmet".
-        mine = super().unique_name_scope(directory_id)
-        if self.unique_name_field == "contact_name":
-            return mine.filter(Q(company_name__isnull=True) | Q(company_name=""))
-        return mine
-
-    def clean(self):
-        # Ensure that you call super().clean() to maintain the default validation behavior.
-        super().clean()
-        if not self.company_name and not self.contact_name:
-            raise ValidationError(
-                "You have to enter either, company name or contact name."
-            )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                Lower("company_name"), "directory", name="uniq_supplier_company_name_ci",
-                condition=Q(company_name__gt=""),
-                violation_error_message=_("A supplier with this name already exists.")),
-            models.UniqueConstraint(
-                Lower("contact_name"), "directory", name="uniq_supplier_contact_name_ci",
-                condition=(Q(company_name__isnull=True) | Q(company_name=""))
-                          & Q(contact_name__gt=""),
-                violation_error_message=_("A supplier with this name already exists.")),
-        ]
-
-    def __str__(self):
-        if self.company_name:
-            return self.company_name
-        elif self.contact_name:
-            return self.contact_name
-        return "Unnamed Supplier"
-
-
 class Note(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_date = models.DateTimeField(auto_now=True)
@@ -683,9 +594,6 @@ class Note(models.Model):
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True, related_name="notes"
-    )
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.CASCADE, blank=True, null=True, related_name="notes"
     )
     content = models.TextField()
 
@@ -698,8 +606,6 @@ class Note(models.Model):
             return f"Note for {self.contact}"
         elif self.company:
             return f"Note for {self.company}"
-        elif self.supplier:
-            return f"Note for {self.supplier}"
         else:
             return "Unassociated Note"
 
@@ -858,7 +764,7 @@ def validate_attachment_size(file):
 
 
 class Attachment(models.Model):
-    """A file hung off a CRM record — contact, company or supplier.
+    """A file hung off a CRM record — a contact or a company.
 
     The bytes live in the Bunny Storage Zone and the row keeps only the
     storage `path` — never a CDN URL. Readers go through the
@@ -881,10 +787,6 @@ class Attachment(models.Model):
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True,
-        related_name="attachments",
-    )
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.CASCADE, blank=True, null=True,
         related_name="attachments",
     )
     name = models.CharField(max_length=255)

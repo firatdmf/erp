@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from crm.models import LinkedRecordManager, Supplier
+
 from marketing.models import Product, ProductVariant
 # RawMaterialGood lives in this same app now, so it is referenced by name:
 # importing operating.models from a module operating.models itself imports
@@ -62,7 +62,6 @@ class RequestForQuotation(models.Model):
 
     title = models.CharField(max_length=255)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    suppliers = models.ManyToManyField(Supplier, related_name='rfqs')
     deadline = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -80,7 +79,6 @@ class PurchaseOrder(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
     rfq = models.ForeignKey(RequestForQuotation, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchase_orders')
     order_date = models.DateField(auto_now_add=True)
     expected_delivery_date = models.DateField(null=True, blank=True)
@@ -93,13 +91,11 @@ class PurchaseOrder(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Listed and opened by its supplier's name, so one placed with a
-    # supplier of another directory is left out (crm.Directory).
-    objects = LinkedRecordManager("supplier")
+    objects = models.Manager()
     everywhere = models.Manager()
 
     def __str__(self):
-        return f"PO-{self.pk} - {self.supplier}"
+        return f"PO-{self.pk}"
 
 class PurchaseOrderItem(models.Model):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')

@@ -436,26 +436,6 @@ def get_or_create_current_account_for_company(company, *, member=None, book=None
     )
 
 
-def get_or_create_current_account_for_supplier(supplier, *, member=None, book=None) -> CurrentAccount:
-    """Find (or create) the supplier's current account — every supplier gets one so
-    purchases (stock intake) can post debt against it. Idempotent via
-    the uniq_current_account_book_supplier constraint (one current account per book+supplier).
-
-    Pass `book` when the caller already knows which one."""
-    book = book or get_default_book(member)
-    current_account = CurrentAccount.objects.filter(book=book, supplier=supplier).first()
-    if current_account:
-        return current_account
-    return CurrentAccount.objects.create(
-        book=book, supplier=supplier,
-        name=str(supplier) or f"Supplier #{supplier.pk}",
-        type="supplier",
-        billing_country=_crm_country(supplier),
-        default_currency=_resolve_currency(),
-        created_by=member,
-    )
-
-
 def _currency_by_code(code) -> CurrencyCategory:
     """Map a plain currency code string ("USD"/"TRY"/"EUR", any case) to
     a CurrencyCategory row, falling back to the base currency."""

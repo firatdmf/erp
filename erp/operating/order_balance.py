@@ -102,7 +102,7 @@ def _customer_accounts(account, member):
     from accounting.models import CurrentAccount
     from accounting.services_accounts import member_books
 
-    for field in ("contact_id", "company_id", "supplier_id"):
+    for field in ("contact_id", "company_id"):
         value = getattr(account, field)
         if value:
             return list(CurrentAccount.objects

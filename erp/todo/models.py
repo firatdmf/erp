@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from django.utils import timezone
 from django.urls import reverse
-from crm.models import Contact, Company, LinkedRecordManager, Supplier
+from crm.models import Contact, Company, LinkedRecordManager
 
 # from authentication.models import Member
 from datetime import datetime, date
@@ -77,15 +77,12 @@ class Task(models.Model):
         'self', on_delete=models.SET_NULL, blank=True, null=True,
         related_name='next_in_series',
     )
-    # make it either a company, contact, or supplier
+    # make it either a company or a contact
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True
-    )
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.CASCADE, blank=True, null=True, related_name="tasks"
     )
     # A team task is a task with a team: it shows on that team's board, in
     # the column it sits in. There is one kind of task — personal and team
@@ -106,7 +103,7 @@ class Task(models.Model):
     # A task names the customer it is about wherever it is listed, so one
     # about another directory's customer is left out — see
     # crm.models.LinkedRecordManager. `everywhere` is unwalled.
-    objects = LinkedRecordManager("contact", "company", "supplier")
+    objects = LinkedRecordManager("contact", "company")
     everywhere = models.Manager()
 
     def __str__(self):
@@ -114,8 +111,6 @@ class Task(models.Model):
             return f"{self.name} for | {self.company}"
         elif self.contact:
             return f"{self.name} for | {self.contact}"
-        elif self.supplier:
-            return f"{self.name} for | {self.supplier}"
         else:
             return self.name
 
@@ -231,7 +226,6 @@ class Task(models.Model):
                                       self.repeat_every, self.repeat_day),
                     contact=self.contact,
                     company=self.company,
-                    supplier=self.supplier,
                     team=self.team,
                     # No column: the board puts an open task in To Do.
                     member=self.member,

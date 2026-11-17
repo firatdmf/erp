@@ -6,7 +6,6 @@ from authentication.models import Member
 from django.utils import timezone
 from decimal import Decimal
 from datetime import date, timedelta
-from crm.models import Supplier
 
 from django.conf import settings
 
@@ -571,9 +570,6 @@ class FinishedGoodsReceipt(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=False, blank=False
-    )
     receipt_number = models.CharField(blank=False, null=False, max_length=50)
     date = models.DateField(blank=True, null=True)
 
@@ -609,7 +605,7 @@ class FinishedGoodsReceipt(models.Model):
         return total
 
     def __str__(self):
-        return f"{self.book} | {self.supplier} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
+        return f"{self.book} | {self.receipt_number} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
 
 
 class FinishedGoodsReceiptItem(models.Model):

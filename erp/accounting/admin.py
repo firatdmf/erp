@@ -85,7 +85,7 @@ class CurrentAccountAdmin(admin.ModelAdmin):
                      "cached_balance", "credit_limit", "is_active")
     list_filter   = ("type", "is_active", "book")
     search_fields = ("code", "name", "tax_number", "identity_number", "email", "phone")
-    raw_id_fields = ("contact", "company", "supplier")
+    raw_id_fields = ("contact", "company")
     readonly_fields = ("cached_balance", "last_movement_at",
                        "created_at", "updated_at")
 

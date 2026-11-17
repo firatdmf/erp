@@ -8428,11 +8428,10 @@ def create_raw_material_good_receipt_json(request):
             instance = form.save()
             return JsonResponse({
                 "success": True,
-                "message": f"Receipt #{instance.receipt_number} from {instance.supplier} created successfully.",
+                "message": f"Receipt #{instance.receipt_number} created successfully.",
                 "data": {
                     "id": instance.pk,
                     "receipt_number": instance.receipt_number,
-                    "supplier": str(instance.supplier)
                 }
             })
         else:

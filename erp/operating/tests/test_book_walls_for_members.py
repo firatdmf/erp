@@ -14,24 +14,19 @@ from django.test import Client, TestCase
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
-from crm.models import Supplier
 from marketing.models import Product, ProductVariant
-from operating.models import Order, OrderItem, PurchaseOrder, RawMaterialGoodReceipt
+from operating.models import Order, OrderItem, RawMaterialGoodReceipt
 
 
 class BookWallsForMembers(TestCase):
     @classmethod
     def setUpTestData(cls):
         # A new book gets a directory of its own, so these two share no
-        # suppliers or products.
+        # products.
         cls.almaty = Book.objects.create(name="Almaty Branch")
         cls.laleli = Book.objects.create(name="Laleli Shopfront")
         cls.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
 
-        cls.own_supplier = Supplier.objects.create(
-            company_name="Steppe Weavers", directory=cls.almaty.directory)
-        cls.other_supplier = Supplier.objects.create(
-            company_name="Bosphorus Mills", directory=cls.laleli.directory)
         cls.own_product = Product.objects.create(
             title="Steppe Linen", sku="STEPPE-LINEN", directory=cls.almaty.directory)
         cls.other_product = Product.objects.create(
@@ -74,23 +69,6 @@ class BookWallsForMembers(TestCase):
 
     # ── Purchase forms ──────────────────────────────────────────────
 
-    def test_the_purchase_order_form_offers_only_her_suppliers(self):
-        for path in ("/operating/procurement/orders/create/",
-                     "/operating/procurement/orders/create/partial/"):
-            with self.subTest(path=path):
-                page = self.client.get(path)
-                self.assertContains(page, "Steppe Weavers")
-                self.assertNotContains(page, "Bosphorus Mills")
-
-    def test_a_purchase_order_for_another_books_supplier_is_refused(self):
-        response = self.client.post("/operating/procurement/orders/create/partial/", {
-            "supplier": self.other_supplier.pk, "currency": "USD",
-            "items-TOTAL_FORMS": "0", "items-INITIAL_FORMS": "0",
-        })
-        self.assertFalse(response.json()["success"])
-        self.assertIn("supplier", response.json()["errors"])
-        self.assertFalse(PurchaseOrder.everywhere.exists())
-
     def test_the_purchase_request_form_offers_only_her_products(self):
         for path in ("/operating/procurement/requests/create/",
                      "/operating/procurement/requests/create/partial/"):
@@ -101,19 +79,17 @@ class BookWallsForMembers(TestCase):
 
     # ── Raw-material receipt ────────────────────────────────────────
 
-    def test_the_receipt_form_offers_only_her_books_and_suppliers(self):
+    def test_the_receipt_form_offers_only_her_books(self):
         for path in ("/operating/raw_material_good_receipt/create",
                      "/operating/raw_material_good_receipt/create/partial"):
             with self.subTest(path=path):
                 page = self.client.get(path)
                 self.assertContains(page, "Almaty Branch")
                 self.assertNotContains(page, "Laleli Shopfront")
-                self.assertContains(page, "Steppe Weavers")
-                self.assertNotContains(page, "Bosphorus Mills")
 
     def test_a_receipt_into_another_book_is_refused(self):
         response = self.client.post("/operating/raw_material_good_receipt/create/json", {
-            "book": self.laleli.pk, "supplier": self.own_supplier.pk,
+            "book": self.laleli.pk,
             "receipt_number": "R-1",
         })
         self.assertFalse(response.json()["success"])
@@ -122,7 +98,7 @@ class BookWallsForMembers(TestCase):
 
     def test_a_receipt_into_her_own_book_saves(self):
         response = self.client.post("/operating/raw_material_good_receipt/create/json", {
-            "book": self.almaty.pk, "supplier": self.own_supplier.pk,
+            "book": self.almaty.pk,
             "receipt_number": "R-2",
         })
         self.assertTrue(response.json()["success"], response.json())

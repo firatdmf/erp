@@ -12,5 +12,5 @@ class CrmConfig(AppConfig):
         # path made it (list screens, detail sidebars, the order form's
         # inline quick-create, the purchase form's supplier picker).
         from erp.ownership import register
-        from .models import Company, Contact, Supplier
-        register(Company, Contact, Supplier)
+        from .models import Company, Contact
+        register(Company, Contact)

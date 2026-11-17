@@ -73,8 +73,7 @@ class Command(BaseCommand):
         if o["from_book"] is not None:
             qs = qs | CurrentAccount.objects.filter(book_id=o["from_book"])
         if o["suppliers"]:
-            qs = (qs | CurrentAccount.objects.filter(supplier__isnull=False)
-                  | CurrentAccount.objects.filter(type__in=["supplier", "both"]))
+            qs = qs | CurrentAccount.objects.filter(type__in=["supplier", "both"])
         if not (o["ids"] or o["from_book"] is not None or o["suppliers"]):
             raise CommandError("Give --ids, --from-book or --suppliers.")
 
@@ -106,7 +105,7 @@ class Command(BaseCommand):
                     f"         code {a.code} held in book {target} by "
                     f"#{twin.id} ({twin.name[:26]}) — will renumber")
 
-            for field in ("contact_id", "company_id", "supplier_id"):
+            for field in ("contact_id", "company_id"):
                 val = getattr(a, field)
                 if val and (CurrentAccount.objects
                             .filter(book_id=target, **{field: val})

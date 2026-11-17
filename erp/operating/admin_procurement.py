@@ -18,9 +18,8 @@ class PurchaseOrderItemInline(admin.TabularInline):
 
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'supplier', 'status', 'total_amount', 'order_date')
+    list_display = ('id', 'status', 'total_amount', 'order_date')
     list_filter = ('status', 'order_date')
-    search_fields = ('supplier__company_name', 'supplier__contact_name')
     inlines = [PurchaseOrderItemInline]
 
 @admin.register(RequestForQuotation)

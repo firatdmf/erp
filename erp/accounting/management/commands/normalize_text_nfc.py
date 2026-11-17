@@ -25,7 +25,6 @@ TARGETS = [
     ("accounting.CurrentAccountMovement", ["description", "reference"]),
     ("crm.Contact", ["name", "address", "backgroundInfo"]),
     ("crm.Company", ["name", "address", "backgroundInfo"]),
-    ("crm.Supplier", ["company_name", "contact_name", "address"]),
 ]
 
 

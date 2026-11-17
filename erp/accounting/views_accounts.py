@@ -241,7 +241,7 @@ def _filter_current_accounts(request, apply_type=True):
     # in from the legacy ledger with nothing behind it, so this is the
     # only way to see what is still waiting to be identified.
     crm_filter = request.GET.get("crm") or ""
-    unlinked = Q(contact__isnull=True, company__isnull=True, supplier__isnull=True)
+    unlinked = Q(contact__isnull=True, company__isnull=True)
     if crm_filter == "none":
         qs = qs.filter(unlinked)
     elif crm_filter == "linked":
@@ -620,9 +620,7 @@ class CurrentAccountEdit(View):
 # One list, defined on the model beside the fields themselves — this used
 # to be spelled out again here, and two copies of "which three FKs" is how
 # a fourth would end up honoured in one place and not the other.
-# The model still carries the retired supplier link until its column is
-# dropped; nothing offers it any more (CR14, 2026-11-17).
-_CRM_KINDS = tuple(k for k in CurrentAccount.CRM_FIELDS if k != "supplier")
+_CRM_KINDS = CurrentAccount.CRM_FIELDS
 
 
 def _crm_subtitle(obj):
@@ -769,8 +767,8 @@ class CurrentAccountCrmLink(View):
                 messages.info(request, _g("This account has no CRM link."))
                 return redirect("accounts:detail", pk=current_account.pk)
             was = str(current_account.crm_link)
-            current_account.contact = current_account.company = current_account.supplier = None
-            current_account.save(update_fields=["contact", "company", "supplier", "updated_at"])
+            current_account.contact = current_account.company = None
+            current_account.save(update_fields=["contact", "company", "updated_at"])
             messages.success(
                 request,
                 _g("CRM link removed (%(name)s). The account and its ledger are untouched.")
@@ -1234,7 +1232,7 @@ class CurrentAccountDetail(View):
     def get(self, request, pk):
         current_account = get_object_or_404(
             CurrentAccount.objects.select_related("book", "default_currency",
-                                               "contact", "company", "supplier"),
+                                               "contact", "company"),
             pk=pk,
         )
         # A few more than the 20 shown, because cancelled pairs are
@@ -2093,14 +2091,14 @@ def select_combined_accounts(request):
 
     accounts = list(
         CurrentAccount.objects.filter(pk__in=ids)
-        .select_related("book", "default_currency", "contact", "company", "supplier")
+        .select_related("book", "default_currency", "contact", "company")
         .order_by("book__name", "pk")
     )
     if len(accounts) != len(ids):
         raise Http404("No such account.")
 
-    who = {(a.contact_id, a.company_id, a.supplier_id) for a in accounts}
-    if len(who) > 1 or who == {(None, None, None)}:
+    who = {(a.contact_id, a.company_id) for a in accounts}
+    if len(who) > 1 or who == {(None, None)}:
         return None, HttpResponseBadRequest(
             _g("A combined statement covers one customer's accounts."))
 

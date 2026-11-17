@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from crm.models import Company, Contact, DuplicateName, Supplier
+from crm.models import Company, Contact, DuplicateName
 
 
 class NamesAreUnique(TestCase):
@@ -46,18 +46,3 @@ class NamesAreUnique(TestCase):
         other = Contact.objects.create(name="Ali")
         with self.assertRaises(IntegrityError), transaction.atomic():
             Contact.objects.filter(pk=other.pk).update(name="ayşe kaya")
-
-    def test_a_supplier_goes_by_its_company_name(self):
-        Supplier.objects.create(company_name="Özce Tekstil", contact_name="Ahmet")
-        with self.assertRaises(DuplicateName):
-            Supplier.objects.create(company_name="özce tekstil")
-        # Two companies reached through people of the same name are two
-        # suppliers; the contact's name only counts where it is the name.
-        Supplier.objects.create(company_name="Elçin Tekstil", contact_name="Ahmet")
-
-    def test_a_supplier_without_a_company_goes_by_its_contact(self):
-        Supplier.objects.create(contact_name="Samira")
-        with self.assertRaises(DuplicateName):
-            Supplier.objects.create(contact_name="samira")
-        with self.assertRaises(DuplicateName):
-            Supplier.objects.create(company_name="", contact_name="SAMIRA")

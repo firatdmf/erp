@@ -58,7 +58,7 @@ _SUFFIXES = {
 
 # Which link makes an account the canonical one. Matches the resolution
 # priority in services.get_or_create_current_account_for_order (company wins).
-_LINK_RANK = {"company": 3, "supplier": 2, "contact": 1, "": 0}
+_LINK_RANK = {"company": 2, "contact": 1, "": 0}
 
 # Blank-only fields copied from the duplicate onto the survivor.
 _FILL_FIELDS = [
@@ -83,8 +83,6 @@ def _norm_tax(value):
 def _link_kind(current_account):
     if current_account.company_id:
         return "company"
-    if current_account.supplier_id:
-        return "supplier"
     if current_account.contact_id:
         return "contact"
     return ""
@@ -158,7 +156,7 @@ class Command(BaseCommand):
         self.allow_currency = opts["allow_currency_mismatch"]
 
         qs = CurrentAccount.objects.select_related(
-            "book", "contact", "contact__company", "company", "supplier",
+            "book", "contact", "contact__company", "company",
             "default_currency",
         ).annotate(n_moves=Count("movements"))
         if opts["book"]:

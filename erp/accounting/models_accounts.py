@@ -71,7 +71,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _gettext, gettext_lazy as _
 
 from authentication.models import Member
-from crm.models import Company, Contact, Supplier
+from crm.models import Company, Contact
 
 # Book and CurrencyCategory live in accounting/models.py, which imports THIS
 # module at the end of its own body. Importing them by name here would be a
@@ -125,10 +125,6 @@ class CurrentAccount(models.Model):
                 fields=["book", "company"], name="uniq_current_account_book_company",
                 condition=models.Q(company__isnull=False),
             ),
-            models.UniqueConstraint(
-                fields=["book", "supplier"], name="uniq_current_account_book_supplier",
-                condition=models.Q(supplier__isnull=False),
-            ),
         ]
 
     TYPE_CHOICES = [
@@ -162,12 +158,6 @@ class CurrentAccount(models.Model):
     )
     company = models.ForeignKey(
         Company,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="current_account_accounts",
-    )
-    supplier = models.ForeignKey(
-        Supplier,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="current_account_accounts",
@@ -247,10 +237,9 @@ class CurrentAccount(models.Model):
 
     def clean(self):
         super().clean()
-        links = [bool(self.contact_id), bool(self.company_id), bool(self.supplier_id)]
-        if sum(links) > 1:
+        if self.contact_id and self.company_id:
             raise ValidationError(
-                "An account can be linked to only one of Contact, Company or Supplier."
+                "An account can be linked to only one of Contact or Company."
             )
 
     # ── The currency lock ─────────────────────────────────────────────
@@ -290,11 +279,11 @@ class CurrentAccount(models.Model):
     # carried in from the legacy Laleli ledger have no CRM record behind
     # them, and the links are SET_NULL besides — deleting a company
     # orphans its account rather than taking the ledger down with it.
-    CRM_FIELDS = ("contact", "company", "supplier")
+    CRM_FIELDS = ("contact", "company")
 
     @property
     def crm_link_field(self):
-        """"contact", "company" or "supplier" — "" when nothing is linked."""
+        """"contact" or "company" — "" when nothing is linked."""
         for field in self.CRM_FIELDS:
             if getattr(self, f"{field}_id"):
                 return field

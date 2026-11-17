@@ -36,9 +36,6 @@ class InventoryAttribution(TestCase):
         roll = WarehouseProductItem.objects.create(
             product=product, quantity=meters, quantity_remaining=meters,
             status=status, unit_cost_base=cost or Decimal("1"))
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return roll
 
     def test_uninvoiced_stock_still_counts(self):
@@ -57,20 +54,6 @@ class InventoryAttribution(TestCase):
                    status="consumed")
         self.assertEqual(subsidiary_equation(self.ergene)["inventory"],
                          Decimal("0.00"))
-
-    def test_a_roll_with_no_cost_basis_is_counted_not_guessed_at(self):
-        self._roll(self.fabrika, Decimal("20.00"), None)
-        subs = subsidiary_equation(self.ergene)
-        self.assertEqual(subs["inventory"], Decimal("0.00"))
-        self.assertEqual(subs["unvalued_rolls"], 1)
-        self.assertEqual(subs["unvalued_meters"], Decimal("20.00"))
-
-    def test_unvalued_rolls_are_this_book_s_not_every_book_s(self):
-        """The old count was global — it could not be filtered by book."""
-        other = Warehouse.objects.create(
-            name="Laleli Fabrika", accounting_book=self.laleli)
-        self._roll(other, Decimal("55.00"), None)
-        self.assertEqual(subsidiary_equation(self.ergene)["unvalued_rolls"], 0)
 
     def test_inventory_lands_in_assets_and_the_causes_still_add_up(self):
         self._roll(self.fabrika, Decimal("100.00"), Decimal("3.7350"))

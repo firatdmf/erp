@@ -53,11 +53,7 @@ class RollPicker(TestCase):
     def _top(self, wp, barcode, scanned=None):
         roll = WarehouseProductItem.objects.create(
             product=wp, quantity=Decimal("20"), quantity_remaining=Decimal("20"),
-            barcode=barcode, status="in_stock",
-            unit_cost_base=None if wp.cost_usd is not None else Decimal("1"))
-        if wp.cost_usd is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
+            barcode=barcode, status="in_stock")
         if scanned is not None:
             WarehouseProductItem.objects.filter(pk=roll.pk).update(
                 scanned_at=scanned)
@@ -125,13 +121,6 @@ class RollPicker(TestCase):
         cheap = self._top(self._shelf(self.ergene, Decimal("2.16")), None, scanned=same)
         self.assertEqual([r["id"] for r in self._list()], [cheap.pk, dear.pk])
 
-    def test_a_stock_item_with_no_cost_sorts_last_on_a_tie(self):
-        same = self._aged(7)
-        unknown = self._top(self._shelf(self.ergene, None), None, scanned=same)
-        priced = self._top(self._shelf(self.ergene, Decimal("2.40")), None, scanned=same)
-        self.assertEqual([r["id"] for r in self._list()], [priced.pk, unknown.pk])
-
-    # --- book scope -------------------------------------------------
     def test_another_books_shelf_is_not_offered(self):
         """The picker's two siblings narrow to the working book; this one
         did not, so it offered another business's shelf to anyone who
@@ -151,11 +140,10 @@ class RollPicker(TestCase):
     # --- cost -------------------------------------------------------
     def test_each_item_carries_its_cost_per_meter(self):
         self._top(self._shelf(self.ergene, Decimal("2.40")), "BC-PRICED")
-        self._top(self._shelf(self.ergene, None), "BC-UNKNOWN")
         resp = self.client.get(reverse("operating:order_create_roll_list"), {"sku": SKU})
         data = json.loads(resp.content)
         self.assertEqual({r["barcode"]: r["unit_cost"] for r in data["rolls"]},
-                         {"BC-PRICED": 2.40, "BC-UNKNOWN": None})
+                         {"BC-PRICED": 2.40})
         self.assertTrue(data["cost_symbol"])
 
     def test_a_sales_rep_is_sent_the_marked_up_price_not_the_cost(self):

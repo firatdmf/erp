@@ -77,96 +77,6 @@ class StampedAtIntake(TestCase):
         self.assertEqual(subsidiary_equation(self.book)["inventory"],
                          Decimal("900.00"))
 
-    def test_a_stock_item_with_no_price_anywhere_is_counted_not_guessed_at(self):
-        wp = self._product(Decimal("1"))
-        roll = self._receive(wp, 20)
-        # Unpriced stock can no longer be created; this stands for older data.
-        WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
-        WarehouseProduct.objects.filter(pk=wp.pk).update(cost_usd=None)
-        subs = subsidiary_equation(self.book)
-        self.assertEqual(subs["inventory"], Decimal("0.00"))
-        self.assertEqual(subs["unvalued_rolls"], 1)
-
-
-class BackfillFromSkuCost(TestCase):
-    """Migration 0079, exercised on real rows the way 0077's backfill is."""
-
-    @staticmethod
-    def _backfill():
-        """Call migration 0079's backfill against the live app registry.
-
-        0079 predates the WarehouseProductRoll -> WarehouseProductItem
-        rename and asks for the model by its historical name, which is
-        correct: a migration must see the state as it stood when it ran.
-        The live registry only knows the new name, so the shim answers to
-        the old one. Everything else is the real registry, so the query
-        this exercises is the one that runs against production.
-        """
-        from importlib import import_module
-
-        from django.apps import apps as registry
-
-        class _AsItWasThen:
-            @staticmethod
-            def get_model(app_label, model_name):
-                if model_name == "WarehouseProductRoll":
-                    model_name = "WarehouseProductItem"
-                return registry.get_model(app_label, model_name)
-
-        module = import_module(
-            "operating.migrations.0079_backfill_roll_unit_cost_base")
-        module.stamp_cost(_AsItWasThen, None)
-
-    def setUp(self):
-        usd = CurrencyCategory.objects.create(
-            code="USD", name="US Dollar", symbol="$")
-        book = Book.objects.create(name="Ergene Fabric", base_currency=usd)
-        self.wh = Warehouse.objects.create(
-            name="Ergene Fabrika", accounting_book=book)
-
-    def _top(self, cost, sku):
-        wp = WarehouseProduct.objects.create(
-            warehouse=self.wh, name="seta", sku=sku, quantity=Decimal("0"),
-            cost_usd=cost)
-        roll = WarehouseProductItem.objects.create(
-            product=wp, quantity=Decimal("50"), quantity_remaining=Decimal("50"),
-            barcode=f"BC-{sku}", status="in_stock",
-            unit_cost_base=cost if cost is not None else Decimal("1"))
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
-        return roll
-
-    def test_it_stamps_the_skus_cost(self):
-        roll = self._top(Decimal("4.40"), "A")
-        WarehouseProductItem.objects.update(unit_cost_base=None)
-        self._backfill()
-        roll.refresh_from_db()
-        self.assertEqual(roll.unit_cost_base, Decimal("4.4000"))
-
-    def test_it_leaves_an_unpriced_sku_null_rather_than_zero(self):
-        roll = self._top(None, "B")
-        self._backfill()
-        roll.refresh_from_db()
-        self.assertIsNone(roll.unit_cost_base)
-
-    def test_it_does_not_overwrite_a_stock_item_already_stamped(self):
-        """Re-running must not pull a stock item back to the current SKU price."""
-        roll = self._top(Decimal("5.00"), "C")
-        WarehouseProductItem.objects.filter(pk=roll.pk).update(
-            unit_cost_base=Decimal("4.0000"))
-        self._backfill()
-        roll.refresh_from_db()
-        self.assertEqual(roll.unit_cost_base, Decimal("4.0000"))
-
-    def test_it_is_one_query_not_one_per_stock_item(self):
-        for i in range(8):
-            self._top(Decimal("4.40"), f"D{i}")
-        WarehouseProductItem.objects.update(unit_cost_base=None)
-        with self.assertNumQueries(1):
-            self._backfill()
-
-
 class ShownOnThePage(TestCase):
     """The figure is no use to anyone if only the ledger can read it."""
 
@@ -192,9 +102,6 @@ class ShownOnThePage(TestCase):
             product=self.wp, quantity=Decimal("19.50"),
             quantity_remaining=Decimal("19.50"), barcode="BC-1",
             status="in_stock", unit_cost_base=cost)
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return roll
 
     def _page(self):
@@ -234,13 +141,6 @@ class ShownOnThePage(TestCase):
         self.assertIn('class="roll-cost">4.40', html)
         self.assertNotIn('class="roll-cost">$4.40', html)
 
-    def test_an_unpriced_stock_item_shows_a_dash_not_a_zero(self):
-        self._top(None)
-        html = self._page()
-        self.assertNotIn('class="roll-cost">', html)
-        self.assertIn("No cost recorded for this roll.", html)
-
-
 class PricingCardIsWeighted(TestCase):
     """The Pricing card sums the stock_items, rather than pricing them all at the
     latest one. Two stock items bought at different prices are the whole test:
@@ -267,9 +167,6 @@ class PricingCardIsWeighted(TestCase):
         roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return roll
 
     def _page(self):
@@ -292,21 +189,6 @@ class PricingCardIsWeighted(TestCase):
         # (100x4 + 300x5) / 400 = 4.75, not the plain mean of 4.50.
         html = self._page()
         self.assertIn('class="avg-cost">$4.7500', html)
-
-    def test_an_unpriced_stock_item_is_left_out_of_the_average(self):
-        """In the denominator it would report stock cheaper than anything
-        actually on the floor."""
-        self._top(Decimal("100"), Decimal("4.0000"), "BC-A")
-        self._top(Decimal("100"), None, "BC-B")
-        html = self._page()
-        self.assertIn('class="avg-cost">$4.0000', html)
-        self.assertIn('class="stock-value">$400.00', html)
-
-    def test_no_priced_stock_at_all_shows_a_dash(self):
-        self._top(Decimal("100"), None, "BC-A")
-        html = self._page()
-        self.assertNotIn('class="avg-cost"', html)
-        self.assertNotIn('class="stock-value"', html)
 
     def test_it_agrees_with_the_balance_sheet(self):
         self._top(Decimal("100"), Decimal("4.0000"), "BC-A")
@@ -339,9 +221,6 @@ class DerivedNotStored(TestCase):
         roll = WarehouseProductItem.objects.create(
             product=self.wp, quantity=meters, quantity_remaining=meters,
             barcode=barcode, status="in_stock", unit_cost_base=cost)
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return roll
 
     def _annotated(self):
@@ -378,11 +257,6 @@ class DerivedNotStored(TestCase):
         # quantity(400) x cost_usd(5.00) would have said 2,000.00.
         self.assertEqual(self.wh.total_value_usd(), Decimal("900.0000"))
 
-    def test_the_warehouse_total_leaves_out_what_it_cannot_price(self):
-        self._top(Decimal("100"), Decimal("4.0000"), "A")
-        self._top(Decimal("100"), None, "B")
-        self.assertEqual(self.wh.total_value_usd(), Decimal("400.0000"))
-
     def test_the_warehouse_total_matches_the_balance_sheet(self):
         self._top(Decimal("100"), Decimal("4.0000"), "A")
         self._top(Decimal("100"), Decimal("5.0000"), "B")
@@ -408,7 +282,6 @@ class SoldOutShowsLastCost(TestCase):
             quantity=Decimal("0"), cost_usd=Decimal("2.80"))
         self.old = self._item(Decimal("2.5000"), "A")
         self.new = self._item(Decimal("2.8000"), "B")
-        self._item(None, "C")  # unpriced, received last: skipped
 
         user = get_user_model().objects.create_user("wh3", password="pw")
         user.member.books.add(self.book)
@@ -421,9 +294,6 @@ class SoldOutShowsLastCost(TestCase):
             product=self.wp, quantity=Decimal("100"),
             quantity_remaining=Decimal("0"), barcode=barcode,
             status="consumed", unit_cost_base=cost)
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=item.pk).update(unit_cost_base=None)
         return item
 
     def _annotated(self):

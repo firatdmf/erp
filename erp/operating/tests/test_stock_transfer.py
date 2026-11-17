@@ -194,13 +194,6 @@ class WhatCannotGo(TransferBase):
         self.second.refresh_from_db()
         self.assertEqual(self.second.product, self.wp)
 
-    def test_a_roll_with_no_cost(self):
-        self.wp.cost_usd = None
-        self.wp.save(update_fields=["cost_usd"])
-        self.first.unit_cost_base = None
-        self.first.save(update_fields=["unit_cost_base"])
-        self.assertEqual(len(self.refused(self.first).blocked), 1)
-
     def test_a_roll_that_is_in_another_warehouse(self):
         elsewhere = Warehouse.objects.create(name="Ready-made Shop", accounting_book=self.ergene)
         other = WarehouseProduct.objects.create(warehouse=elsewhere, name="Krep", sku=SKU)

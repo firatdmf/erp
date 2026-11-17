@@ -41,22 +41,7 @@ class BookPageAssets(TestCase):
             product=product or self.wp, quantity=Decimal(meters),
             quantity_remaining=Decimal(meters), barcode=f"BC-{meters}-{cost}",
             status="in_stock", unit_cost_base=cost or Decimal("1"))
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=item.pk).update(unit_cost_base=None)
-            item.unit_cost_base = None
         return item
-
-    def _unpriced_product(self):
-        """A product with no cost either — an item alone is not enough.
-
-        _inventory_value falls back from the item's own stamp to the
-        purchase-invoice line and then to the SKU's cost, so an item is
-        only genuinely unvalued when none of the three exists.
-        """
-        return WarehouseProduct.objects.create(
-            warehouse=self.wh, name="mystery", sku="S9",
-            quantity=Decimal("0"), cost_usd=None)
 
     def _page(self):
         resp = self.client.get(
@@ -99,19 +84,6 @@ class BookPageAssets(TestCase):
         self._item("250", Decimal("3.25"))
         self.assertEqual(self._check(self._page(), "Inventory")["subsidiary"],
                          subsidiary_equation(self.book)["inventory"])
-
-    def test_an_unpriced_item_is_counted_not_valued(self):
-        self._item("100", Decimal("4.00"))
-        self._item("20", None, product=self._unpriced_product())
-        ctx = self._page()
-        self.assertEqual(self._check(ctx, "Inventory")["subsidiary"], Decimal("400.00"))
-        self.assertEqual(ctx["eq_unvalued_items"], 1)
-
-    def test_the_page_says_how_many_it_could_not_price(self):
-        self._item("20", None, product=self._unpriced_product())
-        resp = self.client.get(
-            reverse("accounting:book_detail", args=[self.book.pk]))
-        self.assertContains(resp, "1 unpriced")
 
     def test_another_books_stock_is_not_counted(self):
         other = Book.objects.create(name="Laleli Fabric", base_currency=self.usd)

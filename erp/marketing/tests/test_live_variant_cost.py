@@ -46,9 +46,6 @@ class LiveVariantCostTest(TestCase):
             product=self.rows[where], quantity=Decimal(meters),
             quantity_remaining=Decimal(left if left is not None else meters),
             unit_cost_base=Decimal(cost if cost is not None else "1"), status=status)
-        if cost is None:
-            # Unpriced stock can no longer be created; this stands for older data.
-            WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
         return roll
 
     def _fresh(self):
@@ -67,10 +64,9 @@ class LiveVariantCostTest(TestCase):
         # (10 x 2 + 100 x 4) / 110
         self.assertEqual(self._fresh().live_cost, Decimal("3.8182"))
 
-    def test_used_up_and_unpriced_rolls_do_not_count(self):
+    def test_used_up_rolls_do_not_count(self):
         self._roll("laleli", "100", "5.00")
         self._roll("laleli", "100", "1.00", left="0", status="consumed")
-        self._roll("ergene", "100", None)
         self.assertEqual(self._fresh().live_cost, Decimal("5.0000"))
 
     def test_with_nothing_in_stock_the_stored_cost_answers(self):
@@ -173,18 +169,6 @@ class ProductCostFieldTest(TestCase):
         value, _n, _q = _inventory_value(Book.objects.get(name="Laleli Fabric"))
         self.assertEqual(self._form(self.product).variants_cost,
                          (value / Decimal("400")).quantize(Decimal("0.0001")))
-
-    def test_a_roll_without_a_stamp_is_costed_as_the_balance_sheet_costs_it(self):
-        # No unit_cost_base: the ledger falls back to the row's cost_usd.
-        row = WarehouseProduct.objects.get(sku="N1522.G54")
-        row.cost_usd = Decimal("6.00")
-        row.save(update_fields=["cost_usd"])
-        roll = WarehouseProductItem.objects.create(
-            product=row, quantity=Decimal("100"), quantity_remaining=Decimal("100"))
-        # Stock is now stamped at birth; a missing stamp stands for older data.
-        WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
-        # (100 x 2 + 300 x 4 + 100 x 6) / 500
-        self.assertEqual(self._form(self.product).variants_cost, Decimal("4.0000"))
 
     def test_with_nothing_in_stock_the_stored_costs_are_averaged(self):
         WarehouseProductItem.objects.update(status="consumed", quantity_remaining=Decimal("0"))

@@ -67,6 +67,16 @@ class TheColumnsRefuseANegativeCost(TestCase):
                 product=self.wp, quantity=10, quantity_remaining=10,
                 unit_cost_base=Decimal("-3.5"))
 
+    def test_a_stock_item_cannot_be_left_without_a_cost(self):
+        """save() refuses it; the column refuses whatever skips save()."""
+        self.wp.cost_usd = None
+        self.wp.save()
+        with self.assertRaises(ValidationError):
+            WarehouseProductItem.objects.create(product=self.wp, quantity=1, quantity_remaining=1)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            WarehouseProductItem.objects.bulk_create([WarehouseProductItem(
+                product=self.wp, quantity=1, quantity_remaining=1, unit_cost_base=None)])
+
     def test_zero_and_blank_are_still_fine(self):
         self.wp.purchase_price = self.wp.cost_usd = self.wp.cost_try = Decimal("0")
         self.wp.save()

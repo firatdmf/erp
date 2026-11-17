@@ -53,14 +53,6 @@ class StockLeavingPostsItsCost(TestCase):
         self._out("10")
         self.assertEqual(self._balances()["5000"], Decimal("40.00"))
 
-    def test_a_roll_with_no_cost_posts_nothing(self):
-        self.roll.unit_cost_base = None
-        self.roll.save()
-        self.product.cost_usd = None
-        self.product.save()
-        self._out("10")
-        self.assertEqual(JournalEntry.objects.count(), 0)
-
     def test_unshipping_puts_the_cost_back(self):
         from operating.models import Order
         self._out("25")

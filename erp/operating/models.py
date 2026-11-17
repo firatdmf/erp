@@ -2502,8 +2502,9 @@ class WarehouseProductItem(models.Model):
     # USD today, so intake stamps this straight from cost_usd; a book
     # based on anything else has to convert at intake, which is the one
     # place that knows the rate on the day the goods arrived.
+    # Required (operating 0124): every stock item carries what it cost.
     unit_cost_base = models.DecimalField(
-        max_digits=14, decimal_places=4, null=True, blank=True,
+        max_digits=14, decimal_places=4,
         help_text="Unit cost when received, in the owning book's base currency",
         validators=[MinValueValidator(Decimal("0"))],
     )

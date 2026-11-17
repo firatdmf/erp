@@ -91,12 +91,6 @@ class UnitCostIsTheWeightedAverage(TestCase):
         self.assertEqual(_cell(html, "Unit cost"), "$4.00")
         self.assertEqual(_cell(html, "Total"), "$1,200.00")
 
-    def test_stock_with_no_recorded_cost_shows_a_dash_not_a_guess(self):
-        roll = self._top("300", None, "a")
-        # Unpriced stock can no longer be created; this stands for older data.
-        WarehouseProductItem.objects.filter(pk=roll.pk).update(unit_cost_base=None)
-        self.assertEqual(_cell(self._list(), "Unit cost"), "—")
-
     def test_the_sign_is_the_owning_books_currency(self):
         try_ = CurrencyCategory.objects.create(
             code="TRY", name="Turkish Lira", symbol="₺")

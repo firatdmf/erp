@@ -76,21 +76,27 @@ class ReadOnlyRoleMiddleware(MiddlewareMixin):
     her unless someone widens `erp.roles.READ_PREFIXES` on purpose. See
     erp/roles.py for the two gates and why they are shaped that way.
 
-    It also keeps an operations manager out of orders altogether
-    (erp.roles.ORDER_PREFIXES), on the same terms: before resolution, so
-    a new order route is closed to the role by default.
+    It also keeps a role without Orders out of orders altogether
+    (erp.roles.ORDER_PREFIXES), and one without Accounts and customers out
+    of the ledger and the CRM (erp.roles.ACCOUNTS_PREFIXES), on the same
+    terms: before resolution, so a new route there is closed by default.
 
-    Everyone else passes straight through — this is not a general
-    permission system, it is two roles.
+    Everyone else passes straight through.
     """
 
     SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
     def process_request(self, request):
-        from erp.roles import (is_operations_manager, is_order_path,
-                               is_sales_rep, may_read, may_write)
+        from erp.roles import (is_accounts_path, is_operations_manager, is_order_path,
+                               is_sales_rep, may_read, may_write, sees_accounts)
 
         user = getattr(request, "user", None)
+        # Before the others: a role may lack Accounts and customers on top
+        # of anything else it lacks (erp.roles.ACCOUNTS_PREFIXES).
+        if (getattr(user, "is_authenticated", False) and is_accounts_path(request.path)
+                and not sees_accounts(user)):
+            return self._deny(request, "Your account does not work with accounts or customers.",
+                              title="No access to accounts")
         if is_operations_manager(user):
             if is_order_path(request.path):
                 return self._deny(request, "Your account does not work with orders.",

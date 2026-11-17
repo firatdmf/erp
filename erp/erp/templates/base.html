@@ -481,16 +481,15 @@
         <i class="fas fa-cart-shopping"></i>
         <span class="top-bar-btn-label">{% trans "Orders" %}</span>
       </a>
-{% endif %}{% if not is_sales_rep %}      <a href="{% url 'accounts:legacy_list' %}" class="top-bar-btn" id="topBarAccountsBtn" title="{% trans 'Accounts' %}">
+{% endif %}{% if not is_sales_rep and sees_accounts %}      <a href="{% url 'accounts:legacy_list' %}" class="top-bar-btn" id="topBarAccountsBtn" title="{% trans 'Accounts' %}">
         <i class="fas fa-id-card"></i>
         <span class="top-bar-btn-label">{% trans "Accounts" context "topbar" %}</span>
       </a>
 {% endif %}
-{% if not is_sales_rep %}      <div class="topbar-menu-container">
+{% if not is_sales_rep and sees_accounts %}      <div class="topbar-menu-container">
         <button class="top-bar-btn" onclick="toggleTransactionsMenu()" id="topBarTransactionsBtn" title="{% trans 'Transactions' %}">
           <i class="fas fa-right-left"></i>
-          <span class="top-bar-btn-label">{% trans "Transactions" %}</span>
-        </button>
+          <span class="top-bar-btn-label">{% trans "Transactions" %}</span>        </button>
         <div class="topbar-menu-dropdown" id="transactionsMenu">
           <div class="topbar-menu-header">
             <h3>{% trans "Transactions" %}</h3>

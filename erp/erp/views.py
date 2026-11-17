@@ -475,19 +475,39 @@ class GlobalSearch(View):
     def _visible(self, results, restricted):
         if not restricted:
             return results
-        from erp.roles import is_order_path, is_sales_rep, may_read
-        if is_sales_rep(self.request.user):
-            return [r for r in results if may_read(r.get('url') or '')]
-        # An operations manager: everything but orders.
-        return [r for r in results if not is_order_path(r.get('url') or '')]
+        from erp.roles import (is_accounts_path, is_operations_manager, is_order_path,
+                               is_sales_rep, may_read, sees_accounts)
+        user = self.request.user
+        if is_sales_rep(user):
+            results = [r for r in results if may_read(r.get('url') or '')]
+        if is_operations_manager(user):
+            results = [r for r in results if not is_order_path(r.get('url') or '')]
+        if not sees_accounts(user):
+            results = [r for r in results if not is_accounts_path(r.get('url') or '')]
+        return results
+
+    def _orders(self):
+        """The orders this viewer may open: those of their books. One with
+        no book yet (a web order not given an account) is an install
+        admin's, as on its own page (accounting.book_scope.order_book_guarded)."""
+        from accounting.services_accounts import member_books
+        from erp.ownership import is_install_admin
+        from operating.models import Order
+
+        user = self.request.user
+        if is_install_admin(user):
+            return Order.objects.all()
+        return Order.objects.filter(
+            current_account__book__in=member_books(getattr(user, "member", None)))
 
     def get(self, request, *args, **kwargs):
-        from erp.roles import is_operations_manager, is_sales_rep
+        from erp.roles import is_operations_manager, is_sales_rep, sees_accounts
 
         query = request.GET.get('q', '').strip()
         search_type = request.GET.get('type', 'all')
         # Whether this viewer's reach is narrower than the search's.
-        restricted = is_sales_rep(request.user) or is_operations_manager(request.user)
+        restricted = (is_sales_rep(request.user) or is_operations_manager(request.user)
+                      or not sees_accounts(request.user))
         results = []
 
         # If query is empty, we might want to return "Recent" items for specific tabs
@@ -521,7 +541,7 @@ class GlobalSearch(View):
             elif search_type == 'orders':
                 from operating.models import Order
                 # Return last 50 orders
-                recent_orders = Order.objects.all().order_by('-id')[:50]
+                recent_orders = self._orders().order_by('-id')[:50]
                 for o in recent_orders:
                      try:
                         url = reverse('operating:order_detail', args=[o.id])
@@ -662,7 +682,7 @@ class GlobalSearch(View):
             # Only add id filter if query is numeric
             if query.isdigit():
                 order_filter |= Q(id=int(query))
-            orders = Order.objects.filter(order_filter)[:limit]
+            orders = self._orders().filter(order_filter)[:limit]
             for o in orders:
                  try:
                     url = reverse('operating:order_detail', args=[o.id])

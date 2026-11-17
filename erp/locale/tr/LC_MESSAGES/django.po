@@ -16526,3 +16526,18 @@ msgstr "%(n)s seçilecek"
 #, python-format
 msgid "Only %(n)s are free in this one."
 msgstr "Bunda yalnızca %(n)s adet boşta."
+
+msgid "Warehouses, purchases and the catalog. Without it, only looking up stock and customers and taking orders, with prices shown in place of cost."
+msgstr "Depolar, alımlar ve katalog. Bu yetki olmadan yalnızca stok ve müşteri bakılır ve sipariş alınır; maliyetin yerine fiyat gösterilir."
+
+msgid "Accounts and customers"
+msgstr "Cari hesaplar ve müşteriler"
+
+msgid "Current accounts, payments, checks, the ledger and its reports, and the customer and supplier lists."
+msgstr "Cari hesaplar, ödemeler, çekler, defter ve raporları, müşteri ve tedarikçi listeleri."
+
+msgid "No accounts or customers"
+msgstr "Cari hesap ve müşteri yok"
+
+msgid "Set on whoever lacks the Accounts and customers permission."
+msgstr "Cari hesaplar ve müşteriler iznine sahip olmayanlara verilir."

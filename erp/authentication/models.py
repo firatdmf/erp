@@ -23,14 +23,24 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "Sees an order's prices, totals and payments, and its customer. "
         "Without it, an order shows what to pack and ship and where it goes.",
     ),
-    # Everything beyond selling: warehouses, purchases, accounts, the
-    # catalog. A role without it only looks up stock and customers and
-    # takes orders, seeing prices where others see cost — a sales rep.
+    # Everything beyond selling: warehouses, purchases, the catalog. A
+    # role without it only looks up stock and customers and takes orders,
+    # seeing prices where others see cost — a sales rep.
     "beyond_sales": (
         "Beyond sales",
-        "Warehouses, purchases, accounts and the catalog. Without it, only "
+        "Warehouses, purchases and the catalog. Without it, only "
         "looking up stock and customers and taking orders, with prices shown "
         "in place of cost.",
+    ),
+    # The money and the people: current accounts and their statements,
+    # payments, checks, the ledger and its reports, and the customer and
+    # supplier lists. A role without it — Operations — runs warehouses and
+    # purchases without them; its members carry the no_accounts
+    # restriction (erp.roles.ACCOUNTS_PREFIXES).
+    "accounts_customers": (
+        "Accounts and customers",
+        "Current accounts, payments, checks, the ledger and its reports, and "
+        "the customer and supplier lists.",
     ),
     # Stored as "admin". Manages the books the member is assigned — their
     # warehouses, orders and purchases (erp.ownership.is_admin) — and
@@ -74,11 +84,15 @@ ACCESS_LEVEL_CHOICES_DICT = {
         "No prices or customers",
         "Set on whoever lacks the Prices and customers permission.",
     ),
+    "no_accounts": (
+        "No accounts or customers",
+        "Set on whoever lacks the Accounts and customers permission.",
+    ),
 }
 
 # restriction → the permission whose absence sets it.
 RESTRICTIONS = {"manager": "orders", "sales_rep": "beyond_sales",
-                "packing_only": "prices_customers"}
+                "packing_only": "prices_customers", "no_accounts": "accounts_customers"}
 
 # What a role can be given: every permission but the restrictions.
 GRANTS = [name for name in ACCESS_LEVEL_CHOICES_DICT if name not in RESTRICTIONS]

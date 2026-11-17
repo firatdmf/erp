@@ -125,13 +125,14 @@ def role_flags(request):
     Only used to hide chrome a member cannot use (the top bar's
     Purchases button and the "Create order" favorite for a read-only
     role; every order door for a role without Orders; an order's prices
-    and customer for one without Prices and customers; every "Add
+    and customer for one without Prices and customers; the ledger and the
+    customer lists for one without Accounts and customers; every "Add
     warehouse" door for a non-admin). The refusal
     itself is the view's job — ReadOnlyRoleMiddleware for the roles, see
     erp/roles.py, and operating.views_warehouse._is_admin for the rest.
     """
     from erp.roles import (is_operations_manager, is_sales_rep, may_print_labels,
-                           may_see_profit, sees_order_money)
+                           may_see_profit, sees_accounts, sees_order_money)
     from operating.views_warehouse import _is_admin
 
     user = getattr(request, "user", None)
@@ -139,6 +140,7 @@ def role_flags(request):
         "is_sales_rep": is_sales_rep(user),
         "sees_orders": not is_operations_manager(user),
         "sees_order_money": sees_order_money(user),
+        "sees_accounts": sees_accounts(user),
         "may_see_profit": may_see_profit(user),
         "may_print_labels": may_print_labels(user),
         "is_brand_admin": _is_admin(user),

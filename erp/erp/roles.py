@@ -381,6 +381,65 @@ def nav_item_reaches_orders(item):
     return is_order_path(item.get("href") or "")
 
 
+# ── What a role without Accounts and customers may not reach ──────────
+# The ledger and the CRM: current accounts and statements, payments,
+# checks, transfers, cash, reports, the book's own page, and the customer
+# and supplier lists. Refused by ReadOnlyRoleMiddleware before URL
+# resolution, so a route added tomorrow under these is closed by default.
+ACCOUNTS_PREFIXES = ("/accounting/", "/crm/")
+# What purchasing needs from inside them, and is warehouse work: the
+# purchases and goods receipts, a raw-material receipt, the rate a
+# purchase in another currency is booked at, switching the working book,
+# and the company picker that chooses a purchase's supplier.
+ACCOUNTS_OPEN_PREFIXES = (
+    "/accounting/accounts/purchases/",
+    "/accounting/accounts/payments/fx-rate/",
+    "/crm/customer_autocomplete/",
+)
+ACCOUNTS_OPEN_PATTERNS = (
+    re.compile(r"^/accounting/books/\d+/purchases/"),
+    re.compile(r"^/accounting/books/\d+/raw_goods_receipt/"),
+    re.compile(r"^/accounting/books/\d+/work_here/"),
+)
+
+
+def is_accounts_path(path):
+    """Whether `path` is under the ledger or the CRM and not one of the
+    purchasing routes that stay open beside them."""
+    if not path.startswith(ACCOUNTS_PREFIXES):
+        return False
+    if path.startswith(ACCOUNTS_OPEN_PREFIXES):
+        return False
+    return not any(pattern.match(path) for pattern in ACCOUNTS_OPEN_PATTERNS)
+
+
+def sees_accounts(actor):
+    """Whether this member reaches the ledger and the customer and
+    supplier lists (the Accounts and customers permission). Read as a
+    restriction, like Orders: a role leaving it out writes no_accounts
+    onto its members. Superusers always may."""
+    member, user = _member_and_user(actor)
+    if member is None:
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return not _has_permission(member, "no_accounts")
+
+
+def nav_item_reaches_accounts(item):
+    """Whether a nav item leads into the ledger or the CRM, judged like
+    nav_item_reaches_orders."""
+    from django.urls import NoReverseMatch, reverse
+
+    name = NAV_ACTION_ENDPOINTS.get(item["action"]) if item.get("action") else item.get("url")
+    if name:
+        try:
+            return is_accounts_path(reverse(name))
+        except NoReverseMatch:
+            return False
+    return is_accounts_path(item.get("href") or "")
+
+
 def may_see_profit(actor):
     """Whether this member may read what an order cost us and what we
     made on it: COGS, gross profit, margin.

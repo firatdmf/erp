@@ -492,7 +492,8 @@ def nav_sections(context, surface="desktop"):
     """
     from erp.nav import NAV_SECTIONS, mobile_sections
     from erp.roles import (is_operations_manager, is_sales_rep, nav_item_needs_order_money,
-                           nav_item_reaches_orders, sees_order_money)
+                           nav_item_reaches_accounts, nav_item_reaches_orders,
+                           sees_accounts, sees_order_money)
     from operating.views_warehouse import _is_admin
 
     user = context.get("user")
@@ -501,6 +502,8 @@ def nav_sections(context, surface="desktop"):
         sections = _readable_sections(sections)
     if is_operations_manager(user):
         sections = _sections_without(sections, nav_item_reaches_orders)
+    if not sees_accounts(user):
+        sections = _sections_without(sections, nav_item_reaches_accounts)
     if not sees_order_money(user):
         sections = _sections_without(sections, nav_item_needs_order_money)
     if not _is_admin(user):

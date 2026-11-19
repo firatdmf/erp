@@ -326,3 +326,17 @@ class AdjustmentsThroughTheFormTest(TestCase):
         body = r.content.decode()
         self.assertIn('label: "Delivery"', body)
         self.assertIn('amount: "45.00"', body)      # unlocalised, so JS can read it
+
+    def test_the_form_stops_a_line_filled_in_halfway(self):
+        # The server drops a row missing its label or its amount, so the
+        # form has to refuse to send one rather than lose the money.
+        self._post([{"label": "Delivery", "amount": "45.00"}])
+        order = Order.objects.get()
+        r = self.client.get(reverse("operating:edit_order", args=[order.pk]),
+                            headers={"x-requested-with": "XMLHttpRequest"})
+        body = r.content.decode()
+        self.assertIn("Give each charge or discount line a name", body)
+        self.assertIn("Enter an amount for each charge or discount line", body)
+        # …and marks the line live while it is typed, before any save.
+        self.assertIn("Add a name, e.g. Discount", body)
+        self.assertIn("Add an amount, negative for a discount", body)

@@ -16559,3 +16559,15 @@ msgid ""
 msgstr ""
 "Perakende satış kaydedildi ama tamamlanmadı (%(reason)s) — sipariş "
 "sayfasından tamamlayın."
+
+msgid "Give each charge or discount line a name, e.g. Discount."
+msgstr "Her ek ücret veya indirim satırına bir ad verin, ör. İndirim."
+
+msgid "Enter an amount for each charge or discount line, negative for a discount."
+msgstr "Her ek ücret veya indirim satırına bir tutar girin; indirim için eksi tutar."
+
+msgid "Add a name, e.g. Discount — without one this line is not saved."
+msgstr "Bir ad girin, ör. İndirim — ad olmadan bu satır kaydedilmez."
+
+msgid "Add an amount, negative for a discount — without one this line is not saved."
+msgstr "Bir tutar girin, indirim için eksi — tutar olmadan bu satır kaydedilmez."

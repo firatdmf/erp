@@ -1543,8 +1543,42 @@
   window.coAdjustmentChanged = function (i, field, value) {
     if (!orderAdjustments[i]) return;
     orderAdjustments[i][field] = value;
+    coMarkAdjustment(i);
     updateTotal();
   };
+
+  // Which half of a line is missing: 'label', 'amount', or '' when the
+  // line is complete or wholly empty. The server keeps only rows with
+  // both, so a half-filled one would be lost on save.
+  function coAdjustmentMissing(a) {
+    var hasLabel = String(a.label || '').trim() !== '';
+    var hasAmount = (parseFloat(String(a.amount).replace(',', '.')) || 0) !== 0;
+    if (hasLabel === hasAmount) return '';
+    return hasLabel ? 'amount' : 'label';
+  }
+
+  // Marks the missing box of line i in red with a hint under it, live as
+  // the user types — the total already counts the amount, so the line
+  // must say plainly that it is not finished yet.
+  function coMarkAdjustment(i) {
+    var row = document.querySelectorAll('#co-adj-rows > div')[i];
+    var a = orderAdjustments[i];
+    if (!row || !a) return;
+    var missing = coAdjustmentMissing(a);
+    var labelInp = row.querySelector('.co-adj-label');
+    var amountInp = row.querySelector('.co-adj-amount');
+    var hint = row.querySelector('.co-adj-hint');
+    if (labelInp) labelInp.style.borderColor = missing === 'label' ? '#DC2626' : '';
+    if (amountInp) amountInp.style.borderColor = missing === 'amount' ? '#DC2626' : '';
+    if (hint) {
+      hint.textContent = missing === 'label'
+        ? '{% filter escapejs %}{% trans "Add a name, e.g. Discount — without one this line is not saved." %}{% endfilter %}'
+        : missing === 'amount'
+          ? '{% filter escapejs %}{% trans "Add an amount, negative for a discount — without one this line is not saved." %}{% endfilter %}'
+          : '';
+      hint.style.display = missing ? '' : 'none';
+    }
+  }
 
   function coAdjustmentsTotal() {
     return orderAdjustments.reduce(function (sum, a) {
@@ -1557,18 +1591,22 @@
     const box = document.getElementById('co-adj-rows');
     if (!box) return;
     box.innerHTML = orderAdjustments.map(function (a, i) {
-      return '<div style="display:flex; gap:6px; align-items:center;">' +
+      return '<div>' +
+        '<div style="display:flex; gap:6px; align-items:center;">' +
         '<input type="text" class="form-input co-adj-label" style="flex:1;" ' +
                'placeholder="{% filter escapejs %}{% trans "e.g. Delivery" %}{% endfilter %}" ' +
                'value="' + coEsc(a.label) + '" ' +
                'oninput="coAdjustmentChanged(' + i + ', \'label\', this.value)">' +
-        '<input type="number" step="0.01" class="form-input" style="width:120px; text-align:right;" ' +
+        '<input type="number" step="0.01" class="form-input co-adj-amount" style="width:120px; text-align:right;" ' +
                'placeholder="0.00" value="' + coEsc(a.amount) + '" onwheel="this.blur()" ' +
                'oninput="coAdjustmentChanged(' + i + ', \'amount\', this.value)">' +
         '<button type="button" class="ord-btn" title="{% filter escapejs %}{% trans "Remove" %}{% endfilter %}" ' +
                'onclick="coRemoveAdjustment(' + i + ')"><i class="fas fa-times"></i></button>' +
+        '</div>' +
+        '<div class="co-adj-hint" style="display:none; margin-top:3px; font:500 11.5px \'Inter\',sans-serif; color:#DC2626;"></div>' +
         '</div>';
     }).join('');
+    orderAdjustments.forEach(function (_, i) { coMarkAdjustment(i); });
   }
 
   function coEsc(v) {
@@ -3331,6 +3369,31 @@
         missingBox.focus();
         return;
       }
+    }
+    // A charge or discount line filled in halfway would be dropped by the
+    // server (it keeps only rows with both a label and an amount), so the
+    // money would quietly never reach the total. The line is already
+    // marked red as it is typed; Save stops and points at it too. A row
+    // left wholly empty is just discarded.
+    var halfAdj = -1, halfAdjField = '';
+    orderAdjustments.some(function (a, i) {
+      var missing = coAdjustmentMissing(a);
+      if (!missing) return false;
+      halfAdj = i; halfAdjField = missing;
+      return true;
+    });
+    if (halfAdj >= 0) {
+      showToast(halfAdjField === 'label'
+        ? '{% filter escapejs %}{% trans "Give each charge or discount line a name, e.g. Discount." %}{% endfilter %}'
+        : '{% filter escapejs %}{% trans "Enter an amount for each charge or discount line, negative for a discount." %}{% endfilter %}',
+        'error');
+      var adjRow = document.querySelectorAll('#co-adj-rows > div')[halfAdj];
+      var adjField = adjRow && adjRow.querySelector(halfAdjField === 'label' ? '.co-adj-label' : '.co-adj-amount');
+      if (adjField) {
+        adjField.scrollIntoView({ block: 'center' });
+        adjField.focus();
+      }
+      return;
     }
     var emptyLine = orderItems.find(function (it) {
       return !it.is_custom_curtain && (parseFloat(it.quantity) || 0) <= 0;

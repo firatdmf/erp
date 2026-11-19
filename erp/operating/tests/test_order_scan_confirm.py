@@ -192,9 +192,21 @@ class TheScannerIsAPopup(SimpleTestCase):
     def test_escape_closes_it(self):
         self.assertRegex(read_camera(), r"e\.key === 'Escape'[\s\S]{0,200}close\(\)")
 
-    def test_every_page_has_it(self):
+    def test_every_page_has_it_before_its_own_scripts(self):
+        """In the head: a page script in the body must find it loaded.
+        At the end of the body it came after the packing page's script,
+        which then found no camera (2026-11-19, on production)."""
         with open("erp/templates/base.html", encoding="utf-8") as fh:
-            self.assertIn('{% include "components/barcode_camera.html" %}', fh.read())
+            base = fh.read()
+        include = base.index('{% include "components/barcode_camera.html" %}')
+        self.assertLess(include, base.index("</head>"))
+        self.assertLess(include, base.index("{% block content %}"))
+
+    def test_the_packing_page_makes_its_reader_when_the_camera_opens(self):
+        with open("operating/templates/operating/order_pack_scan.html", encoding="utf-8") as fh:
+            pack = fh.read()
+        self.assertIn("var pkReader = null;", pack)
+        self.assertIn("pkGetReader()", body_of(pack, "function startCam()"))
 
 
 class OneReaderForEveryPage(SimpleTestCase):

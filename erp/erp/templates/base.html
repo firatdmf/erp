@@ -80,6 +80,10 @@
   {% comment %}
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
   {% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
+  {% comment %}The one camera barcode reader, in the head so it is ready
+  before any page's own script runs (the packing page's ran before it
+  when it sat at the end of the body, and found no camera).{% endcomment %}
+  {% include "components/barcode_camera.html" %}
   {% block css %}
   <link rel="stylesheet" href="{% static 'todo/css/components/tasks_new.css' %}" />
   <link rel="stylesheet" href="{% static 'operating/css/create_order.css' %}" />
@@ -609,7 +613,6 @@
   </main>
   {% endwith %}
 
-  {% include "components/barcode_camera.html" %}
   <script src="{% static 'erp/js/text_fold.js' %}"></script>
   <script src="{% static 'erp/js/command_palette.js' %}"></script>
   <script src="{% static 'erp/js/submit_shortcut.js' %}"></script>

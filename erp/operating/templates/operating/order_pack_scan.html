@@ -1558,21 +1558,26 @@
   // the camera keeps running, unread, so "Scan another" is instant.
   var video = document.getElementById('pkVideo');
   var scanModal = document.getElementById('pkScanModal');
-  var pkReader = (window.NejumCamera && video) ? window.NejumCamera.reader({
-    video: video,
-    diag: document.getElementById('pkDiag'),
-    accept: function(){ return !scanPaused; },
-    soundOnRead: false,     // the card sounds what the read came to
-
-    onStatus: function(text){ var hit=document.getElementById('pkHit'); if(hit) hit.textContent = text; },
-    onCode: function(code){
-      var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
-      pkScanPlace(code);
-    },
-  }) : null;
+  // Made on first use, not when this script runs: the shared reader is
+  // a script of its own, and a page script can run before it has loaded.
+  var pkReader = null;
+  function pkGetReader(){
+    if (!pkReader && window.NejumCamera && video) pkReader = window.NejumCamera.reader({
+      video: video,
+      diag: document.getElementById('pkDiag'),
+      accept: function(){ return !scanPaused; },
+      soundOnRead: false,     // the card sounds what the read came to
+      onStatus: function(text){ var hit=document.getElementById('pkHit'); if(hit) hit.textContent = text; },
+      onCode: function(code){
+        var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
+        pkScanPlace(code);
+      },
+    });
+    return pkReader;
+  }
   // Starts the camera, or goes back to reading on the one already open.
   function startCam(){
-    if (!pkReader){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
+    if (!pkGetReader()){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
     pkReader.resume().catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); });
   }
   function stopCam(){ if (pkReader) pkReader.stop(); }

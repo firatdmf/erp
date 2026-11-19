@@ -955,7 +955,7 @@ def hold_received_rolls(invoice, *, user=None):
     rolls = (WarehouseProductItem.objects
              .filter(Q(purchase_invoice_item__invoice=invoice)
                      | Q(processing_history__invoice=invoice,
-                         processing_history__outcome="returned"))
+                         processing_history__outcome="came_back"))
              .exclude(pk__in=already)
              .select_related("product")
              .distinct()

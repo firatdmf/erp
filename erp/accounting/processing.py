@@ -439,7 +439,7 @@ def settle(receipt, *, user=None):
     for roll_id, line in receipt.lines.items():
         line.received_at = now
         if roll_id in receipt.returned:
-            line.outcome = "returned"
+            line.outcome = "came_back"
             line.quantity_back = receipt.returned[roll_id]
         else:
             roll = WarehouseProductItem.objects.select_related("product").get(pk=roll_id)
@@ -474,7 +474,7 @@ def settle(receipt, *, user=None):
 # ── Undoing a receipt ────────────────────────────────────────────────────
 
 def _in_use_since(roll, own_order_id=None):
-    """Why a returned item can't be put back, or None. The order the
+    """Why an item that came back can't be put back, or None. The order the
     purchase was bought for holding it, unpacked, is no reason: that hold
     goes with the receipt (unreceive_lines), as it does for the rolls the
     purchase brought in itself."""
@@ -502,7 +502,7 @@ def unreceive_problems(invoice):
         if roll is None:
             problems.append(f"{line.barcode}: " + _("it is gone."))
             continue
-        if line.outcome == "returned":
+        if line.outcome == "came_back":
             if _left(roll) != Decimal(line.quantity_back or 0):
                 problems.append(f"{line.barcode}: " + _("%(qty)s has come off it since.") % {
                     "qty": format((Decimal(line.quantity_back or 0) - _left(roll)).normalize(), "f")})
@@ -603,7 +603,7 @@ def rolls_back_on(item):
         return []
     return list(WarehouseProductItem.objects
                 .filter(processing_history__invoice_id=item.invoice_id,
-                        processing_history__outcome="returned",
+                        processing_history__outcome="came_back",
                         product__catalog_variant_id=item.variant_id)
                 .select_related("product", "product__warehouse",
                                 "product__catalog_variant__product")

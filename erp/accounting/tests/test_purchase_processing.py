@@ -170,7 +170,7 @@ class GoodsOutTest(TestCase):
         self.assertEqual((b.status, b.quantity_remaining, b.is_away), ("consumed", 0, False))
         self.assertEqual(WarehouseProductItem.objects.filter(barcode="KZL-A").count(), 1)
         lines = {l.barcode: l.outcome for l in ProcessingLine.objects.filter(invoice_id=pk)}
-        self.assertEqual(lines, {"KZL-A": "returned", "KZL-B": "used"})
+        self.assertEqual(lines, {"KZL-A": "came_back", "KZL-B": "used"})
 
     def test_what_went_out_is_spread_over_what_came_in_and_only_the_work_is_owed(self, _up):
         pk = self._sent_and_back()
@@ -383,6 +383,11 @@ class GoodsOutTest(TestCase):
         self.assertTrue(c.json()["success"], c.json())
         holds = OrderStockReservation.objects.filter(order=order, consumed=False)
         self.assertEqual(list(holds.values_list("stock_item__barcode", flat=True)), ["KZL-A"])
+        # The order's purchase card counts it: the roll came back on this
+        # purchase, though its own purchase is the one that first bought it.
+        page = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        card = next(p for p in page.context["supplier_purchases"] if p.pk == pk)
+        self.assertEqual(card.held_quantity, Decimal("48"))
 
         r = self.client.post(reverse("accounts:purchase_undo_receipt", args=[pk]))
         self.assertEqual(r.status_code, 200, r.content)

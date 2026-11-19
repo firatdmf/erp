@@ -27,7 +27,7 @@ class ProcessingLine(models.Model):
         ordering = ["invoice", "pk"]
 
     OUTCOMES = [
-        ("returned", "Came back"),
+        ("came_back", "Came back"),
         ("used", "Used up"),
     ]
 

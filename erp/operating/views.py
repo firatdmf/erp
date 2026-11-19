@@ -411,18 +411,41 @@ class OrderDetail(DetailView):
 
     def _supplier_purchases(self):
         """Purchases bought for this order, each with how much of what it
-        brought in this order still holds."""
-        from django.db.models import Q, Sum
-        return list(
+        brought in this order still holds. What it brought in is its own
+        stock items, and our own items that came back from work done on it
+        (accounting.processing): those keep the purchase that first bought
+        them, so they are found through its processing lines."""
+        from decimal import Decimal
+        from django.db.models import Sum
+        from accounting.models_processing import ProcessingLine
+        from .models import OrderStockReservation, WarehouseProductItem
+        purchases = list(
             self.object.supplier_purchases
             .exclude(status="cancelled")
             .select_related("current_account", "intake_warehouse")
-            .annotate(held_quantity=Sum(
-                "items__warehouse_stock_items__reservations__quantity",
-                filter=Q(items__warehouse_stock_items__reservations__order=self.object),
-            ))
             .order_by("-date", "-pk")
         )
+        pks = [p.pk for p in purchases]
+        brought = {}  # purchase pk → stock item pks
+        for item_id, inv_id in (WarehouseProductItem.objects
+                                .filter(purchase_invoice_item__invoice_id__in=pks)
+                                .values_list("pk", "purchase_invoice_item__invoice_id")):
+            brought.setdefault(inv_id, set()).add(item_id)
+        for item_id, inv_id in (ProcessingLine.objects
+                                .filter(invoice_id__in=pks, outcome="came_back",
+                                        stock_item__isnull=False)
+                                .values_list("stock_item_id", "invoice_id")):
+            brought.setdefault(inv_id, set()).add(item_id)
+        held = dict(OrderStockReservation.objects
+                    .filter(order=self.object,
+                            stock_item_id__in=set().union(*brought.values()))
+                    .values("stock_item_id")
+                    .annotate(q=Sum("quantity"))
+                    .values_list("stock_item_id", "q"))
+        for p in purchases:
+            p.held_quantity = sum((held.get(i, Decimal(0)) for i in brought.get(p.pk, ())),
+                                  Decimal(0))
+        return purchases
 
     def get_queryset(self):
         # Prefetch items + their product/variant so gross_profit() can

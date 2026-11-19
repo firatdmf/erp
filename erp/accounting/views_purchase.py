@@ -193,7 +193,7 @@ class PurchaseOrderDetail(View):
         from .processing import rolls_back_on
         # Asked once: only a purchase that sent our goods out for work has
         # any that came back, and only then is each line looked at.
-        any_back = invoice.processing_lines.filter(outcome="returned").exists()
+        any_back = invoice.processing_lines.filter(outcome="came_back").exists()
         for i, it in enumerate(items):
             # Its own rolls, and ours that came back from the work as its
             # variant under their own barcode (accounting.processing).

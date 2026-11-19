@@ -150,7 +150,8 @@ class CountedStock(TestCase):
         self.old.save()
         data = self.get("order_create_roll_list", sku=EAN).json()
         self.assertEqual([r["lot"] for r in data["rolls"]], ["101", ""])
-        self.assertEqual((data["item_noun"], data["item_noun_plural"]), ("box", "boxes"))
+        self.assertEqual((data["item_noun"], data["item_noun_plural"], data["item_icon"]),
+                         ("box", "boxes", "fa-box"))
 
     def test_cloth_is_listed_as_it_always_was(self):
         data = self.get("order_create_roll_list", sku="K1.G1").json()

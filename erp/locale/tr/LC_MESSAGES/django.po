@@ -16583,3 +16583,9 @@ msgstr "Sipariş iptal edildi — ürünleri stoğa geri döndü ve satışı ca
 
 msgid "Order marked returned — its goods went back into stock and its sale was taken back from the account."
 msgstr "Sipariş iade edildi olarak işaretlendi — ürünleri stoğa geri döndü ve satışı cari hesaptan geri alındı."
+
+msgid "Taking from"
+msgstr "Alınanlar"
+
+msgid "Put back"
+msgstr "Geri koy"

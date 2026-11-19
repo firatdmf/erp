@@ -3099,6 +3099,7 @@ def free_rolls_response(request, books):
         # items in the form's list.
         "item_noun": (first.item_noun if first else ""),
         "item_noun_plural": (first.item_noun_plural if first else ""),
+        "item_icon": (first.item_icon if first else ""),
         "line_cost_base": line_cost,
     })
 

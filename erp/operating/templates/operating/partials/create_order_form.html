@@ -177,18 +177,31 @@
 .co-stockline.short{color:#B45309;}
 .co-stockline .sep{color:#CBD5E1;margin:0 5px;}
 .co-stockline .cost{font-weight:500;}
-/* A counted card's boxes: which one each piece came out of. */
-.co-box-list{margin-top:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;}
-.co-box-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:11px;color:#0F766E;text-transform:uppercase;letter-spacing:.04em;}
-.co-box-topick{margin-left:auto;text-transform:none;letter-spacing:0;font-size:10.5px;font-weight:800;color:#92400E;background:#FEF3C7;padding:2px 8px;border-radius:999px;}
-.co-box-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 6px 5px 9px;font-size:12px;background:#fff;border:1px solid #E2E8EE;border-radius:7px;}
-.co-box-row.taken{background:#ECFDF5;border-color:#A7F3D0;}
-.co-box-row[data-bc]{cursor:pointer;}
-.co-box-row[data-bc]:hover{border-color:#5EEAD4;background:#F0FDFA;}
+/* A counted card's boxes: which one each piece came out of. Drawn like
+   the roll picker (rollSectionHtml / rollRowHtml): same panel, header,
+   rows, ticks and greens. */
+.co-box-list{margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;}
+.co-box-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;}
+.co-box-hint{font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;}
+.co-box-badge{margin-left:auto;font-weight:800;font-size:10.5px;letter-spacing:0;text-transform:none;color:#94A3B8;background:#F1F5F9;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+.co-box-badge.some{color:#0F766E;background:#D1FAE5;}
+.co-box-badge.topick{color:#92400E;background:#FEF3C7;}
+.co-box-sub{margin-top:9px;font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;}
+.co-box-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding:8px 9px;font-size:12px;background:#fff;border:1px solid #E2E8EE;border-radius:7px;cursor:pointer;}
+.co-box-row:hover{border-color:#A7F3D0;}
+.co-box-row.taken{background:#ECFDF5;border-color:#A7F3D0;cursor:default;padding-top:5px;padding-bottom:5px;}
+.co-box-tick{font-size:17px;color:#CBD5E1;flex-shrink:0;}
+.co-box-row.taken .co-box-tick{color:#0F766E;}
 .co-box-row code{background:#F8FAFC;padding:2px 6px;border-radius:4px;flex-shrink:0;}
 .co-box-where{flex:1;min-width:0;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .co-box-free{color:#0F766E;font-weight:600;white-space:nowrap;}
 .co-box-row .form-input{width:64px;flex:0 0 auto;padding:5px 7px;}
+.co-box-unit{font-size:11px;color:#6b7280;}
+/* base.css pads every <button>: an icon button resets it. */
+.co-box-back{background:none;border:0;padding:0 4px;color:#B91C1C;font-size:14px;line-height:1;cursor:pointer;flex-shrink:0;}
+/* The box a click just took from, so the eye follows it up. */
+@keyframes coBoxIn{from{background:#A7F3D0;}to{background:#ECFDF5;}}
+.co-box-flash{animation:coBoxIn .9s ease-out;}
 /* What this customer paid for the variant last time (coLastPaidHtml). */
 .co-lastpaid{display:block;margin-top:3px;font-size:11px;font-weight:600;color:#0B5F60;}
 .co-lastpaid .sep{color:#CBD5E1;margin:0 5px;}
@@ -1744,6 +1757,7 @@
         item.printedBarcode = (d && d.printed_barcode) || '';
         item.itemNoun = (d && d.item_noun) || '';
         item.itemNounPlural = (d && d.item_noun_plural) || '';
+        item.itemIcon = (d && d.item_icon) || '';
         // Cost per unit by barcode, kept apart from availableRolls: a
         // ticked or saved roll is a different object that never carried
         // it, and the row still wants to show it. A sales rep is sent
@@ -2249,6 +2263,9 @@
                     lot: p.lot || '', quantity: take });
     });
     item.rolls = picked;
+    // A quantity typed or scanned is what the line is asked for now; the
+    // boxes' own × goes back to it (coTakeFromBox).
+    item.wanted = null;
     if (left > 0) {
       showToast('{% filter escapejs %}{% trans "Only %(n)s are free in stock — the line takes those." %}{% endfilter %}'.replace('%(n)s', n - left), 'warning');
     }
@@ -2520,46 +2537,75 @@
       held[(r.barcode || '').toLowerCase()] = parseFloat(r.quantity) || 0;
     });
     var unit = esc(item.rollUnit || '');
-    var rows = pool.map(function (p) {
+    var flash = item.justTaken;
+    item.justTaken = null;
+    var taking = '', shelf = '';
+    pool.forEach(function (p) {
       var key = (p.barcode || '').toLowerCase();
       var n = held[key] || 0;
       var free = Math.floor(parseFloat(p.available) || 0);
-      // A row taken from already is changed in its field, so a stray
-      // click cannot undo a pick; an untaken one is taken from by a click.
-      return '<div class="co-box-row' + (n ? ' taken' : '') + '"' +
-          (n ? '' : ' data-bc="' + escAttr(p.barcode || '') + '" onclick="coClickBox(' + i + ',this.dataset.bc)"') + '>' +
-        '<code>' + esc(coRollLabel(p, item.itemNoun)) + '</code>' +
-        '<span class="co-box-where">' + esc(p.warehouse || '') + coRollBookHtml(p) + '</span>' +
-        '<span class="co-box-free">' + free + ' ' + unit + ' {% trans "free" %}</span>' +
-        '<input type="number" class="form-input" inputmode="numeric" min="0" step="1"' +
-          (free ? ' max="' + free + '"' : '') + ' value="' + (n || '') + '" placeholder="0"' +
-          ' data-bc="' + escAttr(p.barcode || '') + '" onclick="event.stopPropagation()" onfocus="this.select()"' +
-          ' onchange="coTakeFromBox(' + i + ',this.dataset.bc,this.value)"' +
-          ' onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
-      '</div>';
-    }).join('');
+      var label = '<code>' + esc(coRollLabel(p, item.itemNoun)) + '</code>' +
+        '<span class="co-box-where">' + esc(p.warehouse || '') + coRollBookHtml(p) + '</span>';
+      var bc = escAttr(p.barcode || '');
+      if (n) {
+        taking += '<div class="co-box-row taken' + (flash === key ? ' co-box-flash' : '') + '">' +
+          '<i class="fas fa-circle-check co-box-tick"></i>' + label +
+          '<input type="number" class="form-input" inputmode="numeric" min="0" step="1"' +
+            (free ? ' max="' + free + '"' : '') + ' value="' + n + '"' +
+            ' data-bc="' + bc + '" onfocus="this.select()"' +
+            ' onchange="coTakeFromBox(' + i + ',this.dataset.bc,this.value)"' +
+            ' onkeydown="if(event.key===\'Enter\'){event.preventDefault(); this.blur();}">' +
+          '<span class="co-box-unit">' + unit + '</span>' +
+          '<button type="button" class="co-box-back" data-bc="' + bc + '"' +
+            ' onclick="coTakeFromBox(' + i + ',this.dataset.bc,0)"' +
+            ' title="{% filter escapejs %}{% trans "Put back" %}{% endfilter %}">' +
+            '<i class="fas fa-xmark"></i></button>' +
+        '</div>';
+      } else {
+        shelf += '<div class="co-box-row" data-bc="' + bc + '" onclick="coClickBox(' + i + ',this.dataset.bc)">' +
+          '<i class="far fa-circle co-box-tick"></i>' + label +
+          '<span class="co-box-free">' + free + ' ' + unit + ' {% trans "free" %}</span>' +
+        '</div>';
+      }
+    });
     var toPick = coToPick(item);
+    var taken = coPickedTotal(item);
     var title = item.itemNounPlural || '{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}';
+    // The badge says what is still owed while anything is; otherwise how
+    // much the boxes give, as the roll picker counts its rolls.
+    var badge = toPick
+      ? '<span class="co-box-badge topick">' +
+          '{% filter escapejs %}{% trans "%(n)s to pick" %}{% endfilter %}'.replace('%(n)s', toPick) + '</span>'
+      : '<span class="co-box-badge' + (taken ? ' some' : '') + '">' + coWhole(taken) + ' ' + unit + '</span>';
     return '<div class="co-box-list">' +
-      '<div class="co-box-head"><span>' + esc(title.charAt(0).toUpperCase() + title.slice(1)) + '</span>' +
-        (toPick ? '<span class="co-box-topick">' +
-          '{% filter escapejs %}{% trans "%(n)s to pick" %}{% endfilter %}'.replace('%(n)s', toPick) +
-          '</span>' : '') +
-      '</div>' + rows + '</div>';
+      '<div class="co-box-head">' +
+        '<i class="fas ' + esc(item.itemIcon || 'fa-layer-group') + '"></i> ' +
+        esc(title.charAt(0).toUpperCase() + title.slice(1)) +
+        '<span class="co-box-hint">({% trans "click to pick" %})</span>' + badge +
+      '</div>' +
+      (taking ? '<div class="co-box-sub">{% filter escapejs %}{% trans "Taking from" %}{% endfilter %}</div>' + taking : '') +
+      (shelf ? (taking ? '<div class="co-box-sub">{% filter escapejs %}{% trans "On the shelf" %}{% endfilter %}</div>' : '') + shelf : '') +
+    '</div>';
   }
 
-  // Take `raw` of a counted line from this one box. What it takes goes
-  // first to what the line still had to pick, so choosing the box for an
-  // order that came in unpicked leaves its quantity as it was.
-  // A click on a box nothing was taken from yet: it takes what the line
-  // still has to pick (as much as the box holds), or one more when nothing
-  // is left to pick — what a scan of the printed barcode means.
+  // A click on a box on the shelf: it takes what the line still has to
+  // pick (as much as the box holds), or one more when nothing is left to
+  // pick — what a scan of the printed barcode means.
   window.coClickBox = function (i, bc) {
     var item = orderItems[i];
     if (!item) return false;
+    item.justTaken = (bc || '').toLowerCase();
     return window.coTakeFromBox(i, bc, coToPick(item) || 1, true);
   };
 
+  // Take `raw` of a counted line from this one box. Choosing boxes says
+  // where the pieces come from, not how many were ordered. The line keeps
+  // the quantity it was asked for (`wanted`: as saved, typed or scanned);
+  // its boxes fill that first, what they put back (× or a smaller number)
+  // goes back to be picked, and taking more than that makes the line
+  // bigger only until it is put back — so × undoes a click, and never
+  // takes the line below what was ordered. The quantity box is where the
+  // order itself is changed.
   window.coTakeFromBox = function (i, bc, raw, quiet) {
     var item = orderItems[i];
     if (!item) return false;
@@ -2572,9 +2618,8 @@
       n = cap;
       if (!quiet) showToast('{% filter escapejs %}{% trans "Only %(n)s are free in this one." %}{% endfilter %}'.replace('%(n)s', cap), 'warning');
     }
+    if (item.wanted == null) item.wanted = parseFloat(item.quantity) || 0;
     var prev = (item.rolls || []).find(function (r) { return (r.barcode || '').toLowerCase() === key; });
-    var had = prev ? (parseFloat(prev.quantity) || 0) : 0;
-    var unheld = Math.max(0, (parseFloat(item.quantity) || 0) - coPickedTotal(item));
     var rest = (item.rolls || []).filter(function (r) { return r !== prev; });
     if (n > 0) {
       rest.push({ reservation_id: (prev && prev.reservation_id) || null, barcode: p.barcode,
@@ -2583,7 +2628,7 @@
                   lot: p.lot || '', quantity: n });
     }
     item.rolls = rest;
-    item.manualMeters = Math.max(0, unheld - Math.max(0, n - had));
+    item.manualMeters = Math.max(0, item.wanted - coPickedTotal(item));
     syncQtyFromRolls(i, true);
     renderProducts();
     return true;

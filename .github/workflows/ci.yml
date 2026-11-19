@@ -58,7 +58,9 @@ jobs:
           # Pinned to erp/runtime.txt, which is what Railway builds with.
           python-version: "3.12.1"
           cache: pip
-          cache-dependency-path: erp/requirements.txt
+          cache-dependency-path: |
+            erp/requirements.txt
+            erp/requirements-dev.txt
 
       - name: Install system libraries
         # WeasyPrint links against these at import time; the same list
@@ -70,7 +72,9 @@ jobs:
             libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
 
       - name: Install Python dependencies
-        run: pip install -r erp/requirements.txt
+        # The dev list is requirements.txt plus tblib, which the parallel
+        # test run needs to report a failure.
+        run: pip install -r erp/requirements-dev.txt
 
       - name: Migrate a database built from nothing
         # The guard. An undeclared cross-app dependency fails here and
@@ -101,8 +105,10 @@ jobs:
         # to a bare `manage.py test` so discovery cannot wander into
         # whatever else happens to sit in this directory: a stray
         # test_req.py once broke it before it reached the first app.
+        # --parallel auto: one worker per CPU (4 on GitHub's runner); run
+        # one at a time this step took 15-25 minutes.
         working-directory: erp
         run: |
           python manage.py test \
             accounting authentication crm erp.tests marketing operating \
-            --no-input
+            --parallel auto --no-input

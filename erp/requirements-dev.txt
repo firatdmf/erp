@@ -1,4 +1,4 @@
-# Local development only: CI and Railway install requirements.txt, not this.
+# Local development and CI (parallel tests); Railway installs requirements.txt only.
 -r requirements.txt
 # Lets `manage.py test --parallel` report a failing test instead of
 # crashing with "cannot pickle 'traceback' object".

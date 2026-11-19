@@ -45,6 +45,7 @@ urlpatterns = [
     # (views_warehouse.warehouse_in_reach). The three pages about the
     # warehouse itself keep the stricter warehouse_guarded.
     path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),
+    path("warehouses/away/", views_warehouse.warehouse_away, name="warehouse_away"),
     # Global activity feed ("Son Hareketler") — all warehouses. Must sit
     # above warehouses/<int:pk>/ patterns (won't collide: int ≠ "movements").
     path("warehouses/movements/", views_warehouse.WarehouseMovementsAll.as_view(), name="warehouse_movements_all"),

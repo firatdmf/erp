@@ -1776,6 +1776,15 @@
         </div>
       </section>
 
+      {% if away_count %}
+      <a href="{% url 'operating:warehouse_away' %}?warehouse={{ warehouse.pk }}" class="od-card"
+         style="display:flex; align-items:center; gap:10px; padding:12px 16px; text-decoration:none; color:#5B21B6; background:#F5F3FF; border-color:#DDD6FE; font:600 13px var(--font-sans, sans-serif);">
+        <i class="fa fa-truck-arrow-right"></i>
+        <span style="flex:1; min-width:0;">{% blocktrans count n=away_count %}{{ n }} item away for work{% plural %}{{ n }} items away for work{% endblocktrans %}</span>
+        <span style="white-space:nowrap;">{% trans "See them" %} <i class="fa fa-arrow-right" style="font-size:10px;"></i></span>
+      </a>
+      {% endif %}
+
       <!-- SON HAREKETLER — latest activity in THIS warehouse (all products) -->
       {% if recent_movements %}
       <section class="od-card" style="padding:0; overflow:hidden;">

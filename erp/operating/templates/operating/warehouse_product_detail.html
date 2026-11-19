@@ -693,6 +693,7 @@
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-warehouse"></i>{% trans "Current stock" %}</div>
       <div class="od-stat-value">{{ product.quantity|default:0|floatformat:"2g" }}<span class="unit">{{ product.unit_short }}</span></div>
+      {% if away_total %}<a href="{% url 'operating:warehouse_away' %}?warehouse={{ product.warehouse_id }}" style="display:block;margin-top:3px;font:600 11px var(--font-sans);color:#5B21B6;text-decoration:none;"><i class="fa fa-truck-arrow-right" style="font-size:9px;"></i> {% blocktrans with qty=away_total|floatformat:"2g" unit=product.unit_short %}{{ qty }} {{ unit }} away for work{% endblocktrans %}</a>{% endif %}
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% trans "Reserved" context "stock figure" %}</div>

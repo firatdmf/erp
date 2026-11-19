@@ -1535,9 +1535,15 @@ class WarehouseList(View):
                             "product__catalog_variant__product")
             .order_by("-created_at")[:6]
         ))
+        scope = {i for w in warehouses for i in w.scope_ids()}
         return render(request, self.template_name, {
             'warehouses': warehouses,
             'recent_movements': recent,
+            # At suppliers being worked on, on these shelves (warehouse_away).
+            'away_count': (WarehouseProductItem.objects
+                           .filter(product__warehouse_id__in=scope,
+                                   processing_line__isnull=False)
+                           .exclude(status="consumed").count()),
         })
 
 
@@ -2062,7 +2068,8 @@ class WarehouseDetail(View):
                     .annotate(base=base_expr,
                               roll_count=stock_item_count_subquery(),
                               line_usd=F('stock_value'),
-                              reserved=reserved_meters_subquery()))
+                              reserved=reserved_meters_subquery(),
+                              away=away_quantity_subquery()))
             # A → Z by product NAME, stock item quantity, unit price, or recent.
             _flat_sort = {
                 "name_asc": "name", "name_desc": "-name",
@@ -2317,6 +2324,12 @@ class WarehouseDetail(View):
             'variant_count': counts['n'],     # alias — variants
             'group_count': group_count,       # main products (packages)
             'roll_count': roll_count,         # rolls (stock_items)
+            # Of those, how many are at a supplier being worked on — a
+            # way to the list of them (warehouse_away).
+            'away_count': (WarehouseProductItem.objects
+                           .filter(product__warehouse_id__in=scope_ids,
+                                   processing_line__isnull=False)
+                           .exclude(status='consumed').count()),
             'is_admin': _is_admin(request.user),
             # Dup scan is a MERGE tool — merging across two real warehouses
             # from a virtual view would move stock; disabled there.
@@ -2463,6 +2476,7 @@ class _SameSku:
         self.quantity = sum((r.quantity or zero for r in self.members), zero)
         self.roll_count = sum(r.roll_count or 0 for r in self.members)
         self.reserved = sum((r.reserved or zero for r in self.members), zero)
+        self.away = sum((getattr(r, "away", None) or zero for r in self.members), zero)
         value = sum((r.stock_value or zero for r in self.members), zero)
         meters = sum((r.stock_quantity or zero for r in self.members), zero)
         self.stock_value = self.line_usd = value or None
@@ -2573,7 +2587,8 @@ def warehouse_group_variants(request, pk):
           .annotate(base=base_expr,
                     roll_count=stock_item_count_subquery(),
                     line_usd=F("stock_value"),
-                    reserved=reserved_meters_subquery())
+                    reserved=reserved_meters_subquery(),
+                    away=away_quantity_subquery())
           .filter(base=base).order_by("name", "id"))
     total = qs.count()
     if warehouse.is_combined:
@@ -2655,6 +2670,63 @@ def _cost_sign(warehouse):
     from .templatetags.operating_tags import book_sign
 
     return book_sign(warehouse)
+
+
+@login_required
+def warehouse_away(request):
+    """Everything of ours away at a supplier being worked on
+    (accounting.processing), on the shelves this person may read — one
+    section per supplier, each item with the purchase it went on and how
+    long it has been gone. `?warehouse=` narrows it to one warehouse (a
+    combined one: its members)."""
+    from django.utils import timezone
+    from erp.roles import is_sales_rep
+
+    warehouses = _listed_warehouses(request.user)
+    scope = set()
+    for w in warehouses:
+        scope.update(w.scope_ids())
+    chosen = None
+    raw = (request.GET.get("warehouse") or "").strip()
+    if raw.isdigit():
+        chosen = next((w for w in warehouses if w.pk == int(raw)), None)
+        if chosen is None:
+            raise Http404("No such warehouse.")
+        scope = set(chosen.scope_ids())
+
+    items = list(WarehouseProductItem.objects
+                 .filter(product__warehouse_id__in=scope, processing_line__isnull=False)
+                 .exclude(status="consumed")
+                 .select_related("product__warehouse", "product__catalog_variant__product",
+                                 "processing_line__invoice__current_account")
+                 .order_by("processing_line__invoice__current_account__name",
+                           "processing_line__invoice_id", "id"))
+    today = timezone.localdate()
+    sections = {}
+    for item in items:
+        line = item.processing_line
+        invoice = line.invoice
+        account = invoice.current_account
+        key = account.pk if account else 0
+        sec = sections.setdefault(key, {"account": account, "purchases": {}, "count": 0,
+                                        "totals": {}})
+        sec["count"] += 1
+        left = item.quantity_remaining if item.quantity_remaining is not None else item.quantity
+        unit = item.product.unit_short
+        sec["totals"][unit] = sec["totals"].get(unit, Decimal("0")) + (left or 0)
+        item.left = left
+        item.days_away = (today - timezone.localdate(line.created_at)).days
+        sec["purchases"].setdefault(invoice.pk, {"invoice": invoice, "items": []})["items"].append(item)
+    for sec in sections.values():
+        sec["purchases"] = list(sec["purchases"].values())
+        sec["totals"] = sorted(sec["totals"].items())
+    return render(request, "operating/warehouse_away.html", {
+        "sections": list(sections.values()),
+        "total": len(items),
+        "warehouses": [w for w in warehouses],
+        "chosen": chosen,
+        "is_sales_rep": is_sales_rep(request.user),
+    })
 
 
 @login_required
@@ -6680,6 +6752,26 @@ def reserved_meters_subquery():
     )
 
 
+def away_quantity_subquery():
+    """What of each WarehouseProduct is away at a supplier being worked on
+    (accounting.processing), as a Coalesced Subquery like
+    reserved_meters_subquery. Still in its stock, but not on the shelf."""
+    from django.db.models import OuterRef, Subquery, Sum, DecimalField as _DF
+    from django.db.models.functions import Coalesce as _Coalesce
+    from .models import WarehouseProductItem
+    sq = (WarehouseProductItem.objects
+          .filter(product_id=OuterRef("pk"), processing_line__isnull=False)
+          .exclude(status="consumed")
+          .order_by()
+          .values("product_id")
+          .annotate(s=Sum(_Coalesce("quantity_remaining", "quantity")))
+          .values("s")[:1])
+    return Coalesce(
+        Subquery(sq, output_field=_DF(max_digits=18, decimal_places=2)),
+        Decimal("0"), output_field=_DF(max_digits=18, decimal_places=2),
+    )
+
+
 def variant_photos_prefetch():
     """Each row's catalog variant's own photos and videos as `own_files`.
     The variant_gallery filter puts them in the storefront's order; the
@@ -7471,6 +7563,10 @@ class WarehouseProductDetail(View):
             "out_total": out_total,
             "adjust_total": adjust_total,
             "reserved_total": reserved_total,
+            # Of the stock, what is at a supplier being worked on: counted,
+            # but not on the shelf (accounting.processing).
+            "away_total": sum((r.quantity_remaining if r.quantity_remaining is not None
+                               else r.quantity or 0) for r in rolls if r.processing_line_id),
             "active_rolls_count": len(rolls),
             "is_admin": _is_admin(request.user),
         })

@@ -78,6 +78,7 @@ links so that keeps working.{% endcomment %}
       <div class="qty">{{ p.quantity|floatformat:"2g" }} {{ p.unit_short }}</div>
       {% if p.roll_count and p.counts_packs %}<div class="tops-sub" title="{% blocktrans with n=p.item_noun_plural %}The {{ n }} this product is stored in{% endblocktrans %}">{{ p.roll_count }} {% if p.roll_count == 1 %}{{ p.item_noun }}{% else %}{{ p.item_noun_plural }}{% endif %}</div>{% endif %}
       {% if p.reserved %}<div class="tops-sub wh-reserved" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
+      {% if p.away %}<div class="tops-sub" style="color:#5B21B6;" title="{% trans 'In stock, but at a supplier being worked on — not on the shelf.' %}"><i class="fa fa-truck-arrow-right" style="font-size:9px;"></i> {% trans "Away for work" %}: {{ p.away|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
     </a>
   </td>
   {% comment %}Unit cost is the quantity-weighted average of the rolls

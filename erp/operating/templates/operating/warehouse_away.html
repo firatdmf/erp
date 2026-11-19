@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Away for work" %} | Nejum ERP{% endblock %}
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --aw-teal: #005354;
+    --aw-violet: #5B21B6;
+    --aw-violet-50: #F5F3FF;
+    --aw-line: #E2E8EE;
+    --aw-muted: #6B7280;
+    --aw-ink: #0F1419;
+    --aw-card: #FFFFFF;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .aw { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--aw-ink); max-width: 1100px; }
+  @media (max-width: 720px) { .aw { padding: 16px 16px 100px; } }
+  .aw-back { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--font-sans); color: var(--aw-teal); text-decoration: none; margin-bottom: 10px; }
+  .aw-eyebrow { font: 700 11px var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--aw-teal); }
+  .aw-title { font: 800 24px var(--font-sans); margin: 2px 0 4px; }
+  .aw-lead { color: var(--aw-muted); margin: 0 0 16px; max-width: 640px; }
+  .aw-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .aw-filter select { height: 36px; padding: 0 10px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); background: var(--aw-card); max-width: 100%; }
+  .aw-sec { background: var(--aw-card); border: 1px solid var(--aw-line); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .aw-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--aw-line); }
+  .aw-sec-name { font: 700 15px var(--font-sans); color: var(--aw-ink); text-decoration: none; }
+  .aw-sec-sum { font: 600 12.5px var(--font-sans); color: var(--aw-violet); }
+  .aw-po { padding: 10px 16px 12px; border-top: 1px solid #F1F5F9; }
+  .aw-po:first-of-type { border-top: none; }
+  .aw-po-head { font: 600 12px var(--font-sans); color: var(--aw-muted); margin-bottom: 6px; }
+  .aw-po-head a { color: var(--aw-teal); }
+  .aw-item { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto auto; gap: 12px; align-items: center; padding: 6px 0; }
+  .aw-code { font: 700 13px var(--font-mono); overflow-wrap: anywhere; }
+  .aw-what { font: 500 12.5px var(--font-sans); color: var(--aw-muted); min-width: 0; }
+  .aw-what b { color: var(--aw-ink); font-weight: 600; }
+  .aw-qty { font: 700 13px var(--font-sans); white-space: nowrap; text-align: right; }
+  .aw-days { font: 500 12px var(--font-sans); color: var(--aw-muted); white-space: nowrap; text-align: right; min-width: 64px; }
+  @media (max-width: 720px) {
+    .aw-item { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; padding: 8px 0; border-top: 1px dashed #EEF2F6; }
+    .aw-what { grid-column: 1 / -1; grid-row: 2; }
+    .aw-days { grid-column: 1 / -1; grid-row: 3; text-align: left; }
+  }
+  .aw-empty { padding: 40px 16px; text-align: center; color: var(--aw-muted); border: 1px dashed var(--aw-line); border-radius: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% comment %}Everything of ours at a supplier being worked on
+(operating.views_warehouse.warehouse_away): still in stock and still
+valued, but not on the shelf. One section per supplier, by purchase.{% endcomment %}
+<div class="aw">
+  <a class="aw-back" href="{% if chosen %}{% url 'operating:warehouse_detail' chosen.pk %}{% else %}{% url 'operating:warehouse_list' %}{% endif %}">
+    <i class="fa fa-arrow-left"></i> {% if chosen %}{{ chosen.name }}{% else %}{% trans "Warehouses" %}{% endif %}
+  </a>
+  <div class="aw-eyebrow">{% trans "Inventory" %}</div>
+  <h1 class="aw-title">{% trans "Away for work" %}</h1>
+  <p class="aw-lead">{% trans "Our goods at suppliers being worked on. They count in stock but are not on the shelf, and can't be picked until they come back." %}</p>
+
+  {% if warehouses|length > 1 %}
+  <form class="aw-filter" method="get">
+    <select name="warehouse" onchange="this.form.submit()" aria-label="{% trans 'Warehouse' %}">
+      <option value="">{% trans "All warehouses" %}</option>
+      {% for w in warehouses %}
+      <option value="{{ w.pk }}"{% if chosen and chosen.pk == w.pk %} selected{% endif %}>{{ w.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+
+  {% for sec in sections %}
+  <section class="aw-sec">
+    <div class="aw-sec-head">
+      <span class="aw-sec-name">{{ sec.account.name|default:"—" }}</span>
+      <span class="aw-sec-sum">
+        {% blocktrans count n=sec.count %}{{ n }} item away{% plural %}{{ n }} items away{% endblocktrans %}{% for unit, qty in sec.totals %} · {{ qty|floatformat:"-2" }} {{ unit }}{% endfor %}
+      </span>
+    </div>
+    {% for po in sec.purchases %}
+    <div class="aw-po">
+      <div class="aw-po-head">
+        {% if is_sales_rep %}{{ po.invoice.display_number }}{% else %}<a href="{% url 'accounts:purchase_order_detail' po.invoice.pk %}">{{ po.invoice.display_number }}</a>{% endif %}
+        · {{ po.invoice.date|date:"d.m.Y" }}
+      </div>
+      {% for item in po.items %}
+      <div class="aw-item">
+        <span class="aw-code">{% if item.barcode %}{{ item.barcode }}{% elif item.lot_number %}{{ item.product.item_noun }} {{ item.lot_number }}{% else %}#{{ item.pk }}{% endif %}</span>
+        <span class="aw-what">
+          <a href="{% url 'operating:warehouse_product_detail' item.product.warehouse_id item.product_id %}" style="color:inherit;"><b>{{ item.product.sku|default:item.product.name }}</b></a>
+          · {{ item.product.warehouse.name }}
+        </span>
+        <span class="aw-qty">{{ item.left|floatformat:"-2" }} {{ item.product.unit_short }}</span>
+        <span class="aw-days">{% if item.days_away < 1 %}{% trans "Sent today" %}{% else %}{% blocktrans count d=item.days_away %}{{ d }} day out{% plural %}{{ d }} days out{% endblocktrans %}{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+  {% empty %}
+  <div class="aw-empty">
+    <i class="fa fa-truck-arrow-right"></i>
+    {% trans "Nothing is away for work." %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

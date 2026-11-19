@@ -16828,3 +16828,41 @@ msgstr "Bir alımla fasona gönderildi — geri gelince yeniden seçilebilir."
 
 msgid "It can be picked again when it comes back."
 msgstr "Geri gelince yeniden seçilebilir."
+
+#: shelf figures and the list of goods away for work
+msgid "In stock, but at a supplier being worked on — not on the shelf."
+msgstr "Stokta, ama tedarikçide fasonda — rafta değil."
+
+#, python-format
+msgid "%(qty)s %(unit)s away for work"
+msgstr "%(qty)s %(unit)s fasonda"
+
+#, python-format
+msgid "%(n)s item away for work"
+msgid_plural "%(n)s items away for work"
+msgstr[0] "%(n)s kalem fasonda"
+msgstr[1] "%(n)s kalem fasonda"
+
+#, python-format
+msgid "%(n)s away for work"
+msgid_plural "%(n)s away for work"
+msgstr[0] "%(n)s fasonda"
+msgstr[1] "%(n)s fasonda"
+
+msgid "See them"
+msgstr "Göster"
+
+msgid "Our goods at suppliers being worked on. They count in stock but are not on the shelf, and can't be picked until they come back."
+msgstr "Tedarikçilerde fasonda olan mallarımız. Stokta sayılırlar ama rafta değiller; geri gelene kadar seçilemezler."
+
+#, python-format
+msgid "%(d)s day out"
+msgid_plural "%(d)s days out"
+msgstr[0] "%(d)s gündür dışarıda"
+msgstr[1] "%(d)s gündür dışarıda"
+
+msgid "Nothing is away for work."
+msgstr "Fasonda hiçbir şey yok."
+
+msgid "Sent today"
+msgstr "Bugün gönderildi"

@@ -489,6 +489,46 @@ class GoodsOutTest(TestCase):
                                {"barcode": "KZL-B"}).json()
         self.assertIsNone(home["roll"]["away"])
 
+    def test_the_shelf_figures_say_what_is_away(self, _up):
+        """The stock still counts an item away for work, so every figure
+        that says what is in stock says how much of it is away too."""
+        self._save(["KZL-A"])
+        roll = self._roll("KZL-A")
+        page = self.client.get(reverse("operating:warehouse_detail", args=[self.wh.pk]))
+        self.assertContains(page, "Away for work: 50")
+        self.assertContains(page, "1 item away for work")
+        product = self.client.get(reverse("operating:warehouse_product_detail",
+                                          args=[self.wh.pk, roll.product_id]))
+        self.assertContains(product, "50.00 m away for work")
+        group = self.client.get(reverse("operating:warehouse_group_variants", args=[self.wh.pk]),
+                                {"base": "HAVANA"})
+        self.assertContains(group, "Away for work: 50")
+        listing = self.client.get(reverse("operating:warehouse_list"), follow=True)
+        self.assertContains(listing, reverse("operating:warehouse_away"))
+
+    def test_everything_away_is_listed_by_supplier(self, _up):
+        pk = self._save(["KZL-A", "KZL-B"]).json()["invoice_id"]
+        number = Invoice.objects.get(pk=pk).display_number
+        r = self.client.get(reverse("operating:warehouse_away"))
+        self.assertContains(r, "Hakan Atölye")
+        self.assertContains(r, "2 items away · 90 m")
+        self.assertContains(r, number)
+        self.assertContains(r, "KZL-A")
+        self.assertNotContains(r, "KZL-C")
+        one = self.client.get(reverse("operating:warehouse_away"), {"warehouse": self.wh.pk})
+        self.assertContains(one, "KZL-B")
+        far = Warehouse.objects.create(name="Elsewhere", accounting_book=self.book)
+        self.assertNotContains(self.client.get(reverse("operating:warehouse_away"),
+                                               {"warehouse": far.pk}), "KZL-A")
+        self.assertEqual(self.client.get(reverse("operating:warehouse_away"),
+                                         {"warehouse": 999999}).status_code, 404)
+        # Back from the work, it is off the list.
+        self._save(["KZL-A", "KZL-B"], self._goods_in(
+            self._variant("ecru+crystal", [{"qty": 48, "barcode": "KZL-A"}], price="1.5")), pk=pk)
+        self.assertTrue(self._confirm(pk).json()["success"])
+        self.assertContains(self.client.get(reverse("operating:warehouse_away")),
+                            "Nothing is away for work.")
+
     def test_a_draft_opens_in_the_form_with_its_goods_out(self, _up):
         pk = self._save(["KZL-A"]).json()["invoice_id"]
         r = self.client.get(reverse("accounts:goods_receipt_edit", args=[pk]))

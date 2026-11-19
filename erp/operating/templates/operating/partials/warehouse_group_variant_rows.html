@@ -56,6 +56,7 @@ variant's rolls, the SKU pill opens the product.{% endcomment %}
     <div class="qty">{{ p.quantity|floatformat:"2g" }} m</div>
     {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each roll has its own barcode' %}">{{ p.roll_count }} {% blocktrans count c=p.roll_count %}roll{% plural %}rolls{% endblocktrans %}</div>{% endif %}
     {% if p.reserved %}<div class="tops-sub wh-reserved" title="{% trans "Reserved for packed orders" %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% trans "Reserved" %}: {{ p.reserved|floatformat:"2g" }} m</div>{% endif %}
+    {% if p.away %}<div class="tops-sub" style="color:#5B21B6;" title="{% trans 'In stock, but at a supplier being worked on — not on the shelf.' %}"><i class="fa fa-truck-arrow-right" style="font-size:9px;"></i> {% trans "Away for work" %}: {{ p.away|floatformat:"2g" }} {{ p.unit_short }}</div>{% endif %}
   </td>
   {% comment %}Weighted average of the stock on the floor, matching the flat
   list — not the SKU's last-purchase price.{% endcomment %}

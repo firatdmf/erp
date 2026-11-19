@@ -931,6 +931,11 @@ def hold_received_rolls(invoice, *, user=None):
     Rolls that match no line stay free stock. Returns one {"barcode",
     "quantity", "line"} per hold made. Safe to call again: a roll the
     order already holds is skipped.
+
+    Our own items sent out for work that came back under their own
+    barcode (accounting.processing) are among what it brought in: they
+    are still linked to the purchase that first bought them, so they are
+    found through its processing lines instead.
     """
     from .models import OrderStockReservation, WarehouseProductItem
     from .views import _create_roll_reservation
@@ -946,10 +951,14 @@ def hold_received_rolls(invoice, *, user=None):
     already = set(OrderStockReservation.objects
                   .filter(order=order, consumed=False)
                   .values_list("stock_item_id", flat=True))
+    from django.db.models import Q
     rolls = (WarehouseProductItem.objects
-             .filter(purchase_invoice_item__invoice=invoice)
+             .filter(Q(purchase_invoice_item__invoice=invoice)
+                     | Q(processing_history__invoice=invoice,
+                         processing_history__outcome="returned"))
              .exclude(pk__in=already)
              .select_related("product")
+             .distinct()
              .order_by("pk"))
     held = []
     for roll in rolls:

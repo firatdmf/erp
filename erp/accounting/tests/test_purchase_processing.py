@@ -206,6 +206,43 @@ class GoodsOutTest(TestCase):
         self.assertAlmostEqual(row["ledger"], Decimal("368"), places=2)
         self.assertAlmostEqual(row["subsidiary"], row["ledger"], places=2)
 
+    # ── bought for an order ──────────────────────────────────────────────
+    def _order_for_crystal(self):
+        """A customer order with a line for the crystal variant, the way
+        order 363 had one for GREK.WHITE-330-PEARL_CRYSTAL."""
+        from crm.models import Contact
+        from operating.models import OrderItem
+        usd = self.hakan.default_currency
+        buyer = Contact.objects.create(name="Oleg")
+        account = CurrentAccount.objects.create(book=self.book, code="C-OLG", name="Oleg",
+                                                default_currency=usd, contact=buyer)
+        order = Order.objects.create(contact=buyer, current_account=account)
+        crystal = self.product.variants.get(variant_sku="HAVANA.ECRU_CRYSTAL")
+        OrderItem.objects.create(order=order, product=self.product, product_variant=crystal,
+                                 quantity=Decimal("48"), price=Decimal("6"))
+        return order
+
+    def test_what_comes_back_for_an_order_is_held_for_it_and_let_go_on_undo(self, _up):
+        order = self._order_for_crystal()
+        data = {"warehouse_id": self.wh.pk, "current_account_id": self.hakan.pk,
+                "date": "2026-11-19", "unit": "m", "for_order_id": order.pk,
+                "goods_out": [{"barcode": "KZL-A"}], "products": []}
+        r = self._post("accounts:purchase_order_save", data, {"kwargs": {"book_id": self.book.pk}})
+        self.assertTrue(r.json()["success"], r.json())
+        pk = r.json()["invoice_id"]
+        r = self._save(["KZL-A"], self._goods_in(
+            self._variant("ecru+crystal", [{"qty": 48, "barcode": "KZL-A"}], price="1.5")), pk=pk)
+        self.assertTrue(r.json()["success"], r.json())
+        c = self._confirm(pk)
+        self.assertTrue(c.json()["success"], c.json())
+        holds = OrderStockReservation.objects.filter(order=order, consumed=False)
+        self.assertEqual(list(holds.values_list("stock_item__barcode", flat=True)), ["KZL-A"])
+
+        r = self.client.post(reverse("accounts:purchase_undo_receipt", args=[pk]))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertFalse(OrderStockReservation.objects.filter(order=order, consumed=False).exists())
+        self.assertEqual(self._roll("KZL-A").product.sku, "HAVANA.ECRU")
+
     # ── undo and cancel ──────────────────────────────────────────────────
     def test_undo_receipt_puts_every_out_roll_back_and_away_again(self, _up):
         pk = self._sent_and_back()

@@ -321,11 +321,18 @@ def settle(receipt, *, user=None):
 
 # ── Undoing a receipt ────────────────────────────────────────────────────
 
-def _in_use_since(roll):
+def _in_use_since(roll, own_order_id=None):
+    """Why a returned item can't be put back, or None. The order the
+    purchase was bought for holding it, unpacked, is no reason: that hold
+    goes with the receipt (unreceive_lines), as it does for the rolls the
+    purchase brought in itself."""
     for hold in roll.reservations.select_related("order"):
         if hold.consumed:
             return _("it went out on order %(order)s.") % {"order": hold.order}
-        return _("it is held for order %(order)s.") % {"order": hold.order}
+        if hold.pack_id:
+            return _("it is packed for order %(order)s.") % {"order": hold.order}
+        if hold.order_id != own_order_id:
+            return _("it is held for order %(order)s.") % {"order": hold.order}
     if roll.quote_links.exists():
         return _("it is on a quote.")
     if roll.transfer_lines.exists():
@@ -348,7 +355,7 @@ def unreceive_problems(invoice):
                 problems.append(f"{line.barcode}: " + _("%(qty)s has come off it since.") % {
                     "qty": format((Decimal(line.quantity_back or 0) - _left(roll)).normalize(), "f")})
                 continue
-            why = _in_use_since(roll)
+            why = _in_use_since(roll, invoice.for_order_id)
             if why:
                 problems.append(f"{line.barcode}: {why}")
         elif roll.status != "consumed" or _left(roll) != 0:
@@ -373,6 +380,11 @@ def unreceive_lines(invoice, *, user=None, keep_away=True):
                 .select_related("product").filter(pk=line.stock_item_id).first())
         if roll is None:
             continue
+        # The order this purchase was bought for let go of it: it is going
+        # back to what it was before the work.
+        if invoice.for_order_id:
+            roll.reservations.filter(order_id=invoice.for_order_id, consumed=False,
+                                     pack__isnull=True).delete()
         source, target = roll.product, line.from_product
         if target is not None and target.pk != source.pk:
             _move_roll(roll, target, user=user,

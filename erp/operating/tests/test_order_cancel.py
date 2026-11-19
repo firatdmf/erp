@@ -5,10 +5,10 @@ reason; the reason lands in the change history. A completed order can't
 be cancelled in one step — it is re-opened first. A cancelled order keeps
 its lines on the page, struck through.
 
-A completed order is cancelled from the same button: the dialog asks
-where the goods are. Back with us, it is marked returned; never sent, it
-is re-opened and cancelled in one step (views_warehouse.cancel_order) —
-the funnel itself still refuses a completed order's direct cancel.
+A completed order is cancelled from the same button: it is re-opened and
+cancelled in one step (views_warehouse.cancel_order), and the dialog
+warns that its goods go back into stock. The funnel itself still refuses
+a completed order's direct cancel.
 """
 from decimal import Decimal
 from unittest.mock import patch
@@ -101,15 +101,13 @@ class CancellingFromTheOrderPage(OrderCancelBase):
         order.refresh_from_db()
         self.assertEqual(order.order_status, "shipped")
 
-    def test_goods_that_came_back_mark_it_returned(self):
+    def test_returned_from_the_status_list_says_returned(self):
         order = self.order(status="shipped")
-        self.client.post(self.detail_url(order), {
-            "action": "update_status", "order_status": "returned",
-            "cancel_reason": "Wrong colour, sent back"})
+        resp = self.client.post(self.detail_url(order), {
+            "action": "update_status", "order_status": "returned"}, follow=True)
         order.refresh_from_db()
         self.assertEqual(order.order_status, "returned")
-        self.assertEqual(OrderChange.objects.get(order=order, field="return_reason").new_value,
-                         "Wrong colour, sent back")
+        self.assertContains(resp, "Order marked returned")
 
     def test_the_customer_hears_only_of_the_cancel(self):
         order = self.order(status="shipped")
@@ -157,16 +155,15 @@ class TheOrderPage(OrderCancelBase):
         self.assertContains(resp, 'id="odCancelModal"')
         self.assertNotContains(resp, 'data-status="cancelled"')
 
-    def test_a_completed_order_offers_cancel_asking_where_the_goods_are(self):
+    def test_a_completed_order_offers_cancel_and_warns_of_the_stock(self):
         resp = self.client.get(self.detail_url(self.order(status="shipped")))
         self.assertContains(resp, 'id="od-cancel-order-btn"')
         self.assertContains(resp, 'id="odCancelModal"')
-        self.assertContains(resp, 'name="odx_goods" value="returned"')
-        self.assertContains(resp, 'name="odx_goods" value="cancelled"')
+        self.assertContains(resp, "if they are still with the customer")
 
-    def test_an_open_order_is_not_asked_where_the_goods_are(self):
+    def test_an_open_order_gets_no_stock_warning(self):
         resp = self.client.get(self.detail_url(self.order()))
-        self.assertNotContains(resp, 'type="radio" name="odx_goods"')
+        self.assertNotContains(resp, "if they are still with the customer")
 
     def test_a_sales_rep_gets_no_cancel(self):
         perm, _ = Permission.objects.get_or_create(name="sales_rep")

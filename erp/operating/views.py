@@ -1225,16 +1225,8 @@ class OrderDetail(DetailView):
             _counter_settled_notice(request, order)
             return redirect("operating:order_detail", pk=order.pk)
 
-        # Marked returned — from the Cancel dialog, which asks why, or
-        # from the status list, which doesn't.
+        # Marked returned from the status list: say so, not "re-opened".
         if new_status == "returned" and was_shipped:
-            if cancel_reason:
-                from .models import OrderChange
-                OrderChange.objects.create(
-                    order=order, action="field", field="return_reason",
-                    new_value=cancel_reason,
-                    created_by=request.user if request.user.is_authenticated else None,
-                )
             messages.success(
                 request,
                 _g("Order marked returned — its goods went back into stock and its sale "

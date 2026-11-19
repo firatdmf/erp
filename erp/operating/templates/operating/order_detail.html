@@ -1143,11 +1143,6 @@
   .od-approval-text > i { margin-top: 3px; color: #B45309; }
   .od-approval-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .od-approval-form input { border:1px solid #E5E7EB; border-radius:8px; padding:7px 10px; font: 500 13px var(--font-sans); min-width: 180px; }
-  .odx-choice { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 8px; padding: 8px 10px;
-    border: 1px solid var(--gray-200); border-radius: 8px; cursor: pointer;
-    font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.45; }
-  .odx-choice input { margin: 3px 0 0; flex: none; }
-  .odx-choice:has(input:checked) { border-color: #E8A0A0; background: #FEF2F2; }
   .odx-list { margin: 0 0 14px; padding-left: 18px; font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.6; }
   .odx-reason {
     width: 100%; min-height: 72px; box-sizing: border-box; resize: vertical;
@@ -2305,7 +2300,7 @@
     </div>
   </div>
 
-  {% comment %}On a completed order too: the dialog asks whether the goods came back (returned) or never went (re-opened and cancelled in one step, views_warehouse.cancel_order). Sales reps can't move an order at all.{% endcomment %}
+  {% comment %}On a completed order too: it is re-opened and cancelled in one step (views_warehouse.cancel_order). Sales reps can't move an order at all.{% endcomment %}
   {% if not is_terminal and not is_sales_rep and not cancel_request %}
   <div class="od-foot">
     <button type="button" id="od-cancel-order-btn" class="ord-btn danger">
@@ -2409,9 +2404,8 @@
 {% if not is_terminal and not is_sales_rep %}
 <!-- CANCEL-ORDER CONFIRM — cancelling is terminal, so the dialog spells
      out what happens and won't submit without a reason (logged to the
-     order's change history). On a completed order it first asks where
-     the goods are: back with us (Returned) or never sent (Cancelled);
-     both put the stock back and take the sale back. -->
+     order's change history). On a completed order it also warns that
+     the goods go back into stock (views_warehouse.cancel_order). -->
 <div class="odc-overlay" id="odCancelModal" aria-hidden="true">
   <div class="odc-shell" role="dialog" aria-modal="true" aria-labelledby="odxTitle">
     <div class="odc-head">
@@ -2425,13 +2419,6 @@
     <div class="odc-warn danger"><i class="fa fa-triangle-exclamation"></i><span>{% trans "This can't be undone. A cancelled order can never be re-opened." %}</span></div>
     {% if shipped %}
     <div class="odc-warn"><i class="fa fa-truck-ramp-box"></i><span>{% trans "This order was completed. Cancelling puts its goods back into stock — if they are still with the customer, don't cancel: the stock would show goods you don't have." %}</span></div>
-    <div class="odc-body" style="flex:none;">
-      <div class="odc-lbl">{% trans "Where are the goods?" %}</div>
-      <label class="odx-choice"><input type="radio" name="odx_goods" value="returned">
-        <span><b>{% trans "They went out and came back" %}</b> — {% trans "the order is marked Returned" %}</span></label>
-      <label class="odx-choice"><input type="radio" name="odx_goods" value="cancelled">
-        <span><b>{% trans "They never went out" %}</b> — {% trans "it was completed by mistake; the order is cancelled" %}</span></label>
-    </div>
     {% endif %}
     {% if packing %}
     {% comment %}The order has supplier purchases behind it, so cancelling reaches past the order: say first how far packing has got.{% endcomment %}
@@ -2459,7 +2446,7 @@
         {% if shipped %}<li>{% trans "The goods it took go back into stock" %}</li>{% endif %}
         {% if reservation_count %}<li>{% blocktrans count counter=reservation_count %}{{ counter }} reserved roll is released{% plural %}{{ counter }} reserved rolls are released{% endblocktrans %}</li>{% endif %}
         {% if order.current_account_id %}<li>{% trans "The sale is removed from the customer's account" %}</li>{% endif %}
-        {% if order.notify_customer %}<li>{% if shipped %}{% trans "The customer is emailed that the order was cancelled or returned" %}{% else %}{% trans "The customer is emailed that the order was cancelled" %}{% endif %}</li>{% endif %}
+        {% if order.notify_customer %}<li>{% trans "The customer is emailed that the order was cancelled" %}</li>{% endif %}
         {% if cancel_give_back %}{% comment %}Retail Sales holds no one's credit: the counter money goes back with the cancel (operating.counter).{% endcomment %}<li id="odx-give-back">{% blocktrans with amount=cancel_give_back.amount|floatformat:"2g" cur=order.currency_symbol box=cancel_give_back.box %}<b>{{ cur }}{{ amount }}</b> is given back from <b>{{ box }}</b>{% endblocktrans %}</li>{% endif %}
         <li>{% trans "The order can no longer be edited or packed" %}</li>
       </ul>
@@ -3006,25 +2993,15 @@
         document.addEventListener('keydown', onCancelKey);
         setTimeout(() => reasonEl.focus(), 0);
       });
-      // A completed order asks where the goods are first; the choice is
-      // the status the order ends in.
-      const goodsChoices = odxModal.querySelectorAll('input[name="odx_goods"]');
-      function goodsChoice() {
-        const picked = odxModal.querySelector('input[name="odx_goods"]:checked');
-        return goodsChoices.length ? (picked ? picked.value : '') : 'cancelled';
-      }
-      function refreshOk() {
-        okBtn.disabled = !reasonEl.value.trim() || !goodsChoice();
-      }
-      reasonEl.addEventListener('input', refreshOk);
-      goodsChoices.forEach(function (r) { r.addEventListener('change', refreshOk); });
+      reasonEl.addEventListener('input', function () {
+        okBtn.disabled = !reasonEl.value.trim();
+      });
       document.getElementById('odxBack').addEventListener('click', closeCancel);
       document.getElementById('odxClose').addEventListener('click', closeCancel);
       odxModal.addEventListener('mousedown', function (e) { if (e.target === odxModal) closeCancel(); });
       okBtn.addEventListener('click', function () {
         const reason = reasonEl.value.trim();
-        const target = goodsChoice();
-        if (!reason || !target) return;
+        if (!reason) return;
         okBtn.disabled = true;
         let inp = document.getElementById('od-cancel-reason-input');
         if (!inp) {
@@ -3033,7 +3010,7 @@
           statusForm.appendChild(inp);
         }
         inp.value = reason;
-        statusInput.value = target;
+        statusInput.value = 'cancelled';
         submitForm();
       });
     }

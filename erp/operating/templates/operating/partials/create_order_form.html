@@ -235,55 +235,6 @@
   .co-note-toggle input{width:15px;height:15px;}
 }
 
-/* ── Barcode scanner popup ───────────────────────────────────────
-   Same modal the warehouse page's "Find by barcode" uses, so the two
-   readers are one thing to learn. It sits ABOVE the create sidebar
-   (.sidebar-overlay is z-index 10000) — inside it, an inline panel
-   was competing for the little height the sidebar has left. */
-.co-cam-overlay{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;
-  background:rgba(6,10,18,.9);padding:16px;}
-.co-cam-overlay.show{display:flex;}
-.co-cam-shell{width:100%;max-width:460px;background:linear-gradient(180deg,#101826 0%,#0B1220 100%);
-  border:1px solid rgba(94,234,212,.10);border-radius:20px;overflow:hidden;
-  box-shadow:0 24px 70px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:94vh;}
-.co-cam-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
-  border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
-.co-cam-title{color:#fff;font:700 14.5px var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:10px;}
-.co-cam-title i{color:#2DD4BF;}
-.co-cam-close{background:rgba(255,255,255,.08);border:none;color:#fff;width:34px;height:34px;
-  border-radius:10px;cursor:pointer;font-size:15px;transition:background .14s;}
-.co-cam-close:hover{background:rgba(255,255,255,.16);}
-.co-cam-view{position:relative;background:#000;width:100%;aspect-ratio:3/4;max-height:56vh;overflow:hidden;}
-.co-cam-view video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}
-.co-cam-guide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;pointer-events:none;}
-.co-cam-frame{position:relative;width:82%;height:30%;border-radius:16px;box-shadow:0 0 0 2000px rgba(4,10,18,.42);}
-.co-cam-frame .c{position:absolute;width:28px;height:28px;border:3px solid #2DD4BF;
-  filter:drop-shadow(0 0 6px rgba(45,212,191,.55));}
-.co-cam-frame .c1{top:-2px;left:-2px;border-right:none;border-bottom:none;border-top-left-radius:14px;}
-.co-cam-frame .c2{top:-2px;right:-2px;border-left:none;border-bottom:none;border-top-right-radius:14px;}
-.co-cam-frame .c3{bottom:-2px;left:-2px;border-right:none;border-top:none;border-bottom-left-radius:14px;}
-.co-cam-frame .c4{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:14px;}
-.co-cam-laser{position:absolute;left:7%;right:7%;top:14%;height:2px;border-radius:2px;
-  background:linear-gradient(90deg,transparent,#2DD4BF 30%,#5EEAD4 50%,#2DD4BF 70%,transparent);
-  box-shadow:0 0 14px 2px rgba(45,212,191,.65);animation:coCamLaser 2.2s ease-in-out infinite;}
-@keyframes coCamLaser{0%,100%{top:12%}50%{top:84%}}
-/* Doubles as the status line: the decode loop writes the live code, and
-   a reader that never starts writes why, in the same place. */
-.co-cam-hint{margin-top:16px;display:inline-flex;align-items:center;gap:8px;color:#fff;
-  font:600 12.5px var(--font-sans,sans-serif);background:rgba(4,10,18,.62);
-  border:1px solid rgba(255,255,255,.12);padding:6px 14px;border-radius:14px;
-  max-width:86%;overflow:hidden;overflow-wrap:anywhere;}
-.co-cam-hint::before{content:'';width:7px;height:7px;border-radius:50%;background:#2DD4BF;
-  flex-shrink:0;animation:coCamPulse 1.4s ease-in-out infinite;}
-@keyframes coCamPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
-/* What the camera and the reader are doing, in small print: a phone
-   that shows a black picture can be told apart from here by a
-   screenshot, without the phone in hand. */
-.co-cam-diag{position:absolute;left:0;right:0;bottom:6px;padding:0 10px;text-align:center;pointer-events:none;
-  color:rgba(255,255,255,.55);font:500 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;}
-.co-cam-result{padding:18px;color:#fff;overflow-y:auto;text-align:center;}
-@media (max-width:520px){ .co-cam-shell{max-width:100%;} }
 </style>
 
 {% if deposit_cash_boxes %}{{ deposit_cash_boxes|json_script:"co-deposit-boxes" }}{% endif %}
@@ -584,41 +535,7 @@
       <div id="co-products-list"></div>
       <input type="hidden" id="product_json_input" name="product_json_input">
 
-      <!-- Shared roll-barcode scanner — one instance reused by the
-           global bar and by every product card's camera icon (never
-           re-rendered by renderProducts(), so an active stream survives
-           card updates). A popup rather than a panel in the flow: the
-           create sidebar has little height to spare, and the reader
-           wants the whole screen while it is being aimed. -->
-      <div class="co-cam-overlay" id="co-roll-cam-overlay" role="dialog" aria-modal="true">
-        <div class="co-cam-shell">
-          <div class="co-cam-head">
-            <div class="co-cam-title"><i class="fas fa-barcode"></i>{% trans "Scan barcode" %}</div>
-            <button type="button" class="co-cam-close" onclick="coCloseRollCamera()" title="{% trans 'Close' %}">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div id="co-roll-cam-stage">
-            <div class="co-cam-view">
-              <video id="co-roll-cam-video" playsinline muted autoplay></video>
-              <div class="co-cam-guide">
-                <div class="co-cam-frame">
-                  <span class="c c1"></span><span class="c c2"></span><span class="c c3"></span><span class="c c4"></span>
-                  <div class="co-cam-laser"></div>
-                </div>
-                <div class="co-cam-hint" id="co-roll-cam-hit">{% trans "Bring the barcode into the frame" %}</div>
-              </div>
-              <div class="co-cam-diag" id="co-roll-cam-diag"></div>
-            </div>
-          </div>
-          {% comment %}Where a read waits to be confirmed. The reader fires on
-          whatever crosses the frame, so a decode is a question, not an
-          instruction: the loop stops, this panel says what the code IS, and
-          nothing joins the order until it is confirmed. Same shape as the
-          warehouse's "Find by barcode". Written by the script below.{% endcomment %}
-          <div id="co-roll-cam-confirm" class="co-cam-result" style="display:none;"></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -3097,464 +3014,84 @@
     });
   })();
 
-  // ══════════════════ roll-barcode camera (zxing-wasm) ══════════════
-  // Same approach as the packing-scan screen's camera reader, condensed
-  // into one shared overlay any product card's camera icon can open.
-  (function () {
-    var zx = null, zxLoading = null, camStream = null, camRaf = null, camRunning = false, lastDecode = 0;
-    var camTargetIndex = null, camDebounce = { val: '', t: 0 }, roiCanvas = null, audioCtx = null;
-    // Why a reader that reads nothing says nothing: every failure in the
-    // decode path used to be swallowed by an empty .catch, so a camera
-    // that opened and never beeped looked identical whether the wasm
-    // never loaded, the video never delivered a frame, or the decoder
-    // threw on every one. These three carry that answer to the chip.
-    var camFrames = 0, camDecodeErr = '', camOpenedAt = 0;
-    // The decoder is a file of its own, fetched on the first read. The
-    // library keeps a failed fetch and answers every later read with
-    // it, so one dropped download left the reader dead until the page
-    // was reloaded. Until a read has come back, a failure is taken to
-    // be that file and it is fetched again, from the next host.
-    var zxMod = null, zxReady = false, zxWasmTry = 0, camLight = -1, camDiagAt = 0;
-    var ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-      'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-      'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
-    var ZXW_OPTS = { tryHarder: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
-      formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'Code93', 'ITF', 'Codabar', 'QRCode'] };
-    var RS_BAD_LENS = /ultra|wide|tele|depth|truedepth|infrared/i;
-    function camIndex(label) { var m = (label || '').match(/camera2?\s*(\d+)/i); return m ? parseInt(m[1], 10) : 999; }
-    function applyFocus(stream) { try { var tk = stream.getVideoTracks()[0]; if (tk && tk.applyConstraints) tk.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {} return stream; }
-    function beep() {
-      try { if (navigator.vibrate) navigator.vibrate(55); } catch (e) {}
-      try {
-        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
-        o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.07;
-        o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.08);
-      } catch (e) {}
-    }
-    function loadZxw() {
-      if (zx) return Promise.resolve(zx);
-      if (zxLoading) return zxLoading;
-      // The reader-only build: the package's root entry also carries
-      // the barcode writer, and half a megabyte more to download.
-      var urls = ['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm', 'https://esm.sh/zxing-wasm@3.1.0/reader'];
-      function tryNext(i) {
-        if (i >= urls.length) return Promise.reject(new Error('zxing load failed'));
-        return import(urls[i]).then(function (mod) { if (mod && mod.readBarcodes) return mod; throw new Error('no export'); }).catch(function () { return tryNext(i + 1); });
-      }
-      // A load that failed is forgotten, so the next open tries again.
-      zxLoading = tryNext(0).then(function (mod) { zxMod = mod; zx = mod.readBarcodes; return zx; })
-        .catch(function (err) { zxLoading = null; throw err; });
-      return zxLoading;
-    }
-    function zxNextHost() {
-      if (!zxMod || !zxMod.prepareZXingModule || zxWasmTry >= ZXW_WASM.length * 2) return false;
-      var url = ZXW_WASM[zxWasmTry % ZXW_WASM.length];
-      zxWasmTry++;
-      try {
-        zxMod.prepareZXingModule({ overrides: { locateFile: function (path, prefix) { return /\.wasm$/.test(path) ? url : prefix + path; } } });
-      } catch (e) { return false; }
-      return true;
-    }
-    function getRearStream() {
-      var W = { ideal: 1920 }, H = { ideal: 1080 };
-      function open(c) { return navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
-      return open({ facingMode: { ideal: 'environment' }, width: W, height: H }).then(function (stream) {
-        if (!navigator.mediaDevices.enumerateDevices) return applyFocus(stream);
-        // Not being able to list the lenses is no reason to give up the
-        // stream already in hand — it is read as "one camera" instead.
-        return navigator.mediaDevices.enumerateDevices().catch(function () { return []; }).then(function (devices) {
-          var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
-          if (cams.length < 2) return applyFocus(stream);
-          var rear = cams.filter(function (d) { return /back|rear|environment|arka|tras|rück/i.test(d.label || ''); });
-          if (!rear.length) rear = cams;
-          var pool = rear.filter(function (d) { return !RS_BAD_LENS.test(d.label || ''); }); if (!pool.length) pool = rear;
-          var iosMain = pool.filter(function (d) { return /(^|\b)back camera\b/i.test(d.label || ''); });
-          var sorted = pool.slice().sort(function (a, b) { return camIndex(a.label) - camIndex(b.label); });
-          var pick = iosMain[0] || sorted[0], curId = '';
-          try { curId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId || ''; } catch (e) {}
-          if (pick && pick.deviceId && pick.deviceId !== curId) {
-            stream.getTracks().forEach(function (t) { t.stop(); });
-            // The first stream is stopped by now, so a lens that will not
-            // open cannot fall back to it: that handed the popup a dead
-            // stream and a black picture. Ask plainly for a rear camera
-            // again — the request the simple scan page makes, and the
-            // one a phone that refuses the rest still answers.
-            return open({ deviceId: { exact: pick.deviceId }, width: W, height: H })
-              .catch(function () { return open({ facingMode: { ideal: 'environment' } }); })
-              .then(applyFocus);
-          }
-          return applyFocus(stream);
-        });
-      });
-    }
-    function roi() { if (!roiCanvas) { roiCanvas = document.createElement('canvas'); roiCanvas.getContext('2d', { willReadFrequently: true }); } return roiCanvas; }
+  // ══════════════════ roll-barcode camera ═══════════════════════════
+  // The reader is the shared one (erp/js/barcode_camera.js, loaded by
+  // base.html): it reads, stops, asks, and acts only on a confirm. What a
+  // code MEANS on an order, and how it joins one, is decided here.
+  //
+  // `i` is 'global' (the main bar: any product) or a card's index (that
+  // product, falling back to the main bar's way for another product's
+  // roll, which then goes on that product's own line).
+  window.coOpenRollCamera = function (i) {
+    if (!window.NejumCamera) { showToast('{% trans "The camera is not supported" %}', 'error'); return; }
+    var camTargetIndex = i, camRerouted = false;
 
-    // The popup belongs to the body, not to the form. The create drawer
-    // is transformed and clips what overflows it, which makes it — not
-    // the screen — what a position:fixed child fills: on a phone the
-    // popup came out off-centre with its close button cut away. A copy
-    // left behind by a form that has since been re-rendered goes first.
-    Array.prototype.forEach.call(document.querySelectorAll('body > .co-cam-overlay'), function (el) { el.parentNode.removeChild(el); });
-    var camEl = document.getElementById('co-roll-cam-overlay'), video = document.getElementById('co-roll-cam-video');
-    if (camEl && camEl.parentNode !== document.body) document.body.appendChild(camEl);
-    var hitEl = document.getElementById('co-roll-cam-hit'), diagEl = document.getElementById('co-roll-cam-diag');
-    function camDiag(now) {
-      if (!diagEl || (now - camDiagAt) < 1000) return;
-      camDiagAt = now;
-      var tk = null, st = {};
-      try { tk = camStream && camStream.getVideoTracks()[0]; st = (tk && tk.getSettings && tk.getSettings()) || {}; } catch (e) {}
-      diagEl.textContent = [
-        (tk && tk.label) || 'no track',
-        (st.width || '?') + 'x' + (st.height || '?'),
-        'video ' + video.videoWidth + 'x' + video.videoHeight + (video.paused ? ' paused' : ' playing'),
-        tk ? tk.readyState + (tk.muted ? ' muted' : '') : '',
-        'frames ' + camFrames,
-        camLight < 0 ? '' : 'light ' + camLight,
-        zxReady ? 'reader ok' : (zx ? 'reader loading' : 'reader not loaded')
-      ].filter(Boolean).join(' · ');
-    }
-    var stageEl = document.getElementById('co-roll-cam-stage');
-    var panelEl = document.getElementById('co-roll-cam-confirm');
-
-    // ── Confirm, then add ─────────────────────────────────────────
-    // A decode is a question. The reader fires on whatever crosses the
-    // frame — the neighbouring roll on the shelf, the label still in
-    // hand — so adding straight off one put stock on the order that
-    // nobody chose, and the only way to notice was to re-read the card.
-    // The loop pauses on the first read, the panel says what that code
-    // is, and the order changes only on a confirm.
-    //
-    // The STREAM stays live while it waits. "Scan again" then picks up
-    // instantly instead of asking the browser for the camera a second
-    // time, which is the slow part and, on iOS, the part that prompts.
-    var camPending = '', camPrevOverflow = '';
-    // A card's camera read a roll of another product: it is confirmed
-    // and added the main scanner's way, onto that product's own line.
-    var camRerouted = false;
-
-    function camPause() {
-      camRunning = false;
-      if (camRaf) { cancelAnimationFrame(camRaf); camRaf = null; }
-    }
-    function camPanel(html) {
-      if (!panelEl || !stageEl) return;
-      stageEl.style.display = 'none';
-      panelEl.style.display = 'block';
-      panelEl.innerHTML = html;
-      panelEl.scrollTop = 0;
-    }
-    function camStage() {
-      if (!panelEl || !stageEl) return;
-      panelEl.style.display = 'none';
-      panelEl.innerHTML = '';
-      stageEl.style.display = '';
-    }
-    function camPill(kind, text) {
-      var c = kind === 'ok' ? ['rgba(16,185,129,.16)', '#34D399', 'rgba(52,211,153,.38)']
-            : kind === 'warn' ? ['rgba(245,158,11,.16)', '#FBBF24', 'rgba(251,191,36,.38)']
-            : ['rgba(244,63,94,.16)', '#FB7185', 'rgba(251,113,133,.38)'];
-      return '<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;' +
-        'background:' + c[0] + ';color:' + c[1] + ';border:1px solid ' + c[2] +
-        ';font:700 12px var(--font-sans,sans-serif);">' + text + '</span>';
-    }
-    function camCodeChip(code) {
-      return '<div style="display:flex;align-items:center;justify-content:center;gap:9px;margin:11px 0;' +
-        'padding:10px 13px;background:linear-gradient(135deg,rgba(20,127,116,.30),rgba(13,148,136,.10));' +
-        'border:1px solid rgba(45,212,191,.35);border-radius:12px;font:800 16px ui-monospace,monospace;' +
-        'color:#5EEAD4;letter-spacing:.04em;word-break:break-all;">' +
-        '<i class="fas fa-barcode" style="opacity:.8;font-size:14px;flex-shrink:0;"></i>' + esc(code) + '</div>';
-    }
-    function camBtn(kind, onclick, icon, label) {
-      var st = kind === 'primary'
-        ? 'background:linear-gradient(135deg,#0D9488,#0F766E);color:#fff;box-shadow:0 6px 16px rgba(13,148,136,.35);'
-        : 'background:rgba(255,255,255,.10);color:#fff;';
-      return '<button type="button" onclick="' + onclick + '" style="flex:1;display:inline-flex;align-items:center;' +
-        'justify-content:center;gap:7px;padding:11px 12px;border:0;border-radius:11px;cursor:pointer;' +
-        'font:700 12.5px var(--font-sans,sans-serif);' + st + '">' +
-        '<i class="fas ' + icon + '"></i>' + label + '</button>';
-    }
-    function camActions(buttons) {
-      return '<div style="display:flex;gap:9px;margin-top:14px;">' + buttons + '</div>';
-    }
-    var CAM_AGAIN = '{% trans "Scan again" %}';
-    function camAgainBtn() { return camBtn('ghost', 'coRollCamAgain()', 'fa-rotate-right', CAM_AGAIN); }
-    function camDoneBtn() { return camBtn('ghost', 'coCloseRollCamera()', 'fa-xmark', '{% trans "Done" %}'); }
-    // A detail line: label on the left, value on the right.
-    function camFact(label, value) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;' +
-        'padding:7px 0;border-top:1px solid rgba(255,255,255,.09);font:600 12px var(--font-sans,sans-serif);">' +
-        '<span style="color:#94A3B8;">' + label + '</span>' +
-        '<span style="color:#fff;font-weight:800;text-align:right;">' + value + '</span></div>';
-    }
-
-    // What the panel shows once a code has been read and looked up.
-    function camAskConfirm(code, title, facts) {
-      camPanel(
-        camPill('ok', '<i class="fas fa-circle-check"></i>{% trans "Barcode read" %}') +
-        camCodeChip(code) +
-        (title ? '<div style="font:800 14px var(--font-sans,sans-serif);line-height:1.3;margin-bottom:8px;">' +
-                 title + '</div>' : '') +
-        (facts || '') +
-        camActions(camAgainBtn() +
-                   camBtn('primary', 'coRollCamConfirm()', 'fa-plus', '{% trans "Add to order" %}')));
-    }
-    function camRefuse(kind, headline, detail, code) {
-      camPanel(
-        camPill(kind, '<i class="fas fa-triangle-exclamation"></i>' + headline) +
-        (code ? camCodeChip(code) : '') +
-        (detail ? '<div style="font:600 12.5px var(--font-sans,sans-serif);color:#CBD5E1;line-height:1.45;">' +
-                  detail + '</div>' : '') +
-        camActions(camAgainBtn() + camDoneBtn()));
-    }
-
-    // Read -> look up -> ask. Read-only: the lookup reserves nothing, so
-    // a code that is never confirmed leaves no trace on the order.
-    function camRead(code) {
-      camPending = code;
-      // Already on this order? That is answered here rather than after a
-      // confirm, so the panel never asks about something it will refuse.
-      var bcL = code.toLowerCase();
-      var onOrder = orderItems.some(function (it) {
-        return (it.existingRolls || []).concat(it.rolls || []).some(function (r) {
-          return (r.barcode || '').toLowerCase() === bcL;
-        });
-      });
-      if (onOrder) {
-        camRefuse('warn', '{% trans "Already on this order" %}',
-                  '{% trans "This stock item is on a line already — nothing to add." %}', code);
-        return;
-      }
-      var item = (camTargetIndex !== 'global' && camTargetIndex != null) ? orderItems[camTargetIndex] : null;
-      if (camTargetIndex !== 'global' && !item) {
-        camRefuse('bad', '{% trans "That line is gone" %}',
-                  '{% trans "The product this camera was opened for is no longer on the order." %}', code);
-        return;
-      }
-      camPanel('<div style="padding:22px 0;color:#CBD5E1;font:600 12.5px var(--font-sans,sans-serif);">' +
-               '<i class="fas fa-spinner fa-spin"></i> ' + esc(code) + '</div>');
-      camLookup(code, item, camTargetIndex === 'global');
-    }
-
-    // `asGlobal`: look the code up the main scanner's way — any product.
-    // The main camera always does; a card's camera falls back to it when
-    // the roll turns out to be another product's, so the panel can say
-    // where it will go instead of refusing it.
+    // Look a code up, read-only: nothing is reserved until the confirm.
     function camLookup(code, item, asGlobal) {
       camRerouted = asGlobal && camTargetIndex !== 'global';
       var url = asGlobal
         ? '{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(code) + coOrderParam() + coScopeParams()
         : '{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(code) +
           '&sku=' + encodeURIComponent(item.sku) + coOrderParam() + coScopeParams();
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (!camPending) return;            // closed while in flight
-          if (d && !d.ok && !asGlobal && d.kind === 'wrong_product') {
-            camLookup(code, item, true);
-            return;
-          }
-          if (!d || !d.ok) {
-            camRefuse('bad', '{% trans "Cannot be added" %}',
-                      esc((d && d.error) || '{% trans "Barcode could not be checked" %}'), code);
-            return;
-          }
-          var facts = '', title = '';
-          if (asGlobal) {
-            title = esc(d.title || d.sku || '');
-            var roll = d.roll || {};
-            facts = camFact('{% trans "SKU" %}', esc(d.sku || '—')) +
-                    camFact('{% trans "Available" %}', fmtNum(Number(roll.available) || 0) + ' ' + esc(roll.unit || 'm')) +
-                    (roll.warehouse ? camFact('{% trans "Warehouse" %}', esc(roll.warehouse)) : '') +
-                    (roll.book ? camFact('{% trans "Book" %}', esc(roll.book)) : '');
-            if (camRerouted) {
-              facts = camPill('warn', '<i class="fas fa-shuffle"></i>{% trans "Different product — goes on its own line" %}') + facts;
-            }
-          } else {
-            title = esc((item && item.title) || '');
-            facts = camFact('{% trans "Available" %}', fmtNum(Number(d.available) || 0) + ' ' + esc(d.unit || 'm')) +
-                    (d.warehouse ? camFact('{% trans "Warehouse" %}', esc(d.warehouse)) : '') +
-                    (d.book ? camFact('{% trans "Book" %}', esc(d.book)) : '');
-          }
-          camAskConfirm(code, title, facts);
-        })
-        .catch(function () {
-          camRefuse('bad', '{% trans "Barcode could not be checked" %}',
-                    '{% trans "Check the connection and try again." %}', code);
-        });
+      return fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && !d.ok && !asGlobal && d.kind === 'wrong_product') return camLookup(code, item, true);
+        if (!d || !d.ok) {
+          return {ok: false, kind: 'bad', headline: '{% trans "Cannot be added" %}',
+                  detail: (d && d.error) || '{% trans "Barcode could not be checked" %}'};
+        }
+        if (asGlobal) {
+          var roll = d.roll || {};
+          var facts = [['{% trans "SKU" %}', d.sku || '—'],
+                       ['{% trans "Available" %}', fmtNum(Number(roll.available) || 0) + ' ' + (roll.unit || 'm')]];
+          if (roll.warehouse) facts.push(['{% trans "Warehouse" %}', roll.warehouse]);
+          if (roll.book) facts.push(['{% trans "Book" %}', roll.book]);
+          return {ok: true, title: d.title || d.sku || '', facts: facts,
+                  notice: camRerouted ? '{% trans "Different product — goes on its own line" %}' : ''};
+        }
+        var own = [['{% trans "Available" %}', fmtNum(Number(d.available) || 0) + ' ' + (d.unit || 'm')]];
+        if (d.warehouse) own.push(['{% trans "Warehouse" %}', d.warehouse]);
+        if (d.book) own.push(['{% trans "Book" %}', d.book]);
+        return {ok: true, title: (item && item.title) || '', facts: own};
+      });
     }
 
-    // The confirm itself goes through the SAME add path a typed barcode
-    // takes — book adoption, the clash guard and the availability check
-    // all live there, and a second copy of them here would be a second
-    // set of rules to keep in step.
-    window.coRollCamConfirm = function () {
-      var code = camPending;
-      if (!code) return;
-      camPanel('<div style="padding:22px 0;color:#CBD5E1;font:600 12.5px var(--font-sans,sans-serif);">' +
-               '<i class="fas fa-spinner fa-spin"></i> ' + esc(code) + '</div>');
-      var done = (camTargetIndex === 'global' || camRerouted)
-        ? window.coScanAddByBarcode(code, true)
-        : window.coAddRoll(camTargetIndex, code);
-      Promise.resolve(done).then(function (ok) {
-        if (ok) {
-          camPanel(
-            camPill('ok', '<i class="fas fa-circle-check"></i>{% trans "Added to the order" %}') +
-            camCodeChip(code) +
-            camActions(camAgainBtn() + camDoneBtn()));
-        } else {
-          // The add path already said why in a toast; the panel keeps
-          // the way forward on screen rather than dropping back to a
-          // live camera that would re-read the same label.
-          camRefuse('bad', '{% trans "Could not be added" %}', '', code);
-        }
-      });
-    };
-
-    window.coRollCamAgain = function () {
-      camPending = '';
-      camDebounce = { val: '', t: 0 };
-      camStage();
-      if (hitEl) hitEl.textContent = '{% trans "Bring the barcode into the frame" %}';
-      camFrames = 0; camDecodeErr = '';
-      camOpenedAt = (window.performance && performance.now) ? performance.now() : Date.now();
-      if (camStream && video && video.srcObject) {
-        camRunning = true; lastDecode = 0;
-        // The video was display:none while the read was being confirmed,
-        // and Safari may have paused it there.
-        try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
-        camLoop();
-      } else {
-        window.coOpenRollCamera(camTargetIndex);   // stream was lost — start over
-      }
-    };
-
-    window.coOpenRollCamera = function (i) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('{% trans "The camera is not supported" %}', 'error'); return; }
-      camTargetIndex = i;
-      // The create sidebar has already hidden the body's scrollbar when
-      // the form is opened from there. Remember what it was rather than
-      // assuming: clearing it on close would let the page behind the
-      // still-open sidebar scroll again. Remembered only on the way IN:
-      // "scan another" comes back through here with the overlay still
-      // up when the stream was lost, and remembering again at that point
-      // would remember our own lock — the close would then restore
-      // "hidden", and the page could never be scrolled again. That is
-      // how the phone was left unable to reach "Place order".
-      if (!(camEl && camEl.classList.contains('show'))) {
-        camPrevOverflow = document.body.style.overflow;
-      }
-      if (camEl) camEl.classList.add('show');
-      document.body.style.overflow = 'hidden';
-      // A reopen starts on the camera, never on the last read's panel.
-      camPending = '';
-      camDebounce = { val: '', t: 0 };
-      camStage();
-      camFrames = 0; camDecodeErr = ''; camLight = -1; camDiagAt = 0;
-      if (!zxReady) zxWasmTry = 0;
-      if (diagEl) diagEl.textContent = '';
-      camOpenedAt = (window.performance && performance.now) ? performance.now() : Date.now();
-      // Back to the prompt — otherwise a reopen starts under the last
-      // scan's code, or the last error, and reads as a live result.
-      if (hitEl) hitEl.textContent = '{% trans "Bring the barcode into the frame" %}';
-      getRearStream().then(function (stream) {
-        camStream = stream; video.srcObject = stream; camRunning = true; lastDecode = 0;
-        // autoplay alone is not enough on a <video> whose container was
-        // display:none until this click — Safari in particular leaves it
-        // at readyState 0, and camLoop then waits for a frame forever.
-        try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
-        loadZxw().then(function () { camLoop(); }).catch(function (err) {
-          console.error('[roll-camera] zxing load failed', err);
-          showToast('{% trans "Scanner failed to load" %}: ' + ((err && err.message) || err), 'error');
+    window.NejumCamera.open({
+      title: '{% trans "Scan barcode" %}',
+      confirmLabel: '{% trans "Add to order" %}',
+      doneHeadline: '{% trans "Added to the order" %}',
+      failHeadline: '{% trans "Could not be added" %}',
+      // A good read goes straight in; the lookup above is the check.
+      addOnRead: true,
+      lookup: function (code) {
+        // Already on this order? Answered before asking, so the panel
+        // never offers something it will refuse.
+        var bcL = code.toLowerCase();
+        var onOrder = orderItems.some(function (it) {
+          return (it.existingRolls || []).concat(it.rolls || []).some(function (r) {
+            return (r.barcode || '').toLowerCase() === bcL;
+          });
         });
-      }).catch(function (err) { showToast('{% trans "Camera" %}: ' + (err && err.message || err), 'error'); window.coCloseRollCamera(); });
-    };
-    window.coCloseRollCamera = function () {
-      camRunning = false;
-      camPending = '';
-      camStage();
-      if (camRaf) { cancelAnimationFrame(camRaf); camRaf = null; }
-      if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
-      if (video) video.srcObject = null;
-      if (camEl) camEl.classList.remove('show');
-      document.body.style.overflow = camPrevOverflow;
-      camTargetIndex = null;
-    };
-
-    // Escape closes it, like every other modal on the site. Bound to the
-    // document because focus is usually on nothing in particular — the
-    // popup is aimed, not typed into.
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && camEl && camEl.classList.contains('show')) {
-        e.preventDefault();
-        window.coCloseRollCamera();
-      }
+        if (onOrder) {
+          return {ok: false, kind: 'warn', headline: '{% trans "Already on this order" %}',
+                  detail: '{% trans "This stock item is on a line already — nothing to add." %}'};
+        }
+        var item = (camTargetIndex !== 'global' && camTargetIndex != null) ? orderItems[camTargetIndex] : null;
+        if (camTargetIndex !== 'global' && !item) {
+          return {ok: false, kind: 'bad', headline: '{% trans "That line is gone" %}',
+                  detail: '{% trans "The product this camera was opened for is no longer on the order." %}'};
+        }
+        return camLookup(code, item, camTargetIndex === 'global');
+      },
+      // Through the SAME add path a typed barcode takes: book adoption,
+      // the clash guard and the availability check all live there.
+      confirm: function (code) {
+        return (camTargetIndex === 'global' || camRerouted)
+          ? window.coScanAddByBarcode(code, true)
+          : window.coAddRoll(camTargetIndex, code);
+      },
     });
-    // A click on the backdrop closes; one inside the card does not.
-    if (camEl) {
-      camEl.addEventListener('click', function (e) {
-        if (e.target === camEl) window.coCloseRollCamera();
-      });
-    }
-    function onDecode(code) {
-      var now = (window.performance && performance.now) ? performance.now() : Date.now();
-      code = (code || '').toString().trim();
-      if (!code) return;
-      if (code === camDebounce.val && (now - camDebounce.t) < 1600) return;
-      camDebounce = { val: code, t: now };
-      beep();
-      if (hitEl) hitEl.textContent = code;
-      // Stop reading and ask. Nothing is added until coRollCamConfirm.
-      camPause();
-      camRead(code);
-    }
-    function camLoop() {
-      if (!camRunning) return;
-      var now = (window.performance && performance.now) ? performance.now() : Date.now();
-      camDiag(now);
-      if (!zx || !video.videoWidth || video.readyState < 2 || (now - lastDecode) < 120) {
-        // Five seconds of waiting with no frame is not "hold it steadier",
-        // it is a camera that never started. Say so instead of leaving
-        // the aiming prompt up over a picture nobody is reading.
-        if (hitEl && camOpenedAt && (now - camOpenedAt) > 5000 && !camFrames) {
-          hitEl.textContent = !zx
-            ? '{% trans "Scanner did not load — check the connection" %}'
-            : '{% trans "No picture is coming from the camera" %}';
-        }
-        camRaf = requestAnimationFrame(camLoop); return;
-      }
-      camFrames++;
-      lastDecode = now;
-      try {
-        var c = roi(), vw = video.videoWidth, vh = video.videoHeight;
-        var cropW = vw, cropH = Math.round(vh * 0.60), sx = 0, sy = Math.round((vh - cropH) / 2);
-        var outW = Math.min(1280, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
-        if (c.width !== outW) c.width = outW; if (c.height !== outH) c.height = outH;
-        var cx = c.getContext('2d', { willReadFrequently: true });
-        cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
-        var img = cx.getImageData(0, 0, outW, outH);
-        // How bright the frame the reader is given is, 0–255, off a
-        // sparse sample: a black picture over a bright frame is the
-        // screen's fault, over a dark one the camera's.
-        var px = img.data, sum = 0, n = 0;
-        for (var p = 0; p < px.length; p += 4000) { sum += px[p] + px[p + 1] + px[p + 2]; n += 3; }
-        camLight = n ? Math.round(sum / n) : -1;
-        zx(img, ZXW_OPTS).then(function (res) { zxReady = true; if (camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
-          .catch(function (err) {
-            if (!zxReady && zxNextHost()) return;
-            // Once, not once per frame — this fires 8×/second.
-            var msg = (err && err.message) || String(err);
-            if (msg !== camDecodeErr) {
-              camDecodeErr = msg;
-              console.error('[roll-camera] decode failed', err);
-              if (hitEl) hitEl.textContent = '{% trans "Reader error" %}: ' + msg;
-            }
-          })
-          .finally(function () { if (camRunning) camRaf = requestAnimationFrame(camLoop); });
-      } catch (e) { if (camRunning) camRaf = requestAnimationFrame(camLoop); }
-    }
-  })();
+  };
+  window.coCloseRollCamera = function () { if (window.NejumCamera) window.NejumCamera.close(); };
 
   /* CRM customer picker: delegated click handler on the results
      container. The autocomplete view writes <li class="customer-ac-item"

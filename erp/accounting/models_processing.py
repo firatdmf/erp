@@ -1,26 +1,24 @@
-"""Our own stock sent to a supplier to be worked on, on a purchase.
+"""Our own rolls sent out to a supplier to be worked on, on a purchase.
 
-Crystals or pearls put on a plain fabric, embroidery, printing, dyeing: the
-supplier is paid for the work, by the unit the goods are sold in, and the
-same roll comes back as another variant. It is a purchase like any other
-(the supplier's account, the price, receiving), except that a processing
-line brings in no new stock: it names one of our rolls and what that roll
-becomes.
+Crystals or pearls put on a plain fabric, embroidery, printing, dyeing: a
+purchase from that supplier lists our rolls going out ("goods out") beside
+what comes back ("goods in", its ordinary products). The supplier is paid
+the goods-in price, which is the work; the fabric was ours already.
 
-  saved (draft)  the roll is away: still ours and still in the stock value,
-                 but no order can pick it and the storefront doesn't offer it
+  saved (draft)  each out roll is away: still ours and still valued, but no
+                 order can pick it and the storefront doesn't offer it
                  (WarehouseProductItem.processing_line points here).
-  received       the roll is moved onto the variant it became, in the same
-                 warehouse, and its unit cost rises by the price of the work.
-                 The supplier is owed meters × price, against Inventory —
-                 the same figure the roll's value went up by.
-  undone         the roll goes back to the variant and the cost it had.
+  received       a goods-in roll with an out roll's barcode IS that roll,
+                 back as the variant and length it came in as; the other
+                 out rolls were used up into what came in. Everything that
+                 went out is pooled and spread per unit over everything
+                 that came in, on top of each row's price.
+  undone         every out roll is put back as it was, away again.
 
-The line keeps what is needed to put the roll back, and what was sent, if
-the roll itself is later cut or deleted.
+One line per out roll. It keeps what the roll was before it was settled,
+so an undo can put it back, and what was sent if the roll itself is later
+cut or deleted.
 """
-from decimal import Decimal
-
 from django.db import models
 
 
@@ -28,40 +26,35 @@ class ProcessingLine(models.Model):
     class Meta:
         ordering = ["invoice", "pk"]
 
+    OUTCOMES = [
+        ("returned", "Came back"),
+        ("used", "Used up"),
+    ]
+
     invoice = models.ForeignKey(
         "accounting.Invoice", on_delete=models.CASCADE, related_name="processing_lines")
-    # SET_NULL: the original purchase can be cancelled, taking the roll with
-    # it. What was sent stays on this row.
+    # SET_NULL: the roll's own purchase can be cancelled, taking the roll
+    # with it. What was sent stays on this row.
     stock_item = models.ForeignKey(
         "operating.WarehouseProductItem", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="processing_history")
     barcode = models.CharField(max_length=64, blank=True)
-    # What it is now, and what it becomes.
-    from_variant = models.ForeignKey(
-        "marketing.ProductVariant", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="+")
-    to_variant = models.ForeignKey(
-        "marketing.ProductVariant", on_delete=models.PROTECT, related_name="processing_lines")
-    # What the supplier works on and bills: what was left on the roll when
-    # it was sent, in the unit the product is sold in.
+    # What was left on the roll when it was sent, in its product's unit.
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
     unit = models.CharField(max_length=20, default="m")
-    # Per unit, in the purchase's currency, as typed.
-    unit_price = models.DecimalField(max_digits=18, decimal_places=6, default=Decimal("0"))
-    currency = models.CharField(max_length=3, default="USD")
 
     # Set on receipt, cleared on undo.
     received_at = models.DateTimeField(null=True, blank=True)
-    # Where the roll stood and what it cost before, for an undo to put back.
+    outcome = models.CharField(max_length=10, choices=OUTCOMES, blank=True)
+    # How long it came back, when it did.
+    quantity_back = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    # The roll as it stood before receipt changed it, for an undo.
     from_product = models.ForeignKey(
         "operating.WarehouseProduct", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="+")
     unit_cost_before = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
-    # What the work added to one unit, in the book's base currency.
-    added_cost_base = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
-    invoice_item = models.ForeignKey(
-        "accounting.InvoiceItem", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="processing_lines")
+    length_before = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    status_before = models.CharField(max_length=16, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -70,4 +63,4 @@ class ProcessingLine(models.Model):
         return self.received_at is not None
 
     def __str__(self):
-        return f"{self.barcode} → {self.to_variant_id} ({self.quantity} × {self.unit_price})"
+        return f"{self.barcode} out on {self.invoice_id} ({self.quantity})"

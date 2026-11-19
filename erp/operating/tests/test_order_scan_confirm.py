@@ -1,4 +1,11 @@
-"""A camera read is a question, not an instruction.
+"""A camera read: checked, then added, one label at a time.
+
+Since 2026-11-19 the order form adds a good read straight away
+(addOnRead), as the packing page always has: Muhammed found the extra
+confirm tap slowed picking. What stays is below — the loop stops on each
+read, so one label is one add, and the order's own check runs first.
+
+The history that shaped it:
 
 The order form's barcode camera used to add on the decode itself: the
 reader fires on whatever crosses the frame — the next roll on the shelf,
@@ -45,40 +52,69 @@ def body_of(src, signature):
     raise AssertionError(f"never closed: {signature}")
 
 
-class TheReadWaitsToBeConfirmed(SimpleTestCase):
-    def test_the_camera_has_somewhere_to_ask(self):
-        form = read_form()
-        self.assertIn('id="co-roll-cam-stage"', form)
-        self.assertIn('id="co-roll-cam-confirm"', form)
+CAMERA = "erp/static/erp/js/barcode_camera.js"
 
-    def test_a_decode_stops_and_asks_instead_of_adding(self):
-        """The whole point: onDecode must not reach an add path."""
-        decode = body_of(read_form(), "function onDecode(code)")
-        self.assertIn("camPause()", decode)
-        self.assertIn("camRead(code)", decode)
-        self.assertNotIn("coScanAddByBarcode", decode)
-        self.assertNotIn("coAddRoll", decode)
+
+def read_camera():
+    """The one camera reader every page shares."""
+    with open(CAMERA, encoding="utf-8") as fh:
+        return fh.read()
+
+
+class TheReadWaitsToBeConfirmed(SimpleTestCase):
+    def test_the_order_form_uses_the_shared_reader(self):
+        form = read_form()
+        self.assertIn("window.NejumCamera.open(", form)
+        # No copy of its own: one reader, one place to fix it.
+        self.assertNotIn("zxing", form)
+        self.assertNotIn("getUserMedia", form)
+
+    def test_a_decode_stops_and_is_checked_before_anything_is_added(self):
+        """One label is one read, and the page's lookup — already on the
+        order, another book, nothing left — runs before the add."""
+        cam = read_camera()
+        # The popup's handler for a read: stop reading, then handle it.
+        popup = cam[cam.index("rd = reader({"):]
+        handler = popup[popup.index("onCode: function (code) {"):]
+        handler = handler[:handler.index("},")]
+        self.assertIn("rd.pause()", handler)
+        self.assertIn("camRead(code)", handler)
+        self.assertNotIn("opts.confirm", handler)
+        read = body_of(cam, "function camRead(code)")
+        self.assertLess(read.index("opts.lookup"), read.index("confirmPending("))
+        self.assertIn("if (!r.ok)", read)
+
+    def test_the_order_adds_on_a_good_read(self):
+        opened = body_of(read_form(), "window.coOpenRollCamera = function (i)")
+        self.assertIn("addOnRead: true", opened)
 
     def test_confirming_goes_through_the_ordinary_add_path(self):
         """Book adoption, the clash guard and the availability check live
-        in the add functions; the panel must not grow a second copy."""
-        confirm = body_of(read_form(), "window.coRollCamConfirm = function ()")
-        self.assertRegex(confirm, r"window\.coScanAddByBarcode\(code[,)]")
-        self.assertIn("window.coAddRoll(camTargetIndex, code)", confirm)
+        in the add functions; the camera must not grow a second copy."""
+        opened = body_of(read_form(), "window.coOpenRollCamera = function (i)")
+        self.assertRegex(opened, r"window\.coScanAddByBarcode\(code[,)]")
+        self.assertIn("window.coAddRoll(camTargetIndex, code)", opened)
+        confirm = body_of(read_camera(), "function confirmPending(found)")
+        self.assertIn("opts.confirm(code)", confirm)
+
+    def test_a_code_already_on_the_order_is_answered_before_asking(self):
+        opened = body_of(read_form(), "window.coOpenRollCamera = function (i)")
+        self.assertIn("Already on this order", opened)
 
     def test_the_panel_offers_another_scan(self):
-        form = read_form()
-        self.assertIn("coRollCamAgain()", form)
-        again = body_of(form, "window.coRollCamAgain = function ()")
-        # Resumes the paused loop on the live stream. Stopping the tracks
+        cam = read_camera()
+        self.assertIn("data-nj-cam=", cam)
+        again = body_of(cam, "function again()")
+        # Resumes the paused reader on the live stream. Stopping the tracks
         # and re-asking for the camera is the slow path, and on iOS it
         # prompts again.
-        self.assertIn("camLoop()", again)
-        self.assertNotIn("getRearStream", again)
-        self.assertNotIn("t.stop()", again)
+        self.assertIn("rd.resume()", again)
+        self.assertNotIn("rearStream", again)
+        resume = cam[cam.index("resume: function () {"):cam.index("stop: function () {")]
+        self.assertIn("if (stream && video.srcObject)", resume)
 
     def test_reopening_never_lands_on_the_last_reads_panel(self):
-        opened = body_of(read_form(), "window.coOpenRollCamera = function (i)")
+        opened = body_of(read_camera(), "function open(options)")
         self.assertIn("camStage()", opened)
         self.assertIn("camPending = ''", opened)
 
@@ -117,20 +153,18 @@ class EveryExitCarriesAVerdict(SimpleTestCase):
 
 
 class TheScannerIsAPopup(SimpleTestCase):
-    """The reader opens as a modal, the same one the warehouse page's
-    "Find by barcode" uses. Inline, it was a 280px strip competing for
-    the little height the create sidebar has left."""
+    """The reader opens as a modal over everything. Inline, it was a 280px
+    strip competing for the little height the create sidebar has left."""
 
     def test_it_is_an_overlay_with_a_way_out(self):
-        form = read_form()
-        self.assertIn('class="co-cam-overlay" id="co-roll-cam-overlay"', form)
-        self.assertIn("co-cam-shell", form)
-        self.assertIn("co-cam-close", form)
-        # The old inline strip is gone, not merely hidden.
-        self.assertNotIn("height:280px", form)
+        cam = read_camera()
+        self.assertIn("nj-cam-overlay", cam)
+        self.assertIn("nj-cam-shell", cam)
+        self.assertIn("nj-cam-close", cam)
+        self.assertNotIn("height:280px", read_form())
 
     def test_it_sits_above_the_create_sidebar(self):
-        """The form is loaded INTO .sidebar-overlay. A popup that does
+        """The order form is loaded INTO .sidebar-overlay. A popup that does
         not out-stack it opens behind the sidebar, where the camera runs
         and nothing is visible — so this reads both numbers rather than
         trusting one."""
@@ -138,28 +172,46 @@ class TheScannerIsAPopup(SimpleTestCase):
             base = fh.read()
         sidebar = re.search(r"\.sidebar-overlay\s*\{[^}]*?z-index:\s*(\d+)", base, re.S)
         self.assertIsNotNone(sidebar, "could not read .sidebar-overlay's z-index")
-        popup = re.search(r"\.co-cam-overlay\{[^}]*?z-index:(\d+)", read_form(), re.S)
-        self.assertIsNotNone(popup, "could not read .co-cam-overlay's z-index")
+        popup = re.search(r"\.nj-cam-overlay\{[^}]*?z-index:(\d+)", read_camera(), re.S)
+        self.assertIsNotNone(popup, "could not read .nj-cam-overlay's z-index")
         self.assertGreater(int(popup.group(1)), int(sidebar.group(1)))
 
     def test_opening_and_closing_toggle_the_same_class(self):
-        form = read_form()
-        opened = body_of(form, "window.coOpenRollCamera = function (i)")
-        closed = body_of(form, "window.coCloseRollCamera = function ()")
-        self.assertIn("camEl.classList.add('show')", opened)
-        self.assertIn("camEl.classList.remove('show')", closed)
+        cam = read_camera()
+        self.assertIn("el.classList.add('show')", body_of(cam, "function open(options)"))
+        self.assertIn("el.classList.remove('show')", body_of(cam, "function close()"))
 
     def test_closing_gives_back_the_scroll_it_took(self):
         """Not `overflow = ''`: the create sidebar has already hidden the
         body's scrollbar, and clearing it here would let the page behind
         a still-open sidebar scroll."""
-        form = read_form()
-        opened = body_of(form, "window.coOpenRollCamera = function (i)")
-        closed = body_of(form, "window.coCloseRollCamera = function ()")
-        self.assertIn("camPrevOverflow = document.body.style.overflow", opened)
-        self.assertIn("document.body.style.overflow = camPrevOverflow", closed)
+        cam = read_camera()
+        self.assertIn("camPrevOverflow = document.body.style.overflow", body_of(cam, "function open(options)"))
+        self.assertIn("document.body.style.overflow = camPrevOverflow", body_of(cam, "function close()"))
 
     def test_escape_closes_it(self):
-        self.assertRegex(
-            read_form(),
-            r"e\.key === 'Escape'[\s\S]{0,200}coCloseRollCamera\(\)")
+        self.assertRegex(read_camera(), r"e\.key === 'Escape'[\s\S]{0,200}close\(\)")
+
+    def test_every_page_has_it(self):
+        with open("erp/templates/base.html", encoding="utf-8") as fh:
+            self.assertIn('{% include "components/barcode_camera.html" %}', fh.read())
+
+
+class OneReaderForEveryPage(SimpleTestCase):
+    """No page carries its own camera or decoder (Muhammed, 2026-11-17:
+    "so we won't have duplicates when it comes to barcode scanning")."""
+
+    PAGES = (
+        "operating/templates/operating/partials/create_order_form.html",
+        "operating/templates/operating/order_pack_scan.html",
+        "operating/templates/operating/warehouse_detail.html",
+        "accounting/templates/accounts/goods_receipt_form.html",
+    )
+
+    def test_no_page_has_a_copy(self):
+        for page in self.PAGES:
+            with self.subTest(page=page), open(page, encoding="utf-8") as fh:
+                src = fh.read()
+                self.assertNotIn("zxing", src)
+                self.assertNotIn("getUserMedia", src)
+                self.assertIn("NejumCamera", src)

@@ -1,0 +1,28 @@
+{% load i18n static %}
+{% comment %}The one phone-camera barcode reader (erp/js/barcode_camera.js), on
+every page, with its words translated here. Pages open it with
+NejumCamera.open({...}); see the script for what they hand it.{% endcomment %}
+<script>
+  window.NJ_CAMERA_TEXT = {
+    title: "{% filter escapejs %}{% trans 'Scan barcode' %}{% endfilter %}",
+    close: "{% filter escapejs %}{% trans 'Close' %}{% endfilter %}",
+    aim: "{% filter escapejs %}{% trans 'Bring the barcode into the frame' %}{% endfilter %}",
+    again: "{% filter escapejs %}{% trans 'Scan again' %}{% endfilter %}",
+    done: "{% filter escapejs %}{% trans 'Done' %}{% endfilter %}",
+    read: "{% filter escapejs %}{% trans 'Barcode read' %}{% endfilter %}",
+    add: "{% filter escapejs %}{% trans 'Add' %}{% endfilter %}",
+    added: "{% filter escapejs %}{% trans 'Added' %}{% endfilter %}",
+    cannot: "{% filter escapejs %}{% trans 'Cannot be added' %}{% endfilter %}",
+    notAdded: "{% filter escapejs %}{% trans 'Could not be added' %}{% endfilter %}",
+    notChecked: "{% filter escapejs %}{% trans 'Barcode could not be checked' %}{% endfilter %}",
+    checkConnection: "{% filter escapejs %}{% trans 'Check the connection and try again.' %}{% endfilter %}",
+    camera: "{% filter escapejs %}{% trans 'Camera' %}{% endfilter %}",
+    unsupported: "{% filter escapejs %}{% trans 'The camera is not supported' %}{% endfilter %}",
+    loadFailed: "{% filter escapejs %}{% trans 'Scanner did not load — check the connection' %}{% endfilter %}",
+    noPicture: "{% filter escapejs %}{% trans 'No picture is coming from the camera' %}{% endfilter %}",
+    readerError: "{% filter escapejs %}{% trans 'Reader error' %}{% endfilter %}",
+    typePlaceholder: "{% filter escapejs %}{% trans 'Or type the barcode' %}{% endfilter %}",
+    typeGo: "{% filter escapejs %}{% trans 'Go' %}{% endfilter %}"
+  };
+</script>
+<script src="{% static 'erp/js/barcode_camera.js' %}"></script>

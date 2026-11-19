@@ -27,4 +27,6 @@ def purchase_history(**account_filter):
     pill = {"ordered": "scheduled", "received": "confirmed"}
     for inv in purchases:
         inv.pill = pill.get(inv.status, "scheduled")
-    return purchases
+    # Our rolls still out with them, beside the order sending them.
+    from accounting.processing import away_summary
+    return away_summary(purchases)

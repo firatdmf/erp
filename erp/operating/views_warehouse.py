@@ -4414,13 +4414,14 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
     """
     from django.db import transaction
 
-    from accounting.processing import plan_rows as processing_rows
+    from accounting.processing import ProcessingError, plan_rows as goods_out_rows
     products_in = data.get("products")
-    # A confirmed order may bring no goods at all, only our own rolls back
-    # from being worked on (accounting.processing).
-    if not isinstance(products_in, list):
-        products_in = []
-    if not products_in and not (invoice is not None and processing_rows(data)):
+    if not isinstance(products_in, list) or not products_in:
+        # Rolls sent out to be worked on come back as goods in.
+        if invoice is not None and goods_out_rows(data):
+            raise IntakeError({"success": False, "error": _gettext(
+                "Enter what came back from this supplier before receiving the "
+                "purchase.")}, status=400)
         raise IntakeError({"success": False, "error": _gettext("Add at least one product.")}, status=400)
 
     # ── Current account → barcode prefix + purchase posting below ──
@@ -4435,7 +4436,23 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                                         default_unit=data.get("unit"))
     _intake_check_described(products_in)
     _intake_check_lookalikes(resolved)
-    manual_codes = _intake_typed_barcodes(products_in)
+    # Our own rolls this purchase sent out (accounting.processing): a
+    # goods-in row carrying one's barcode is that roll come back, so its
+    # code is its own, not a clash.
+    from accounting.processing import start_receipt
+    try:
+        receipt = start_receipt(invoice) if invoice is not None else None
+    except ProcessingError as exc:
+        raise IntakeError({"success": False, "error": str(exc)}, status=400)
+    if receipt is not None:
+        for p_in in products_in:
+            for v_in in (p_in.get("variants") or []):
+                for t in (v_in.get("tops") or []):
+                    back = receipt.roll_for(t.get("barcode"))
+                    if back is not None:
+                        t["stock_item_id"] = back.pk
+    manual_codes = _intake_typed_barcodes(
+        products_in, current_barcodes=receipt.ids_by_code() if receipt else None)
     _intake_variant_barcodes(products_in)
     # The customer order this stock is bought for. Only a confirmed draft
     # can have one: a purchase for a customer is always saved first, since
@@ -4477,10 +4494,25 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     )
                     wp = target["wp"]
 
+                    # Our own rolls coming back as this variant keep their
+                    # record; only the others are new stock.
+                    back = ([t for t in stock_items if receipt.roll_for(t.get("barcode"))]
+                            if receipt is not None else [])
                     added_qty, new_roll_ids = _add_stock_to_variant(
-                        wp, stock_items, _item_minter(main_product, mint), user,
+                        wp, [t for t in stock_items if t not in back],
+                        _item_minter(main_product, mint), user,
                         notes_supplier=account_name,
                     )
+                    if receipt is not None:
+                        from accounting.processing import return_roll
+                        receipt.came_in.extend(new_roll_ids)
+                        for t in back:
+                            qty = _safe_decimal(t.get("qty"))
+                            if qty is None or qty <= 0:
+                                continue
+                            return_roll(receipt, receipt.roll_for(t.get("barcode")), wp, qty,
+                                        user=user, unit_cost=target["cost_usd"])
+                            added_qty += qty
                     if new_roll_ids:
                         created["barcodes"].extend(
                             WarehouseProductItem.objects
@@ -4517,15 +4549,21 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
 
                 created_list.append(created)
 
-            # Our own rolls back from being worked on: each becomes the
-            # variant it was sent to become, and the work is billed.
-            if invoice is not None:
-                from accounting.processing import ProcessingError, receive_lines
+            # Our rolls that went out and did not come back were used up in
+            # the work; what they were worth is spread over what came in.
+            if receipt is not None:
+                from accounting.processing import settle
                 try:
-                    purchase_lines.extend(
-                        receive_lines(invoice, user=user, rates=data.get("rates")))
+                    settled = settle(receipt, user=user)
                 except ProcessingError as exc:
                     raise IntakeError({"success": False, "error": str(exc)}, status=400)
+                for touched_wp in settled:
+                    _recount_wp(touched_wp)
+                    _resync_wp_catalog(touched_wp)
+                for line in receipt.lines.values():
+                    if line.from_product is not None:
+                        _recount_wp(line.from_product)
+                        _resync_wp_catalog(line.from_product)
     except IntakeError:
         raise
     except Exception as exc:
@@ -4586,8 +4624,6 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                     WarehouseProductItem.objects.filter(pk__in=stock_item_ids).update(
                         purchase_invoice_item=item
                     )
-            from accounting.processing import link_invoice_items
-            link_invoice_items(purchase_lines, inv_items)
             from accounting.signals_ledger import post_purchase_again
             post_purchase_again(inv)
             if not any(l["unit_price"] > 0 for l in purchase_lines):
@@ -5446,10 +5482,7 @@ def received_purchase_products(invoice):
                               .select_related("order").order_by("created_at", "id"))))
                 .order_by("id"))
     items = list(
-        # Lines billing work on our own rolls are not goods it brought
-        # (accounting.processing): they live in the plan's "processing".
-        invoice.items.filter(processing_lines__isnull=True).distinct()
-        .select_related("product")
+        invoice.items.select_related("product")
         .prefetch_related(Prefetch("warehouse_stock_items", queryset=rolls_qs))
         .order_by("line_no")
     )

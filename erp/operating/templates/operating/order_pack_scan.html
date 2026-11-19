@@ -1550,117 +1550,32 @@
     pkRegroup();
   }
 
-  // ══════════════════════ camera (zxing-wasm) ══════════════════════
-  var zx = null, zxLoading = null, camStream = null, camRaf = null, camRunning = false, lastDecode = 0;
-  var camDebounce = {val:'', t:0};
-  var roiCanvas = null, audioCtx = null;
-  var ZXW_OPTS = {tryHarder:true, tryRotate:true, tryDownscale:true, maxNumberOfSymbols:1,
-    formats:['Code128','EAN-13','EAN-8','UPC-A','UPC-E','Code39','Code93','ITF','Codabar','QRCode']};
-  var RS_BAD_LENS = /ultra|wide|tele|depth|truedepth|infrared/i;
-  function camIndex(label){ var m=(label||'').match(/camera2?\s*(\d+)/i); return m?parseInt(m[1],10):999; }
-  function applyFocus(stream){ try{ var tk=stream.getVideoTracks()[0]; if(tk&&tk.applyConstraints) tk.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){}); }catch(e){} return stream; }
-  function beep(){ try{ if(navigator.vibrate) navigator.vibrate(55); }catch(e){}
-    try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume();
-      var o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.07;
-      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.08); }catch(e){} }
-  function loadZxw(){
-    if (zx) return Promise.resolve(zx);
-    if (zxLoading) return zxLoading;
-    // The reader-only build: the package's root entry also carries the
-    // barcode writer, and half a megabyte more to download.
-    var urls=['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm','https://esm.sh/zxing-wasm@3.1.0/reader'];
-    function tryNext(i){ if(i>=urls.length) return Promise.reject(new Error('zxing load failed'));
-      return import(urls[i]).then(function(mod){ if(mod&&mod.readBarcodes) return mod; throw new Error('no export'); }).catch(function(){ return tryNext(i+1); }); }
-    // A load that failed is forgotten, so the next open tries again.
-    zxLoading = tryNext(0).then(function(mod){ zx=zxHealing(mod); return zx; })
-      .catch(function(err){ zxLoading=null; throw err; });
-    return zxLoading;
-  }
-  // The decoder is a file of its own, fetched on the first read. The
-  // library keeps a failed fetch and answers every later read with it,
-  // so one dropped download left the reader dead until the page was
-  // reloaded. Until a read has come back, a failure is taken to be that
-  // file, and it is fetched again from the next host.
-  var ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-    'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-    'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
-  var zxReady = false;
-  function zxHealing(mod){
-    var tries = 0;
-    function read(img, opts){
-      return mod.readBarcodes(img, opts).then(function(res){ zxReady=true; return res; }, function(err){
-        if (zxReady || !mod.prepareZXingModule || tries >= ZXW_WASM.length*2) throw err;
-        var url = ZXW_WASM[tries % ZXW_WASM.length]; tries++;
-        mod.prepareZXingModule({overrides:{locateFile:function(path, prefix){ return /\.wasm$/.test(path) ? url : prefix+path; }}});
-        return read(img, opts);
-      });
-    }
-    return read;
-  }
-  function getRearStream(){
-    var W={ideal:1920}, H={ideal:1080};
-    function open(c){ return navigator.mediaDevices.getUserMedia({video:c,audio:false}); }
-    return open({facingMode:{ideal:'environment'},width:W,height:H}).then(function(stream){
-      if (!navigator.mediaDevices.enumerateDevices) return applyFocus(stream);
-      // Not being able to list the lenses is no reason to give up the
-      // stream already in hand — it is read as "one camera" instead.
-      return navigator.mediaDevices.enumerateDevices().catch(function(){ return []; }).then(function(devices){
-        var cams=devices.filter(function(d){return d.kind==='videoinput';});
-        if (cams.length<2) return applyFocus(stream);
-        var rear=cams.filter(function(d){return /back|rear|environment|arka|tras|rück/i.test(d.label||'');});
-        if(!rear.length) rear=cams;
-        var pool=rear.filter(function(d){return !RS_BAD_LENS.test(d.label||'');}); if(!pool.length) pool=rear;
-        var iosMain=pool.filter(function(d){return /(^|\b)back camera\b/i.test(d.label||'');});
-        var sorted=pool.slice().sort(function(a,b){return camIndex(a.label)-camIndex(b.label);});
-        var pick=iosMain[0]||sorted[0], curId='';
-        try{ curId=(stream.getVideoTracks()[0].getSettings()||{}).deviceId||''; }catch(e){}
-        if (pick&&pick.deviceId&&pick.deviceId!==curId){ stream.getTracks().forEach(function(t){t.stop();});
-          // The first stream is stopped by now, so a lens that will not
-          // open cannot fall back to it: that hands the popup a dead
-          // stream and a black picture. Ask plainly for a rear camera.
-          return open({deviceId:{exact:pick.deviceId},width:W,height:H})
-            .catch(function(){ return open({facingMode:{ideal:'environment'}}); })
-            .then(applyFocus); }
-        return applyFocus(stream);
-      });
-    });
-  }
-  function roi(){ if(!roiCanvas){ roiCanvas=document.createElement('canvas'); roiCanvas.getContext('2d',{willReadFrequently:true}); } return roiCanvas; }
-
+  // ══════════════════════ camera ══════════════════════════════════
+  // The shared reader (erp/js/barcode_camera.js, loaded by base.html):
+  // the camera, the lens, the decoder. This page keeps its own screen —
+  // the package it scans into, the typed list, the result cards. A read
+  // goes straight into the package (pkScanPlace); while its card is up
+  // the camera keeps running, unread, so "Scan another" is instant.
   var video = document.getElementById('pkVideo');
   var scanModal = document.getElementById('pkScanModal');
-  var diagEl = document.getElementById('pkDiag'), camFrames = 0, camLight = -1, camDiagAt = 0;
-  function camDiag(now){
-    if (!diagEl || (now-camDiagAt)<1000) return;
-    camDiagAt = now;
-    var tk=null, st={};
-    try{ tk=camStream&&camStream.getVideoTracks()[0]; st=(tk&&tk.getSettings&&tk.getSettings())||{}; }catch(e){}
-    diagEl.textContent = [
-      (tk&&tk.label)||'no track',
-      (st.width||'?')+'x'+(st.height||'?'),
-      'video '+video.videoWidth+'x'+video.videoHeight+(video.paused?' paused':' playing'),
-      tk ? tk.readyState+(tk.muted?' muted':'') : '',
-      'frames '+camFrames,
-      camLight<0 ? '' : 'light '+camLight,
-      zxReady ? 'reader ok' : (zx ? 'reader loading' : 'reader not loaded')
-    ].filter(Boolean).join(' · ');
-  }
+  var pkReader = (window.NejumCamera && video) ? window.NejumCamera.reader({
+    video: video,
+    diag: document.getElementById('pkDiag'),
+    accept: function(){ return !scanPaused; },
+    soundOnRead: false,     // the card sounds what the read came to
+
+    onStatus: function(text){ var hit=document.getElementById('pkHit'); if(hit) hit.textContent = text; },
+    onCode: function(code){
+      var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
+      pkScanPlace(code);
+    },
+  }) : null;
+  // Starts the camera, or goes back to reading on the one already open.
   function startCam(){
-    if (camRunning) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
-    camFrames=0; camLight=-1; camDiagAt=0; if(diagEl) diagEl.textContent='';
-    getRearStream().then(function(stream){ camStream=stream; video.srcObject=stream; camRunning=true; lastDecode=0;
-      // autoplay alone is not always enough on Safari for a <video>
-      // whose popup was display:none until this tap.
-      try{ var pl=video.play(); if(pl&&pl.catch) pl.catch(function(){}); }catch(e){}
-      loadZxw().then(function(){ camLoop(); }).catch(function(){ toast('{% filter escapejs %}{% trans "Scanner failed to load." %}{% endfilter %}','err'); });
-    }).catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); });
+    if (!pkReader){ toast('{% filter escapejs %}{% trans "Camera not supported." %}{% endfilter %}','err'); return; }
+    pkReader.resume().catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); });
   }
-  function stopCam(){
-    camRunning=false; if(camRaf){ cancelAnimationFrame(camRaf); camRaf=null; }
-    if(camStream){ camStream.getTracks().forEach(function(t){t.stop();}); camStream=null; }
-    if(video) video.srcObject=null;
-  }
+  function stopCam(){ if (pkReader) pkReader.stop(); }
 
   // ── the popup ─────────────────────────────────────────────────────
   // packId '' scans loose, exactly as the inline camera used to.
@@ -1710,8 +1625,8 @@
     scanPaused = false;
     // Back to the scanner: the camera comes back with it (a no-op when
     // it is already running, or before the popup is showing).
+    // (Resuming also forgets the last code, so the same top may be re-read.)
     if (stageEl && scanModal && scanModal.classList.contains('show')) startCam();
-    camDebounce = {val:'', t:0};          // the same top may be re-read
     // The box keeps what is in it — a mistyped barcode, or the ones a
     // list could not place — and is deliberately NOT focused: on a phone,
     // focusing throws the on-screen keyboard over the camera every time
@@ -1744,6 +1659,7 @@
 
   // The roll was already in this package: nothing moved.
   function renderAlreadyHere(r, code){
+    pkSound('error');                     // nothing moved
     showResult('<div class="pks-rc">' +
       '<span class="pks-status warn"><i class="fa fa-circle-check"></i>' +
         '{% filter escapejs %}{% trans "Already in this package" %}{% endfilter %}' + '</span>' +
@@ -1762,6 +1678,7 @@
   }
 
   function renderRefused(msg, code){
+    pkSound('error');
     showResult('<div class="pks-rc">' +
       '<span class="pks-status err"><i class="fa fa-triangle-exclamation"></i>' +
         '{% filter escapejs %}{% trans "Cannot be added" %}{% endfilter %}' + '</span>' +
@@ -1876,8 +1793,12 @@
     }).finally(function(){ placeBusy = false; });
   }
 
+  // What a read came to, by ear: found and placed, or not.
+  function pkSound(kind){ if (window.NejumCamera) window.NejumCamera.sound(kind); }
+
   // The card after a read has placed the roll, with where it came from.
   function renderPlaced(r, code, was){
+    pkSound('ok');
     var num = targetPackNumber();
     var from = was.packNumber ? ('{% filter escapejs %}{% trans "Package #" %}{% endfilter %}' + was.packNumber) : '{% filter escapejs %}{% trans "Not in a package" %}{% endfilter %}';
     showResult('<div class="pks-rc">' +
@@ -1980,41 +1901,6 @@
     });
   }
 
-  function onDecode(code){
-    var now = (window.performance&&performance.now)?performance.now():Date.now();
-    code = (code||'').toString().trim();
-    if (!code) return;
-    if (scanPaused) return;                                                // a result is up
-    if (code === camDebounce.val && (now - camDebounce.t) < 1600) return;   // ignore same code within 1.6s
-    camDebounce = {val:code, t:now};
-    beep();
-    var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
-    pkScanPlace(code);
-  }
-  function camLoop(){
-    if (!camRunning) return;
-    var now=(window.performance&&performance.now)?performance.now():Date.now();
-    camDiag(now);
-    if (!zx || !video.videoWidth || video.readyState<2 || (now-lastDecode)<120){ camRaf=requestAnimationFrame(camLoop); return; }
-    lastDecode=now; camFrames++;
-    try{
-      var c=roi(), vw=video.videoWidth, vh=video.videoHeight;
-      var cropW=vw, cropH=Math.round(vh*0.60), sx=0, sy=Math.round((vh-cropH)/2);
-      var outW=Math.min(1280,cropW), outH=Math.max(1,Math.round(cropH*(outW/cropW)));
-      if(c.width!==outW) c.width=outW; if(c.height!==outH) c.height=outH;
-      var cx=c.getContext('2d',{willReadFrequently:true});
-      cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
-      var img=cx.getImageData(0,0,outW,outH);
-      // How bright the frame the reader is given is, 0–255, off a sparse
-      // sample: a black picture over a bright frame is the screen's
-      // fault, over a dark one the camera's.
-      var px=img.data, sum=0, n=0;
-      for (var p=0; p<px.length; p+=4000){ sum+=px[p]+px[p+1]+px[p+2]; n+=3; }
-      camLight = n ? Math.round(sum/n) : -1;
-      zx(img, ZXW_OPTS).then(function(res){ if(camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
-        .catch(function(){}).finally(function(){ if(camRunning) camRaf=requestAnimationFrame(camLoop); });
-    }catch(e){ if(camRunning) camRaf=requestAnimationFrame(camLoop); }
-  }
 })();
 </script>
 {% endblock %}

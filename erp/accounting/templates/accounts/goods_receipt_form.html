@@ -459,21 +459,30 @@ site's menus and the page's own way back are left out.{% endcomment %}
   }
   .np-gate.show { display: flex; }
   /* Our own rolls sent to be worked on (accounting.processing). */
-  .np-work-add { display: flex; gap: 8px; margin-bottom: 10px; }
+  .np-work-add { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .np-work-add input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); }
+  /* On a phone the box gets its own line, the buttons share the next. */
+  @media (max-width: 720px) { .np-work-add input { flex: 1 1 100%; } .np-work-add .gr-btn { flex: 1 1 0; justify-content: center; } }
   .np-work-add input:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
-  .np-work-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.7fr) auto; gap: 10px; align-items: end; padding: 12px 14px; margin-bottom: 8px; border: 1px solid #E2E8EE; border-radius: 10px; background: white; }
+  /* A small link, not a band: most purchases never send anything out.
+     base.css pads every button, so the padding is reset here. */
+  .np-work-open { display: flex; justify-content: flex-end; padding: 10px 22px 0; }
+  .np-work-open[hidden] { display: none; }
+  @media (max-width: 720px) { .np-work-open { padding: 10px 12px 0; } }
+  .np-work-open button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: none; background: none; cursor: pointer; font: 600 12px var(--font-sans); color: var(--nejum-teal-700, #005354); }
+  .np-work-open button:hover { text-decoration: underline; }
+  .np-work-open button i { font-size: 11px; }
+  .np-work-open-eg { font-weight: 500; color: var(--gray-500); }
+  @media (max-width: 720px) { .np-work-open-eg { display: none; } }
+  .np-work-close { margin-left: auto; align-self: flex-start; padding: 0; width: 28px; height: 28px; border: none; background: none; cursor: pointer; color: var(--gray-400); border-radius: 6px; }
+  .np-work-close:hover { color: var(--ink); background: #F1F5F9; }
+  .np-work-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 14px; margin-bottom: 8px; border: 1px solid #E2E8EE; border-radius: 10px; background: white; }
   .np-work-roll b { font: 700 13px var(--font-mono, monospace); color: var(--ink); }
   .np-work-roll div { font: 500 12px var(--font-sans); color: var(--gray-600); margin-top: 3px; }
-  .np-work-row label { display: block; font: 600 11px var(--font-sans); color: var(--gray-500); margin-bottom: 4px; }
-  .np-work-row select, .np-work-row input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); background: white; }
-  .np-work-row .bad { border-color: #D14343; }
-  .np-work-price { display: flex; align-items: center; gap: 6px; }
-  .np-work-price span { font: 600 12px var(--font-sans); color: var(--gray-500); white-space: nowrap; }
   .np-work-x { border: none; background: none; color: var(--gray-400); cursor: pointer; height: 36px; width: 32px; padding: 0; }
   .np-work-x:hover { color: #D14343; }
   .np-work-problem { grid-column: 1 / -1; font: 500 12px var(--font-sans); color: #B42318; }
-  @media (max-width: 720px) { .np-work-row { grid-template-columns: 1fr; } .np-work-x { justify-self: end; } }
+
   .np-fx { margin: 0 0 12px; padding: 14px 16px; border: 1px solid #E2E8EE; border-radius: 12px; background: white; }
   .np-fx-head { display:flex; align-items:center; gap:8px; font: 500 12.5px var(--font-sans); color: var(--gray-600); margin-bottom: 10px; }
   .np-fx-head b { color: var(--ink); }
@@ -808,12 +817,50 @@ site's menus and the page's own way back are left out.{% endcomment %}
       </div>
     </section>
 
+    {% if not edit_invoice %}
+    {% comment %}Goods out: our own rolls going to this supplier to be worked on
+      (accounting.processing). Most purchases have none, so it is one line
+      until asked for; a saved order with goods out opens with it showing.
+      What comes back is the products below — a roll that comes back keeps
+      its barcode there.{% endcomment %}
+    <div class="np-work-open" id="npWorkOpen">
+      <button type="button" onclick="npWorkShow(true)">
+        <i class="fa fa-plus"></i> {% trans "Send our goods out for work" %}
+        <span class="np-work-open-eg">{% trans "(sewing, embroidery, crystals…)" %}</span>
+      </button>
+    </div>
+    <section class="gr-sec" id="npWorkSec" hidden>
+      <div class="gr-sec-h">
+        <span class="gr-sec-n"><i class="fa fa-arrow-right-from-bracket"></i></span>
+        <span class="gr-sec-t">{% trans "Our goods sent out for work" %}</span>
+        <span class="gr-sec-d">{% trans "Goods of ours this supplier works on. Saved, they are away and can't be picked or sold. When the work is back, enter it under What comes back: anything that comes back with its own barcode is the same item, the rest was used up in the work." %}</span>
+        <button type="button" class="np-work-close" onclick="npWorkClose()"
+                title="{% trans 'Send nothing out' %}"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="np-work-add">
+        <input type="text" id="npWorkCode" autocomplete="off"
+               placeholder="{% trans 'Type a barcode, or use the camera' %}"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); npWorkAdd(); }">
+        <button type="button" class="gr-btn" onclick="npWorkCamera()">
+          <i class="fa fa-camera"></i> {% trans "Camera" %}
+        </button>
+        <button type="button" class="gr-btn" onclick="npWorkAdd()">
+          <i class="fa fa-plus"></i> {% trans "Add" %}
+        </button>
+      </div>
+      <div id="npWorkRows"></div>
+    </section>
+    {% endif %}
+
     <!-- ── 2. Products — one card per main product (+ variants & tops) ── -->
     <section class="gr-sec">
       <div class="gr-sec-h">
         <span class="gr-sec-n">2</span>
-        <span class="gr-sec-t">{% trans "Products" %}</span>
-        <span class="gr-sec-d">{% trans "A delivery can carry several unrelated products — they're all entered here and saved together." %}</span>
+        <span class="gr-sec-t" id="npProductsTitle"
+              data-plain="{% trans 'Products' %}" data-in="{% trans 'What comes back' %}">{% trans "Products" %}</span>
+        <span class="gr-sec-d" id="npProductsDesc"
+              data-plain="{% trans "A delivery can carry several unrelated products — they're all entered here and saved together." %}"
+              data-in="{% trans 'What comes back from the work, at the price of the work. Something that comes back with its own barcode is the same item.' %}">{% trans "A delivery can carry several unrelated products — they're all entered here and saved together." %}</span>
       </div>
 
       {% comment %}
@@ -838,25 +885,6 @@ site's menus and the page's own way back are left out.{% endcomment %}
       </button>
     </section>
 
-    {% if not edit_invoice %}
-    <!-- ── 3. Our rolls this supplier works on (accounting.processing) ── -->
-    <section class="gr-sec" id="npWorkSec">
-      <div class="gr-sec-h">
-        <span class="gr-sec-n">3</span>
-        <span class="gr-sec-t">{% trans "Our rolls sent to be worked on" %}</span>
-        <span class="gr-sec-d">{% trans "Rolls of ours this supplier works on — crystals, pearls, embroidery. Saved, they are away and can't be picked; received, each becomes the variant chosen here and the work is billed per unit." %}</span>
-      </div>
-      <div class="np-work-add">
-        <input type="text" id="npWorkCode" autocomplete="off"
-               placeholder="{% trans 'Scan or type a roll barcode' %}"
-               onkeydown="if (event.key === 'Enter') { event.preventDefault(); npWorkAdd(); }">
-        <button type="button" class="gr-btn" onclick="npWorkAdd()">
-          <i class="fa fa-plus"></i> {% trans "Add roll" %}
-        </button>
-      </div>
-      <div id="npWorkRows"></div>
-    </section>
-    {% endif %}
   </div>
 
   {% comment %}
@@ -2702,7 +2730,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
     const el = document.getElementById('npSummary');
     if (el) {
       el.style.color = '';
-      let html = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
+      let html = npWorkSummary() +
+        '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
         '<b>' + tcount + '</b> ' + npBatchNoun() +
         (Object.keys(totals).length ? '' : ' · <b>0</b> ' + unitShort(document.querySelector('#npProducts .np-product-card'))) +
         Object.keys(totals).map(function (u) {
@@ -3390,13 +3419,45 @@ site's menus and the page's own way back are left out.{% endcomment %}
   // order (which stores it untouched and replays it on confirm) and the
   // receive endpoint (which acts on it now). Returns null after alerting
   // if anything is missing, so no half-typed batch is ever sent.
-  // ── Our own rolls sent to be worked on (accounting.processing) ──────
-  // Each row is one roll: what it is now, what it becomes, the price of
-  // the work per unit. Posted as the plan's "processing".
+  // ── Goods out: our own rolls sent to be worked on (accounting.processing)
+  // Each row is one roll going out. What comes back is entered as goods in
+  // (the products), a returned roll under its own barcode. Posted as the
+  // plan's "goods_out".
   let npWorkPending = 0;   // rows of a saved plan still being looked up
   window.npWorkHasRows = function () {
     const rows = document.getElementById('npWorkRows');
     return npWorkPending > 0 || !!(rows && rows.querySelector('.np-work-row'));
+  };
+  // Opens (or, with no rolls in it, folds away) the goods-out section, and
+  // names the products what they are beside it: goods in.
+  window.npWorkShow = function (open) {
+    const sec = document.getElementById('npWorkSec');
+    const opener = document.getElementById('npWorkOpen');
+    if (!sec) return;
+    sec.hidden = !open;
+    if (opener) opener.hidden = !!open;
+    ['npProductsTitle', 'npProductsDesc'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = open ? el.dataset.in : el.dataset.plain;
+    });
+    if (open) {
+      const input = document.getElementById('npWorkCode');
+      if (input && !npWorkPending) input.focus();
+    }
+  };
+  // Folds goods out away. Rolls already in it come off it, so ask first.
+  window.npWorkClose = function () {
+    const rows = document.querySelectorAll('#npWorkRows .np-work-row');
+    if (rows.length && !confirm(
+        '{% filter escapejs %}{% trans "Take these goods off this purchase? They stay on the shelf." %}{% endfilter %}')) return;
+    rows.forEach(function (r) { r.remove(); });
+    const input = document.getElementById('npWorkCode');
+    if (input) input.value = '';
+    npWorkShow(false);
+    if (rows.length) window.npDirty = true;
+    // The products need a card to start from again.
+    if (window.npGateUpdate) npGateUpdate();
+    npSummaryUpdate();
   };
   function npCardUntouched(card) {
     if (card._npMode) return false;
@@ -3411,11 +3472,13 @@ site's menus and the page's own way back are left out.{% endcomment %}
                 '?code=' + encodeURIComponent(code) + (GR_ORDER_ID ? '&purchase=' + GR_ORDER_ID : '');
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(npReadJson);
   }
-  function npWorkRender(roll, saved) {
+  function npWorkRender(roll) {
     const wrap = document.getElementById('npWorkRows');
     const row = document.createElement('div');
     row.className = 'np-work-row';
     row.dataset.barcode = roll.barcode;
+    row.dataset.qty = roll.quantity;
+    row.dataset.unit = roll.unit;
 
     const info = document.createElement('div');
     info.className = 'np-work-roll';
@@ -3425,46 +3488,13 @@ site's menus and the page's own way back are left out.{% endcomment %}
     what.textContent = roll.label + ' · ' + roll.quantity + ' ' + roll.unit + ' · ' + roll.warehouse;
     info.appendChild(code); info.appendChild(what);
 
-    const toBox = document.createElement('div');
-    const toLabel = document.createElement('label');
-    toLabel.textContent = '{% filter escapejs %}{% trans "Becomes" %}{% endfilter %}';
-    const to = document.createElement('select');
-    to.className = 'np-work-to';
-    const blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = roll.variants.length
-      ? '{% filter escapejs %}{% trans "Pick the variant…" %}{% endfilter %}'
-      : '{% filter escapejs %}{% trans "No other variant — add it on the product first" %}{% endfilter %}';
-    to.appendChild(blank);
-    roll.variants.forEach(function (v) {
-      const o = document.createElement('option');
-      o.value = v.id; o.textContent = v.label;
-      to.appendChild(o);
-    });
-    if (saved && saved.to_variant_id) to.value = String(saved.to_variant_id);
-    toBox.appendChild(toLabel); toBox.appendChild(to);
-
-    const priceBox = document.createElement('div');
-    const priceLabel = document.createElement('label');
-    priceLabel.textContent = '{% filter escapejs %}{% trans "Price per" %}{% endfilter %} ' + roll.unit;
-    const priceWrap = document.createElement('div');
-    priceWrap.className = 'np-work-price';
-    const price = document.createElement('input');
-    price.className = 'np-work-price-in';
-    price.inputMode = 'decimal';
-    price.value = (saved && saved.price) || '';
-    const cur = document.createElement('span');
-    cur.textContent = npBillingCurrency();
-    priceWrap.appendChild(price); priceWrap.appendChild(cur);
-    priceBox.appendChild(priceLabel); priceBox.appendChild(priceWrap);
-
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'np-work-x';
-    x.title = '{% filter escapejs %}{% trans "Take this roll off" %}{% endfilter %}';
+    x.title = '{% filter escapejs %}{% trans "Take this off" %}{% endfilter %}';
     x.innerHTML = '<i class="fa fa-times"></i>';
-    x.onclick = function () { row.remove(); window.npDirty = true; };
+    x.onclick = function () { row.remove(); window.npDirty = true; npSummaryUpdate(); };
 
-    row.appendChild(info); row.appendChild(toBox); row.appendChild(priceBox); row.appendChild(x);
+    row.appendChild(info); row.appendChild(x);
     if (roll.problem) {
       const p = document.createElement('div');
       p.className = 'np-work-problem';
@@ -3474,72 +3504,113 @@ site's menus and the page's own way back are left out.{% endcomment %}
     wrap.appendChild(row);
     return row;
   }
+  function npWorkTaken(code) {
+    return Array.prototype.some.call(document.querySelectorAll('#npWorkRows .np-work-row'),
+      function (r) { return (r.dataset.barcode || '').toUpperCase() === code.toUpperCase(); });
+  }
+  // Put a looked-up item on the list. The empty card the page opened with
+  // goes: what comes back is entered when it is known.
+  function npWorkPut(roll) {
+    document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
+      if (npCardUntouched(card)) card.remove();
+    });
+    npWorkRender(roll);
+    window.npDirty = true;
+    npSummaryUpdate();
+  }
+  const NP_WORK_NEEDS_GATE = '{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}';
+  const NP_WORK_TWICE = '{% filter escapejs %}{% trans "This is already on the list." %}{% endfilter %}';
   window.npWorkAdd = function () {
     const input = document.getElementById('npWorkCode');
     const code = (input.value || '').trim();
     if (!code) { input.focus(); return; }
-    if (!npGateReady()) {
-      alert('{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}');
-      return;
-    }
-    const taken = Array.prototype.some.call(document.querySelectorAll('#npWorkRows .np-work-row'),
-      function (r) { return (r.dataset.barcode || '').toUpperCase() === code.toUpperCase(); });
-    if (taken) { alert('{% filter escapejs %}{% trans "This roll is already on the list." %}{% endfilter %}'); return; }
+    if (!npGateReady()) { alert(NP_WORK_NEEDS_GATE); return; }
+    if (npWorkTaken(code)) { alert(NP_WORK_TWICE); return; }
     npWorkFetch(code).then(function (d) {
       if (!d || !d.ok) { alert((d && d.error) || '{% trans "Could not save." %}'); return; }
       if (d.roll.problem) { alert(d.roll.problem); return; }
-      // The card the page opened with is not needed for work alone.
-      document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
-        if (npCardUntouched(card)) card.remove();
-      });
-      const row = npWorkRender(d.roll, null);
+      npWorkPut(d.roll);
       input.value = '';
-      window.npDirty = true;
-      row.querySelector('.np-work-to').focus();
+      input.focus();
     }).catch(npFailed);
   };
-  // A saved order's rows, looked up again so each shows what it is now.
+  // The phone camera: the shared reader (erp/js/barcode_camera.js). Each
+  // read says what it found and goes on the list on a confirm.
+  window.npWorkCamera = function () {
+    if (!npGateReady()) { alert(NP_WORK_NEEDS_GATE); return; }
+    if (!window.NejumCamera) { alert('{% filter escapejs %}{% trans "The camera is not supported" %}{% endfilter %}'); return; }
+    let found = null;
+    window.NejumCamera.open({
+      title: '{% filter escapejs %}{% trans "Our goods sent out for work" %}{% endfilter %}',
+      confirmLabel: '{% filter escapejs %}{% trans "Send out" %}{% endfilter %}',
+      doneHeadline: '{% filter escapejs %}{% trans "On the list" %}{% endfilter %}',
+      // A good read goes straight in; the lookup above is the check.
+      addOnRead: true,
+      lookup: function (code) {
+        found = null;
+        if (npWorkTaken(code)) return {ok: false, kind: 'warn', headline: NP_WORK_TWICE};
+        return npWorkFetch(code).then(function (d) {
+          if (!d || !d.ok) return {ok: false, kind: 'bad', headline: (d && d.error) || code};
+          if (d.roll.problem) return {ok: false, kind: 'bad', headline: d.roll.problem};
+          found = d.roll;
+          return {ok: true, title: d.roll.label,
+                  facts: [['{% filter escapejs %}{% trans "On it" %}{% endfilter %}', d.roll.quantity + ' ' + d.roll.unit],
+                          ['{% filter escapejs %}{% trans "Warehouse" %}{% endfilter %}', d.roll.warehouse]]};
+        });
+      },
+      confirm: function () {
+        if (!found) return false;
+        npWorkPut(found);
+        return true;
+      },
+    });
+  };
+  // A saved order's goods out, looked up again so each shows what it is now.
   function npWorkLoad(rows) {
     if (!rows.length) return;
+    npWorkShow(true);
     let chain = Promise.resolve();
     rows.forEach(function (saved) {
       chain = chain.then(function () {
         return npWorkFetch(saved.barcode).then(function (d) {
-          if (d && d.ok) npWorkRender(d.roll, saved);
+          if (d && d.ok) npWorkRender(d.roll);
           else alert((d && d.error) || saved.barcode);
         });
-      }).catch(npFailed).then(function () { npWorkPending -= 1; });
+      }).catch(npFailed).then(function () {
+        npWorkPending -= 1;
+        if (!npWorkPending) npSummaryUpdate();
+      });
     });
   }
-  // The rows as the plan carries them; null (after saying why) when one
-  // isn't finished.
+  // The goods out as the plan carries them. A code still in the box counts
+  // too: the server checks it like the others.
   function npWorkCollect() {
     const out = [];
-    const rows = document.querySelectorAll('#npWorkRows .np-work-row');
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const to = row.querySelector('.np-work-to');
-      const price = row.querySelector('.np-work-price-in');
-      to.classList.toggle('bad', !to.value);
-      const n = parseFloat((price.value || '').replace(',', '.'));
-      price.classList.toggle('bad', !(isFinite(n) && n >= 0));
-      if (!to.value) {
-        alert('{% filter escapejs %}{% trans "Say what each roll sent to be worked on becomes." %}{% endfilter %}');
-        to.focus(); return null;
-      }
-      if (!(isFinite(n) && n >= 0)) {
-        alert('{% filter escapejs %}{% trans "Enter the price of the work for each roll." %}{% endfilter %}');
-        price.focus(); return null;
-      }
-      out.push({ barcode: row.dataset.barcode, to_variant_id: parseInt(to.value, 10),
-                 price: String(n), currency: npBillingCurrency() });
-    }
+    document.querySelectorAll('#npWorkRows .np-work-row').forEach(function (row) {
+      out.push({ barcode: row.dataset.barcode });
+    });
+    const input = document.getElementById('npWorkCode');
+    const typed = ((input && input.value) || '').trim();
+    if (typed && !npWorkTaken(typed)) out.push({ barcode: typed });
     return out;
+  }
+  // "Out: 2 rolls · 140 m" for the summary bar, or ''.
+  function npWorkSummary() {
+    const rows = document.querySelectorAll('#npWorkRows .np-work-row');
+    if (!rows.length) return '';
+    const totals = {};
+    rows.forEach(function (r) {
+      const q = parseFloat(r.dataset.qty || '0');
+      if (q > 0) totals[r.dataset.unit || 'm'] = (totals[r.dataset.unit || 'm'] || 0) + q;
+    });
+    return '{% filter escapejs %}{% trans "Sent out" %}{% endfilter %}: <b>' + rows.length + '</b> ' + npBatchNoun() +
+      Object.keys(totals).map(function (u) {
+        return ' · <b>' + (Math.round(totals[u] * 100) / 100) + '</b> ' + (NP_UNIT_SHORT[u] || u);
+      }).join('') + ' &nbsp;|&nbsp; {% filter escapejs %}{% trans "Comes back" %}{% endfilter %}: ';
   }
 
   function npCollect() {
     const work = npWorkCollect();
-    if (work === null) return null;
     // A purchase of work on our own rolls may bring no goods: the card the
     // page opened with, left untouched, is not a product.
     const cards = Array.prototype.filter.call(
@@ -3756,7 +3827,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
       // rate and the total that posts is not the total that was agreed to.
       rates: npFxRates,
       products: products,
-      processing: work
+      goods_out: work
     };
   }
 
@@ -4192,10 +4263,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
   npUpdatePrefix();
   if (GR_EDIT_ID) {
     npLoadForEdit(GR_EDIT_ID);
-  } else if (GR_PLAN && ((GR_PLAN.products || []).length || (GR_PLAN.processing || []).length)) {
-    npWorkPending = (GR_PLAN.processing || []).length;
+  } else if (GR_PLAN && ((GR_PLAN.products || []).length || (GR_PLAN.goods_out || []).length)) {
+    npWorkPending = (GR_PLAN.goods_out || []).length;
     npLoadFromPlan(GR_PLAN);
-    npWorkLoad(GR_PLAN.processing || []);
+    npWorkLoad(GR_PLAN.goods_out || []);
     // A purchase pre-filled from a customer order has no account yet, so
     // its cards wait behind the gate until one is picked.
     npGateUpdate();

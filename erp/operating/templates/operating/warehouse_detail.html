@@ -3089,102 +3089,40 @@
       }
     } catch (_) {}
   }
-  // Pick the MAIN rear camera (not the ultra-wide / tele / macro / depth).
-  // Some phones map facingMode:'environment' to the ultra-wide lens, which
-  // focuses poorly on close labels → bad barcode reads. We enumerate the
-  // cameras and choose the main lens by excluding those by label.
-  // Exclude non-main lenses: ULTRA-wide, telephoto, macro, depth, fisheye,
-  // 0.5x. NOTE: we keep plain "wide" — the MAIN lens is a wide-angle (~1x);
-  // only the ULTRA-wide (0.5x, fixed-focus) is the problem.
-  var RS_BAD_LENS = /ultra|0\.5|tele|macro|depth|fish/i;
-  function rsCamIndex(label) { var m = /camera2?\s+(\d+)/i.exec(label || ''); return m ? parseInt(m[1], 10) : 1000; }
-  function rsApplyFocus(stream) {
-    try {
-      var t = stream.getVideoTracks()[0];
-      if (t && t.applyConstraints) {
-        var caps = t.getCapabilities ? t.getCapabilities() : null;
-        // Apply continuous autofocus where supported (Android). iOS has no
-        // programmatic focus — it auto-focuses, and picking the main lens
-        // (done above) is what actually fixes close-up focus there.
-        if (!caps || !caps.focusMode || caps.focusMode.indexOf('continuous') !== -1) {
-          t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
-        }
-      }
-    } catch (e) {}
-    return stream;
-  }
-  function getRearCameraStream() {
-    var W = { ideal: 1920 }, H = { ideal: 1080 };
-    function open(c) { return navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
-    // Open the rear camera first (also grants permission so labels populate).
-    return open({ facingMode: { ideal: 'environment' }, width: W, height: H }).then(function (stream) {
-      if (!navigator.mediaDevices.enumerateDevices) return rsApplyFocus(stream);
-      // Not being able to list the lenses is no reason to give up the
-      // stream already in hand — it is read as "one camera" instead.
-      return navigator.mediaDevices.enumerateDevices().catch(function () { return []; }).then(function (devices) {
-        var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
-        if (cams.length < 2) return rsApplyFocus(stream);
-        var rear = cams.filter(function (d) { return /back|rear|environment|arka|tras|rück/i.test(d.label || ''); });
-        if (!rear.length) rear = cams;
-        var pool = rear.filter(function (d) { return !RS_BAD_LENS.test(d.label || ''); });
-        if (!pool.length) pool = rear;
-        // iOS: the standard 1x lens is exactly "Back Camera".
-        var iosMain = pool.filter(function (d) { return /(^|\b)back camera\b/i.test(d.label || ''); });
-        // Android: the MAIN sensor is the lowest "camera2 N" index.
-        var sorted = pool.slice().sort(function (a, b) { return rsCamIndex(a.label) - rsCamIndex(b.label); });
-        var pick = iosMain[0] || sorted[0];
-        var curId = '';
-        try { curId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId || ''; } catch (e) {}
-        if (pick && pick.deviceId && pick.deviceId !== curId) {
-          stream.getTracks().forEach(function (t) { t.stop(); });
-          // The first stream is stopped by now, so a lens that will not
-          // open cannot fall back to it: that hands the reader a dead
-          // stream and a black picture. Ask plainly for a rear camera.
-          return open({ deviceId: { exact: pick.deviceId }, width: W, height: H })
-            .catch(function () { return open({ facingMode: { ideal: 'environment' } }); })
-            .then(rsApplyFocus);
-        }
-        return rsApplyFocus(stream);
-      });
-    });
-  }
-
+  // The camera and the decoder are the shared reader (erp/js/
+  // barcode_camera.js, loaded by base.html). This screen keeps its own
+  // jobs on top: the label photo for the AI reading, the torch, and the
+  // last barcode seen, ready for the capture.
+  var rsReader = null;
   function startRollCamera() {
     const video = document.getElementById('rsVideo');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (!window.NejumCamera) {
       alert('{% trans "Camera not supported in this browser." %}');
       return;
     }
-    getRearCameraStream().then(function (stream) {
+    rsReader = rsReader || window.NejumCamera.reader({
+      video: video, diag: document.getElementById('rsDiag'),
+      // Long Code128 labels need the full width and most of the height.
+      cropHeight: 0.72, debounceMs: 1200,
+      onCode: rsOnBarcode,
+    });
+    rsLiveBarcode = '';
+    updateLiveBarcodeChip('');
+    rsReader.start().then(function (stream) {
       rsStream = stream;
-      video.srcObject = stream;
-      // autoplay alone is not always enough on Safari for a <video>
-      // whose popup was display:none until this tap.
-      try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (_) {}
-      // Start the LIVE barcode scanner on the same stream (job #2; the
-      // AI label OCR is job #1 on capture). Guarded so it never breaks
-      // the camera if unavailable.
-      try {
-        var _bcStart = function () {
-          if (typeof startBarcodeScanner === 'function') startBarcodeScanner(video);
-        };
-        video.onloadedmetadata = null;          // clear any stale handler first
-        video.onloadedmetadata = _bcStart;
-        // If the stream already has current data, start now (the start-once
-        // guard makes this safe even if onloadedmetadata also fires).
-        if (video.readyState >= 2) _bcStart();
-      } catch (_) {}
+      rsCamTrack = rsReader.track();
+      rsSetupTorchButton();
     }).catch(function (err) {
-      alert('{% trans "Camera access denied or unavailable:" %} ' + err.message);
+      alert('{% trans "Camera access denied or unavailable:" %} ' + ((err && err.message) || err));
     });
   }
   function stopRollCamera() {
-    try { if (typeof stopBarcodeScanner === 'function') stopBarcodeScanner(); } catch (_) {}
-    if (rsStream) {
-      rsStream.getTracks().forEach(function (t) { t.stop(); });
-      rsStream = null;
-    }
-    document.getElementById('rsVideo').srcObject = null;
+    try { if (rsCamTrack && rsCamTrack.applyConstraints) rsCamTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {}); } catch (e) {}
+    rsCamTrack = null;
+    if (rsReader) rsReader.stop();
+    rsStream = null;
+    rsLiveBarcode = '';
+    updateLiveBarcodeChip('');
   }
 
   let rsCapturing = false;   // one OCR in flight at a time (no races)
@@ -3200,192 +3138,20 @@
     else { val.textContent = ''; chip.hidden = true; }
   }
 
-  // ── LIVE barcode scanner (job #2 of the camera; AI OCR is job #1) ──
-  // Native BarcodeDetector first (Android Chrome / Edge); ZXing from CDN
-  // as a fallback for iOS Safari & Firefox, which have no BarcodeDetector.
-  // ── Universal barcode scanner — zxing-wasm (ZXing-C++ → WebAssembly).
-  //    ONE code path, identical on every browser/OS (Chrome/Safari/Firefox,
-  //    Android/iOS/desktop). No native BarcodeDetector (missing on iOS/FF).
-  //    Loads from CDN (no build step); the .wasm auto-loads from jsdelivr.
-  let rsZxw = null;          // the readBarcodes(imageData, opts) function
-  let rsZxwLoading = null;
-  let rsBcRaf = null, rsBcRunning = false, rsBcStarted = false, rsBcLastDecode = 0;
   let rsCamTrack = null;     // active video track (for focus / torch)
-  let rsBcDebounce = { val: '', t: 0 };
-  let _rsRoiCanvas = null, _rsRoiCtx = null, _rsBcCanvas = null, _rsAudioCtx = null;
-
-  const ZXW_OPTS = {
-    tryHarder: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
-    formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'Code93', 'ITF', 'Codabar', 'QRCode']
-  };
-
-  function loadZxw() {
-    if (rsZxw) return Promise.resolve(rsZxw);
-    if (rsZxwLoading) return rsZxwLoading;
-    // The reader-only build: the package's root entry also carries the
-    // barcode writer, and half a megabyte more to download.
-    var urls = [
-      'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/reader/+esm',
-      'https://esm.sh/zxing-wasm@3.1.0/reader'
-    ];
-    function tryNext(i) {
-      if (i >= urls.length) return Promise.reject(new Error('zxing-wasm load failed'));
-      return import(urls[i]).then(function (mod) {
-        if (mod && mod.readBarcodes) return mod;
-        throw new Error('no readBarcodes export');
-      }).catch(function () { return tryNext(i + 1); });
-    }
-    // A load that failed is forgotten, so the next open tries again.
-    rsZxwLoading = tryNext(0).then(function (mod) { rsZxw = rsZxwHealing(mod); return rsZxw; })
-      .catch(function (err) { rsZxwLoading = null; throw err; });
-    return rsZxwLoading;
-  }
-  // The decoder is a file of its own, fetched on the first read. The
-  // library keeps a failed fetch and answers every later read with it,
-  // so one dropped download left every reader on the page dead until it
-  // was reloaded. Until a read has come back, a failure is taken to be
-  // that file, and it is fetched again from the next host.
-  const ZXW_WASM = ['https://unpkg.com/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-    'https://esm.sh/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm',
-    'https://fastly.jsdelivr.net/npm/zxing-wasm@3.1.0/dist/reader/zxing_reader.wasm'];
-  let rsZxwReady = false;
-  function rsZxwHealing(mod) {
-    var tries = 0;
-    function read(img, opts) {
-      return mod.readBarcodes(img, opts).then(function (res) { rsZxwReady = true; return res; }, function (err) {
-        if (rsZxwReady || !mod.prepareZXingModule || tries >= ZXW_WASM.length * 2) throw err;
-        var url = ZXW_WASM[tries % ZXW_WASM.length]; tries++;
-        mod.prepareZXingModule({ overrides: { locateFile: function (path, prefix) { return /\.wasm$/.test(path) ? url : prefix + path; } } });
-        return read(img, opts);
-      });
-    }
-    return read;
-  }
-  // The small-print status line under either reader's picture. `img` is
-  // the frame just handed to the decoder, when there is one: its
-  // brightness (0–255, off a sparse sample) tells a black picture over a
-  // bright frame — the screen's fault — from one over a dark frame.
-  let rsDiagAt = 0, rsDiagFrames = 0, rsDiagLight = -1;
-  function rsDiag(id, video, img) {
-    if (img) {
-      rsDiagFrames++;
-      var px = img.data, sum = 0, n = 0;
-      for (var p = 0; p < px.length; p += 4000) { sum += px[p] + px[p + 1] + px[p + 2]; n += 3; }
-      rsDiagLight = n ? Math.round(sum / n) : -1;
-    }
-    var now = Date.now();
-    if ((now - rsDiagAt) < 1000) return;
-    rsDiagAt = now;
-    var el = document.getElementById(id);
-    if (!el) return;
-    var tk = null, st = {};
-    try { tk = video.srcObject && video.srcObject.getVideoTracks()[0]; st = (tk && tk.getSettings && tk.getSettings()) || {}; } catch (e) {}
-    el.textContent = [
-      (tk && tk.label) || 'no track',
-      (st.width || '?') + 'x' + (st.height || '?'),
-      'video ' + video.videoWidth + 'x' + video.videoHeight + (video.paused ? ' paused' : ' playing'),
-      tk ? tk.readyState + (tk.muted ? ' muted' : '') : '',
-      'frames ' + rsDiagFrames,
-      rsDiagLight < 0 ? '' : 'light ' + rsDiagLight,
-      rsZxwReady ? 'reader ok' : (rsZxw ? 'reader loading' : 'reader not loaded')
-    ].filter(Boolean).join(' · ');
-  }
-
-  function rsGetRoiCanvas() {
-    if (!_rsRoiCanvas) {
-      _rsRoiCanvas = document.createElement('canvas');
-      _rsRoiCtx = _rsRoiCanvas.getContext('2d', { willReadFrequently: true });
-    }
-    return _rsRoiCanvas;
-  }
+  let _rsBcCanvas = null;
   function rsGetBcCanvas() {
     if (!_rsBcCanvas) _rsBcCanvas = document.createElement('canvas');
     return _rsBcCanvas;
   }
 
-  function startBarcodeScanner(video) {
-    if (rsBcStarted) return;          // exactly one scanner per camera session
-    rsBcStarted = true;
-    rsBcRunning = true;
-    rsLiveBarcode = '';
-    rsBcDebounce = { val: '', t: 0 };
-    updateLiveBarcodeChip('');
-    // Grab the track for continuous autofocus + torch (best-effort).
-    try {
-      var stream = video.srcObject;
-      rsCamTrack = (stream && stream.getVideoTracks) ? stream.getVideoTracks()[0] : null;
-      if (rsCamTrack && rsCamTrack.applyConstraints) {
-        rsCamTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
-      }
-      rsSetupTorchButton();
-    } catch (e) {}
-    loadZxw().then(function () { rsBcLoop(video); }).catch(function () {/* decoder unavailable → AI barcode used */});
-  }
-
-  function rsBcLoop(video) {
-    if (!rsBcRunning) return;
-    // Throttle decoding to ~9/s — decoding every frame saturates the CPU on
-    // weaker phones (jittery camera). rAF still spins smoothly; only the
-    // heavy getImageData + WASM decode is rate-limited.
-    var now = (window.performance && performance.now) ? performance.now() : Date.now();
-    rsDiag('rsDiag', video);
-    if (!rsZxw || !video.videoWidth || video.readyState < 2 || (now - rsBcLastDecode) < 110) {
-      rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
-      return;
-    }
-    rsBcLastDecode = now;
-    try {
-      // FULL-WIDTH center strip → ≤1280px. Long Code128 barcodes need the
-      // full width (incl. quiet zones) and enough resolution for their fine
-      // bars; over-cropping/over-shrinking made them undecodable.
-      var vw = video.videoWidth, vh = video.videoHeight;
-      var cropW = vw, cropH = Math.round(vh * 0.72);
-      var sx = 0, sy = Math.round((vh - cropH) / 2);
-      var outW = Math.min(1280, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
-      var roi = rsGetRoiCanvas();
-      if (roi.width !== outW) roi.width = outW;
-      if (roi.height !== outH) roi.height = outH;
-      _rsRoiCtx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
-      var img = _rsRoiCtx.getImageData(0, 0, outW, outH);
-      rsDiag('rsDiag', video, img);
-      rsZxw(img, ZXW_OPTS).then(function (res) {
-        if (rsBcRunning && res && res.length && res[0].text) rsOnBarcode(res[0].text);
-      }).catch(function () {}).finally(function () {
-        if (rsBcRunning) rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
-      });
-    } catch (e) {
-      if (rsBcRunning) rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
-    }
-  }
-
+  // Each new code the live reader sees: kept for the capture, shown on
+  // the chip. The reader has already beeped.
   function rsOnBarcode(value) {
     value = (value || '').toString().trim();
     if (!value) return;
     rsLiveBarcode = value;                 // always keep the latest for capture
     updateLiveBarcodeChip(value);
-    var now = Date.now();
-    // Fire instant feedback once per new code (or after a 1.2s gap) — debounce.
-    if (value !== rsBcDebounce.val || (now - rsBcDebounce.t) > 1200) {
-      rsBcFeedback();
-    }
-    rsBcDebounce = { val: value, t: now };
-  }
-
-  // Shared instant-feedback: a short vibrate + beep (used by both the
-  // add-scanner and the barcode-lookup scanner).
-  function rsBeep(freq) {
-    try { if (navigator.vibrate) navigator.vibrate(55); } catch (e) {}
-    try {
-      _rsAudioCtx = _rsAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (_rsAudioCtx.state === 'suspended') _rsAudioCtx.resume();
-      var o = _rsAudioCtx.createOscillator(), g = _rsAudioCtx.createGain();
-      o.type = 'sine'; o.frequency.value = freq || 880; g.gain.value = 0.07;
-      o.connect(g); g.connect(_rsAudioCtx.destination);
-      o.start(); o.stop(_rsAudioCtx.currentTime + 0.08);
-    } catch (e) {}
-  }
-  function rsBcFeedback() {
-    rsBeep(880);
     try {
       var chip = document.getElementById('rsBcChip');
       if (chip) { chip.classList.remove('rs-bc-hit'); void chip.offsetWidth; chip.classList.add('rs-bc-hit'); }
@@ -3413,25 +3179,12 @@
     }).catch(function () {});
   }
 
-  function stopBarcodeScanner() {
-    rsBcStarted = false;
-    rsBcRunning = false;
-    if (rsBcRaf) { cancelAnimationFrame(rsBcRaf); rsBcRaf = null; }
-    try { if (rsCamTrack && rsCamTrack.applyConstraints) rsCamTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {}); } catch (e) {}
-    rsCamTrack = null;
-    rsLiveBarcode = '';
-    updateLiveBarcodeChip('');
-  }
-
-  // Capture-time one-shot decode of the FULL-RES still — same WASM decoder.
+  // Capture-time one-shot decode of the still — the same shared decoder.
   function decodeBarcodeFromCanvas(canvas) {
-    var p = loadZxw().then(function () {
-      var ctx = canvas.getContext('2d', { willReadFrequently: true });
-      var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      return rsZxw(img, ZXW_OPTS);
-    }).then(function (res) {
-      return (res && res.length && res[0].text) ? res[0].text.toString().trim() : '';
-    }).catch(function () { return ''; });
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+    var p = window.NejumCamera
+      ? window.NejumCamera.decodeImage(ctx.getImageData(0, 0, canvas.width, canvas.height)).catch(function () { return ''; })
+      : Promise.resolve('');
     // Never hang the confirm panel.
     return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(''); }, 3000); })]);
   }
@@ -3464,8 +3217,7 @@
     // PAUSE the live barcode loop during capture so the OCR + freeze stay
     // instant — running the WASM decode loop alongside the capture is what
     // made the camera jitter / lag on weaker phones.
-    rsBcRunning = false;
-    if (rsBcRaf) { cancelAnimationFrame(rsBcRaf); rsBcRaf = null; }
+    if (rsReader) rsReader.pause();
 
     // Barcode: the live scanner usually ALREADY has it (snapshot above). Only
     // run the heavier still-decode as a FALLBACK when it didn't — and at a
@@ -3612,8 +3364,7 @@
     // Resume the live barcode loop (it was paused during capture) so the
     // next scan reads instantly.
     try {
-      var _v = document.getElementById('rsVideo');
-      if (_v && rsBcStarted && !rsBcRunning) { rsBcRunning = true; rsBcLoop(_v); }
+      if (rsReader && rsStream) rsReader.resume();
     } catch (_) {}
     // Drop the frozen frame so the user sees the live camera again.
     try {
@@ -3987,10 +3738,10 @@
 </script>
 
 <script>
-  // ── Barcode LOOKUP scanner — reuses the zxing-wasm decoder (loadZxw /
-  //    rsZxw / ZXW_OPTS / rsGetRoiCanvas / rsBeep from the add-scanner). ──
+  // ── Barcode LOOKUP scanner — the shared reader (erp/js/barcode_camera.js);
+  //    this page keeps the lookup and its result card. ──
   const barcodeLookupUrl = "{% url 'operating:warehouse_barcode_lookup' warehouse.pk %}";
-  let blStream = null, blRaf = null, blRunning = false, blLastCode = '', blLastDecode = 0;
+  let blReader = null, blLastCode = '';
 
   function openBarcodeLookup() {
     document.getElementById('blOverlay').classList.add('show');
@@ -4004,10 +3755,7 @@
     stopLookup();
   }
   function stopLookup() {
-    blRunning = false;
-    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
-    if (blStream) { blStream.getTracks().forEach(function (t) { t.stop(); }); blStream = null; }
-    var v = document.getElementById('blVideo'); if (v) v.srcObject = null;
+    if (blReader) blReader.stop();
     blLastCode = '';
   }
   function blShowScan() {
@@ -4016,53 +3764,23 @@
     var mi = document.getElementById('blManualInput'); if (mi) mi.value = '';
   }
   function startLookupCamera() {
-    var video = document.getElementById('blVideo');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('{% trans "Camera not supported" %}'); return; }
-    // Use the MAIN rear camera (shared picker — avoids ultra-wide).
-    getRearCameraStream().then(function (stream) {
-      blStream = stream; video.srcObject = stream;
-      try { var pl = video.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
-      try { var t = stream.getVideoTracks()[0]; if (t && t.applyConstraints) t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {}
-      blRunning = true; blLastCode = '';
-      loadZxw().then(function () { blLoop(video); }).catch(function () {});
-    }).catch(function (err) { alert('{% trans "Camera:" %} ' + (err && err.message || err)); });
+    if (!window.NejumCamera) { alert('{% trans "Camera not supported" %}'); return; }
+    blReader = blReader || window.NejumCamera.reader({
+      video: document.getElementById('blVideo'),
+      diag: document.getElementById('blDiag'),
+      cropHeight: 0.72,
+      soundOnRead: false,     // renderLookup sounds found or not
+      onCode: onLookupBarcode,
+    });
+    blLastCode = '';
+    blReader.resume().catch(function (err) { alert('{% trans "Camera:" %} ' + ((err && err.message) || err)); });
   }
-  function blLoop(video) {
-    if (!blRunning) return;
-    var now = (window.performance && performance.now) ? performance.now() : Date.now();
-    rsDiag('blDiag', video);
-    if (!rsZxw || !video.videoWidth || video.readyState < 2 || (now - blLastDecode) < 110) {
-      blRaf = requestAnimationFrame(function () { blLoop(video); }); return;
-    }
-    blLastDecode = now;
-    try {
-      var roi = rsGetRoiCanvas();
-      var vw = video.videoWidth, vh = video.videoHeight;
-      var cropW = vw, cropH = Math.round(vh * 0.72);
-      var sx = 0, sy = Math.round((vh - cropH) / 2);
-      var outW = Math.min(1280, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
-      if (roi.width !== outW) roi.width = outW;
-      if (roi.height !== outH) roi.height = outH;
-      var ctx = roi.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
-      var img = ctx.getImageData(0, 0, outW, outH);
-      rsDiag('blDiag', video, img);
-      rsZxw(img, ZXW_OPTS).then(function (res) {
-        if (blRunning && res && res.length && res[0].text) onLookupBarcode(res[0].text);
-      }).catch(function () {}).finally(function () {
-        if (blRunning) blRaf = requestAnimationFrame(function () { blLoop(video); });
-      });
-    } catch (e) {
-      if (blRunning) blRaf = requestAnimationFrame(function () { blLoop(video); });
-    }
-  }
+  // A read: stop reading and look it up. The reader has already beeped.
   function onLookupBarcode(code) {
     code = (code || '').toString().trim();
     if (!code || code === blLastCode) return;
     blLastCode = code;
-    blRunning = false;                          // pause while we look it up
-    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
-    rsBeep(880);
+    if (blReader) blReader.pause();
     doBarcodeLookup(code);
   }
   function lookupManualBarcode() {
@@ -4070,8 +3788,7 @@
     var code = (inp && inp.value || '').toString().trim();
     if (!code) { if (inp) inp.focus(); return; }   // ignore empty
     blLastCode = code;
-    blRunning = false;                              // pause the camera loop
-    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
+    if (blReader) blReader.pause();                 // stop reading meanwhile
     doBarcodeLookup(code);                          // SAME path as the camera scan
   }
   function doBarcodeLookup(code) {
@@ -4083,6 +3800,7 @@
       .then(function (resp) { return resp.json(); })
       .then(function (d) { renderLookup(d, code); })
       .catch(function () {
+        if (window.NejumCamera) window.NejumCamera.sound('error');
         r.innerHTML = '<div class="bl-rc notfound"><span class="bl-status notfound"><i class="fa fa-triangle-exclamation"></i> {% trans "Network error" %}</span>' + blAgainBtn() + '</div>';
       });
   }
@@ -4166,6 +3884,8 @@
 
   function renderLookup(d, code) {
     var r = document.getElementById('blResult');
+    // Found — here or in another warehouse — or not, by ear.
+    if (window.NejumCamera) window.NejumCamera.sound((d && (d.found || d.found_elsewhere)) ? 'ok' : 'error');
     if (d && d.found && d.product) {
       var p = d.product;
       var tiles = '';
@@ -4323,9 +4043,7 @@
   function lookupScanAgain() {
     blLastCode = '';
     blShowScan();
-    var v = document.getElementById('blVideo');
-    if (blStream && v) { blRunning = true; loadZxw().then(function () { blLoop(v); }); }
-    else startLookupCamera();
+    startLookupCamera();                            // back to reading, on the open camera
   }
   function blRow(k, v) { return '<div class="bl-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
   function blAgainBtn() { return '<div class="bl-actions"><button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button></div>'; }

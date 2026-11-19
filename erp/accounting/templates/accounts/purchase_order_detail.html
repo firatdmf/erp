@@ -211,7 +211,35 @@
   </div>
   {% endif %}
 
-  <h2 class="po-items-h">{% trans "Purchased products" %}</h2>
+  {% if goods_out %}
+  {% comment %}Our own rolls this purchase sends out to be worked on
+     (accounting.processing): away while it is an order; once received,
+     each came back as goods in (same barcode) or was used up in the work.{% endcomment %}
+  <h2 class="po-items-h">{% trans "Our goods sent out" %}
+    <span style="font:500 12px var(--font-sans); color:#94A3B8; margin-left:8px;">{% trans "for work" %}</span>
+  </h2>
+  <div class="po-item">
+    <div class="po-rolls">
+      {% for line in goods_out %}
+      <div class="po-roll">
+        <code>{{ line.barcode|default:"—" }}</code>
+        <span class="m">{{ line.quantity|floatformat:"2g" }} {{ line.unit }}</span>
+        {% if line.stock_item.product.catalog_variant %}<span class="wh">{{ line.stock_item.product.catalog_variant.variant_sku }}</span>{% endif %}
+        <span class="wh">
+          {% if not line.received_at %}{% trans "away" %}{% elif line.outcome == "returned" %}{% blocktrans with qty=line.quantity_back|floatformat:"2g" %}came back, {{ qty }}{% endblocktrans %}{% else %}{% trans "used up in the work" %}{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <h2 class="po-items-h">{% if goods_out %}{% trans "What came back" %}{% else %}{% trans "Purchased products" %}{% endif %}</h2>
+  {% if goods_out and not items %}
+  <div class="po-item">
+    <span class="po-no-rolls">{% trans "Nothing yet. When the work is back, edit this order and enter what came back — anything that came back keeps its barcode." %}</span>
+  </div>
+  {% endif %}
 
   {% for it in items %}
   <div class="po-item">
@@ -258,22 +286,7 @@
     </dl>
     {% endif %}
 
-    {% if it.work_rolls %}
-    {% comment %}Our own rolls this line pays for work on (accounting.processing):
-       away while the purchase is an order, the variant they became once received.{% endcomment %}
-    <div class="po-rolls-h">
-      <i data-lucide="layers"></i>
-      {% if is_order %}{% trans "Our rolls away being worked on" %}{% else %}{% trans "Our rolls worked on" %}{% endif %}
-    </div>
-    <div class="po-rolls">
-      {% for r in it.work_rolls %}
-      <div class="po-roll">
-        <code>{{ r.barcode|default:"—" }}</code>
-        <span class="m">{{ r.quantity|floatformat:"2g" }} {{ it.unit_short }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% elif it.planned_rolls %}
+    {% if it.planned_rolls %}
     {% comment %}Not received yet: the rolls the order expects, at the meters the
        supplier quoted — the real ones replace them on confirmation.{% endcomment %}
     <div class="po-rolls-h">

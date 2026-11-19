@@ -16589,3 +16589,242 @@ msgstr "Alınanlar"
 
 msgid "Put back"
 msgstr "Geri koy"
+
+#: goods sent out for work (accounting.processing), its form, pages and camera
+#, python-format
+msgid "%(code)s is used up — there is nothing left of it to send."
+msgstr "%(code)s tükenmiş — gönderilecek bir şey kalmadı."
+
+#, python-format
+msgid "%(code)s is on the shelves of %(book)s — send it on a purchase of that book."
+msgstr "%(code)s %(book)s raflarında — o defterin bir alımıyla gönderin."
+
+#, python-format
+msgid "%(code)s is already away on purchase %(number)s."
+msgstr "%(code)s zaten %(number)s alımıyla fasonda."
+
+#, python-format
+msgid "%(code)s holds %(left)s — there aren't %(count)s of it to send."
+msgstr "%(code)s içinde %(left)s var — gönderilecek %(count)s tane yok."
+
+#, python-format
+msgid "%(code)s goes out whole — it has a barcode of its own."
+msgstr "%(code)s bütün olarak gider — kendi barkodu var."
+
+#, python-format
+msgid "Only %(free)s of %(code)s are free to send — orders hold the rest."
+msgstr "%(code)s içinden yalnızca %(free)s gönderilebilir — kalanını siparişler tutuyor."
+
+#, python-format
+msgid "%(code)s is reserved for order %(orders)s — take it off the order before sending it."
+msgstr "%(code)s %(orders)s siparişine ayrılmış — göndermeden önce siparişten çıkarın."
+
+#, python-format
+msgid "Nothing in stock has the barcode %(code)s."
+msgstr "Stokta %(code)s barkodlu bir şey yok."
+
+#, python-format
+msgid "%(code)s is on this purchase twice."
+msgstr "%(code)s bu alımda iki kez var."
+
+#, python-format
+msgid "How many of %(code)s go out? Enter a number above 0, not “%(qty)s”."
+msgstr "%(code)s içinden kaç tane gidiyor? “%(qty)s” değil, 0’dan büyük bir sayı girin."
+
+#, python-format
+msgid "%(code)s is no longer away on this purchase."
+msgstr "%(code)s artık bu alımla fasonda değil."
+
+#, python-format
+msgid "%(code)s has no cost, so what it adds to the goods that came back can't be worked out."
+msgstr "%(code)s için maliyet yok, bu yüzden geri gelen mallara kattığı hesaplanamıyor."
+
+msgid "Enter what came back from this supplier before receiving the purchase."
+msgstr "Alımı kabul etmeden önce bu tedarikçiden geri gelenleri girin."
+
+msgid "it is away on another purchase."
+msgstr "başka bir alımla fasonda."
+
+msgid "it is gone."
+msgstr "artık yok."
+
+#, python-format
+msgid "%(qty)s has come off it since."
+msgstr "o zamandan beri %(qty)s kullanıldı."
+
+msgid "it has been changed since."
+msgstr "o zamandan beri değiştirildi."
+
+msgid "Nothing in stock has this barcode."
+msgstr "Stokta bu barkodlu bir şey yok."
+
+msgid "Scan or type a roll barcode."
+msgstr "Bir barkod okutun veya yazın."
+
+#, python-format
+msgid "This stock item is away being worked on (purchase %(number)s) — it can be picked once it is back."
+msgstr "Bu stok kalemi fasonda (alım %(number)s) — geri gelince seçilebilir."
+
+#, python-format
+msgid "Rolls this purchase had worked on have been used since, so they can't go back to what they were: %(rolls)s"
+msgstr "Bu alımla fasona gönderilen mallar o zamandan beri kullanıldı, eski hallerine dönemezler: %(rolls)s"
+
+msgid "This purchase sent our rolls to be worked on — undo its receipt to change it, then receive it again."
+msgstr "Bu alım mallarımızı fasona gönderdi — değiştirmek için mal kabulünü geri alın, sonra yeniden kabul edin."
+
+msgid "Send our goods out for work"
+msgstr "Mallarımızı fasona gönder"
+
+msgid "(sewing, embroidery, crystals…)"
+msgstr "(dikiş, nakış, taş…)"
+
+msgid "Our goods sent out for work"
+msgstr "Fasona gönderilen mallarımız"
+
+msgid "Goods of ours this supplier works on. Saved, they are away and can't be picked or sold. When the work is back, enter it under What comes back: anything that comes back with its own barcode is the same item, the rest was used up in the work."
+msgstr "Bu tedarikçinin üzerinde çalıştığı mallarımız. Kaydedilince fasonda sayılır; seçilemez, satılamaz. İş geri gelince Geri gelenler altına girin: kendi barkoduyla geri gelen her şey aynı maldır, kalanı işte kullanılmıştır."
+
+msgid "Send nothing out"
+msgstr "Hiçbir şey gönderme"
+
+msgid "Barcodes, one per line — or use the camera"
+msgstr "Barkodlar, her satıra bir tane — ya da kamerayı kullanın"
+
+msgid "What comes back"
+msgstr "Geri gelenler"
+
+msgid "What comes back from the work, at the price of the work. Something that comes back with its own barcode is the same item."
+msgstr "Fasondan geri gelenler, işçilik fiyatıyla. Kendi barkoduyla geri gelen mal aynı maldır."
+
+msgid "Pick the warehouse and the account above first — they decide where this stock lands and who it is billed to."
+msgstr "Önce yukarıdan depoyu ve cari hesabı seçin — stokun nereye gireceğini ve kime faturalanacağını onlar belirler."
+
+msgid "Pick the warehouse and the account above first."
+msgstr "Önce yukarıdan depoyu ve cari hesabı seçin."
+
+msgid "Sent out on this purchase — the same item comes back"
+msgstr "Bu alımla gönderildi — aynı mal geri geliyor"
+
+msgid "Take these goods off this purchase? They stay on the shelf."
+msgstr "Bu mallar alımdan çıkarılsın mı? Rafta kalırlar."
+
+msgid "Take this off"
+msgstr "Bunu çıkar"
+
+msgid "This is already on the list."
+msgstr "Bu zaten listede."
+
+msgid "How many go out"
+msgstr "Kaç tane gidiyor"
+
+msgid "Not found."
+msgstr "Bulunamadı."
+
+msgid "Send out"
+msgstr "Gönder"
+
+msgid "On the list"
+msgstr "Listede"
+
+msgid "On it"
+msgstr "Üzerinde"
+
+msgid "Sent out"
+msgstr "Gönderilen"
+
+msgid "Comes back"
+msgstr "Geri gelen"
+
+msgid "This delivery is billed in"
+msgstr "Bu teslimat şu para biriminde faturalanıyor:"
+
+msgid "these lines are converted into it"
+msgstr "bu satırlar ona çevrilir"
+
+msgid "in use"
+msgstr "kullanımda"
+
+msgid "this variant SKU is already used on"
+msgstr "bu varyant SKU’su zaten şurada kullanılıyor:"
+
+msgid "This variant SKU is already used on another product"
+msgstr "Bu varyant SKU’su başka bir üründe kullanılıyor"
+
+msgid "awaiting a rate"
+msgstr "kur bekleniyor"
+
+msgid "enter a rate"
+msgstr "kur girin"
+
+msgid "Use published"
+msgstr "Yayınlananı kullan"
+
+msgid "Click to fill a variant row with this — click again to remove that row"
+msgstr "Bir varyant satırını bununla doldurmak için tıklayın — o satırı kaldırmak için yeniden tıklayın"
+
+msgid "Saving creates the customer's order; receiving reserves the items for it. Every item then needs the price the customer is charged."
+msgstr "Kaydetmek müşterinin siparişini oluşturur; mal kabul, kalemleri ona ayırır. Bu yüzden her kalemin müşteriye uygulanan fiyatı olmalı."
+
+msgid "Enter the sale price the customer is charged for every item — it is what their order is billed at."
+msgstr "Her kalem için müşteriye uygulanan satış fiyatını girin — siparişi bu fiyattan faturalanır."
+
+msgid "The server could not complete the save"
+msgstr "Sunucu kaydı tamamlayamadı"
+
+msgid "Nothing was saved — the server log says why."
+msgstr "Hiçbir şey kaydedilmedi — nedeni sunucu kaydında."
+
+msgid "For customer order"
+msgstr "Müşteri siparişi için"
+
+msgid "Our goods sent out"
+msgstr "Gönderilen mallarımız"
+
+msgid "for work"
+msgstr "fasona"
+
+msgid "away"
+msgstr "fasonda"
+
+#, python-format
+msgid "came back, %(qty)s"
+msgstr "geri geldi, %(qty)s"
+
+msgid "used up in the work"
+msgstr "işte kullanıldı"
+
+msgid "What came back"
+msgstr "Geri gelenler"
+
+msgid "Nothing yet. When the work is back, edit this order and enter what came back — anything that came back keeps its barcode."
+msgstr "Henüz yok. İş geri gelince bu siparişi düzenleyip geri geleni girin — geri gelen her şey barkodunu korur."
+
+#, python-format
+msgid "%(n)s item away"
+msgid_plural "%(n)s items away"
+msgstr[0] "%(n)s kalem fasonda"
+msgstr[1] "%(n)s kalem fasonda"
+
+msgid "Purchase history"
+msgstr "Alım geçmişi"
+
+#, python-format
+msgid "%(n)s purchase"
+msgid_plural "%(n)s purchases"
+msgstr[0] "%(n)s alım"
+msgstr[1] "%(n)s alım"
+
+msgid "Or type the barcode"
+msgstr "Ya da barkodu yazın"
+
+msgid "Go"
+msgstr "Git"
+
+msgid "Away for work"
+msgstr "Fasonda"
+
+msgid "Sent out for work on a purchase — it can be picked again when it comes back."
+msgstr "Bir alımla fasona gönderildi — geri gelince yeniden seçilebilir."
+
+msgid "It can be picked again when it comes back."
+msgstr "Geri gelince yeniden seçilebilir."

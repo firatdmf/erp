@@ -460,10 +460,13 @@ site's menus and the page's own way back are left out.{% endcomment %}
   .np-gate.show { display: flex; }
   /* Our own rolls sent to be worked on (accounting.processing). */
   .np-work-add { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-  .np-work-add input { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px var(--font-sans); }
+  .np-work-add textarea { flex: 1; min-width: 0; min-height: 38px; max-height: 180px; padding: 9px 12px; border: 1px solid #DDE3EA; border-radius: 8px; font: 500 13px/1.45 var(--font-mono, monospace); resize: none; overflow-y: auto; }
+  .np-work-add .gr-btn { align-self: flex-start; }
+  .np-work-refused { font: 500 12px var(--font-sans); color: #B42318; margin: -2px 0 10px; }
+  .np-work-refused code { font: 600 12px var(--font-mono, monospace); color: var(--ink); margin-right: 6px; }
   /* On a phone the box gets its own line, the buttons share the next. */
-  @media (max-width: 720px) { .np-work-add input { flex: 1 1 100%; } .np-work-add .gr-btn { flex: 1 1 0; justify-content: center; } }
-  .np-work-add input:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
+  @media (max-width: 720px) { .np-work-add textarea { flex: 1 1 100%; } .np-work-add .gr-btn { flex: 1 1 0; justify-content: center; } }
+  .np-work-add textarea:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
   /* A small link, not a band: most purchases never send anything out.
      base.css pads every button, so the padding is reset here. */
   .np-work-open { display: flex; justify-content: flex-end; padding: 10px 22px 0; }
@@ -838,9 +841,12 @@ site's menus and the page's own way back are left out.{% endcomment %}
                 title="{% trans 'Send nothing out' %}"><i class="fa fa-times"></i></button>
       </div>
       <div class="np-work-add">
-        <input type="text" id="npWorkCode" autocomplete="off"
-               placeholder="{% trans 'Type a barcode, or use the camera' %}"
-               onkeydown="if (event.key === 'Enter') { event.preventDefault(); npWorkAdd(); }">
+        {% comment %}One barcode a line: a list pasted in, or typed. Enter
+        starts a new line; Add (or Ctrl/⌘+Enter) puts them all on.{% endcomment %}
+        <textarea id="npWorkCode" rows="1" autocomplete="off" spellcheck="false"
+                  placeholder="{% trans 'Barcodes, one per line — or use the camera' %}"
+                  oninput="npWorkFit()"
+                  onkeydown="if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); npWorkAdd(); }"></textarea>
         <button type="button" class="gr-btn" onclick="npWorkCamera()">
           <i class="fa fa-camera"></i> {% trans "Camera" %}
         </button>
@@ -848,6 +854,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
           <i class="fa fa-plus"></i> {% trans "Add" %}
         </button>
       </div>
+      <div id="npWorkRefused"></div>
       <div id="npWorkRows"></div>
     </section>
     {% endif %}
@@ -3452,7 +3459,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '{% filter escapejs %}{% trans "Take these goods off this purchase? They stay on the shelf." %}{% endfilter %}')) return;
     rows.forEach(function (r) { r.remove(); });
     const input = document.getElementById('npWorkCode');
-    if (input) input.value = '';
+    if (input) { input.value = ''; npWorkFit(); }
+    const refusedEl = document.getElementById('npWorkRefused');
+    if (refusedEl) { refusedEl.innerHTML = ''; refusedEl.className = ''; }
     npWorkShow(false);
     if (rows.length) window.npDirty = true;
     // The products need a card to start from again.
@@ -3520,19 +3529,63 @@ site's menus and the page's own way back are left out.{% endcomment %}
   }
   const NP_WORK_NEEDS_GATE = '{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}';
   const NP_WORK_TWICE = '{% filter escapejs %}{% trans "This is already on the list." %}{% endfilter %}';
+  // The codes in the box: one a line (spaces, commas and semicolons
+  // split them too), each once.
+  function npWorkTyped() {
+    const input = document.getElementById('npWorkCode');
+    const seen = {}, out = [];
+    ((input && input.value) || '').split(/[\s,;]+/).forEach(function (c) {
+      c = c.trim();
+      if (c && !seen[c.toUpperCase()]) { seen[c.toUpperCase()] = 1; out.push(c); }
+    });
+    return out;
+  }
+  // The box grows with its lines, up to a point, then scrolls.
+  window.npWorkFit = function () {
+    const input = document.getElementById('npWorkCode');
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight + 2, 180) + 'px';
+  };
+  let npWorkBusy = false;
+  // Every code in the box goes on the list, one after the other. Those
+  // that can't go stay in the box, each with its reason under it.
   window.npWorkAdd = function () {
     const input = document.getElementById('npWorkCode');
-    const code = (input.value || '').trim();
-    if (!code) { input.focus(); return; }
+    const refusedEl = document.getElementById('npWorkRefused');
+    const codes = npWorkTyped();
+    if (!codes.length) { input.focus(); return; }
     if (!npGateReady()) { alert(NP_WORK_NEEDS_GATE); return; }
-    if (npWorkTaken(code)) { alert(NP_WORK_TWICE); return; }
-    npWorkFetch(code).then(function (d) {
-      if (!d || !d.ok) { alert((d && d.error) || '{% trans "Could not save." %}'); return; }
-      if (d.roll.problem) { alert(d.roll.problem); return; }
-      npWorkPut(d.roll);
-      input.value = '';
+    if (npWorkBusy) return;
+    npWorkBusy = true;
+    const refused = [];
+    codes.reduce(function (chain, code) {
+      return chain.then(function () {
+        if (npWorkTaken(code)) return;              // already on: nothing to do
+        return npWorkFetch(code).then(function (d) {
+          if (!d || !d.ok) { refused.push([code, (d && d.error) || '{% filter escapejs %}{% trans "Not found." %}{% endfilter %}']); return; }
+          if (d.roll.problem) { refused.push([code, d.roll.problem]); return; }
+          npWorkPut(d.roll);
+        }, function () {
+          refused.push([code, '{% filter escapejs %}{% trans "Network error." %}{% endfilter %}']);
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      npWorkBusy = false;
+      input.value = refused.map(function (r) { return r[0]; }).join('\n');
+      npWorkFit();
+      refusedEl.innerHTML = '';
+      refusedEl.className = refused.length ? 'np-work-refused' : '';
+      refused.forEach(function (r) {
+        const line = document.createElement('div');
+        const c = document.createElement('code');
+        c.textContent = r[0];
+        line.appendChild(c);
+        line.appendChild(document.createTextNode(r[1]));
+        refusedEl.appendChild(line);
+      });
       input.focus();
-    }).catch(npFailed);
+    });
   };
   // The phone camera: the shared reader (erp/js/barcode_camera.js). Each
   // read says what it found and goes on the list on a confirm.
@@ -3589,9 +3642,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
     document.querySelectorAll('#npWorkRows .np-work-row').forEach(function (row) {
       out.push({ barcode: row.dataset.barcode });
     });
-    const input = document.getElementById('npWorkCode');
-    const typed = ((input && input.value) || '').trim();
-    if (typed && !npWorkTaken(typed)) out.push({ barcode: typed });
+    npWorkTyped().forEach(function (code) {
+      if (!npWorkTaken(code)) out.push({ barcode: code });
+    });
     return out;
   }
   // "Out: 2 rolls · 140 m" for the summary bar, or ''.

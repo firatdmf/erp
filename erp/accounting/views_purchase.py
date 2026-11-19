@@ -1424,6 +1424,6 @@ class ProcessingRoll(View):
         found = lookup(code, book=account.book, invoice=invoice)
         if found is None:
             return JsonResponse({"ok": False,
-                                 "error": _gettext("No roll has barcode %(code)s.") % {"code": code}},
+                                 "error": _gettext("Nothing in stock has this barcode.")},
                                 status=404)
         return JsonResponse({"ok": True, "roll": found})

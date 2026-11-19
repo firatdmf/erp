@@ -269,4 +269,6 @@ class GoodsOutTest(TestCase):
         r = self.client.get(reverse("accounts:goods_receipt_edit", args=[pk]))
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'id="npWorkSec"')
+        # Several barcodes at once, one a line.
+        self.assertContains(r, '<textarea id="npWorkCode"')
         self.assertContains(r, '"goods_out"')

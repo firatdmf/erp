@@ -38,6 +38,14 @@ class ProcessingLine(models.Model):
     stock_item = models.ForeignKey(
         "operating.WarehouseProductItem", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="processing_history")
+    # Goods counted in pieces go out in part: so many of a box. The part
+    # sent is split off into an item of its own (stock_item), and this is
+    # the box it came out of, which takes it back if it comes home unworked
+    # (processing.save_draft_lines / release_lines). None when the whole
+    # item went.
+    split_from = models.ForeignKey(
+        "operating.WarehouseProductItem", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+")
     barcode = models.CharField(max_length=64, blank=True)
     # What was left on the roll when it was sent, in its product's unit.
     quantity = models.DecimalField(max_digits=12, decimal_places=3)

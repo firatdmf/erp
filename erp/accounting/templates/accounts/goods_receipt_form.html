@@ -485,6 +485,15 @@ site's menus and the page's own way back are left out.{% endcomment %}
   .np-work-x { border: none; background: none; color: var(--gray-400); cursor: pointer; height: 36px; width: 32px; padding: 0; }
   .np-work-x:hover { color: #D14343; }
   .np-work-problem { grid-column: 1 / -1; font: 500 12px var(--font-sans); color: #B42318; }
+  /* Goods counted in pieces: how many of the box go. */
+  .np-work-row.counted { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .np-work-count { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--font-sans); color: var(--gray-600); white-space: nowrap; }
+  .np-work-count input { width: 72px; height: 36px; padding: 0 8px; border: 1px solid #DDE3EA; border-radius: 8px; font: 700 14px var(--font-sans); color: var(--ink); text-align: right; }
+  .np-work-count input:focus { border-color: var(--nejum-teal-500, #147F74); outline: none; }
+  @media (max-width: 720px) {
+    .np-work-row.counted { grid-template-columns: minmax(0, 1fr) auto; }
+    .np-work-row.counted .np-work-count { grid-row: 2; }
+  }
 
   .np-fx { margin: 0 0 12px; padding: 14px 16px; border: 1px solid #E2E8EE; border-radius: 12px; background: white; }
   .np-fx-head { display:flex; align-items:center; gap:8px; font: 500 12.5px var(--font-sans); color: var(--gray-600); margin-bottom: 10px; }
@@ -3485,24 +3494,46 @@ site's menus and the page's own way back are left out.{% endcomment %}
   function npWorkFetch(code) {
     const sel = document.getElementById('npSupplier');
     const url = GR_WORK_ROLL_TPL.replace('/0/', '/' + sel.value + '/') +
-                '?code=' + encodeURIComponent(code) + (GR_ORDER_ID ? '&purchase=' + GR_ORDER_ID : '');
+                '?code=' + encodeURIComponent(code) + (GR_ORDER_ID ? '&purchase=' + GR_ORDER_ID : '') +
+                '&skip=' + encodeURIComponent(npWorkSkip());
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(npReadJson);
   }
-  function npWorkRender(roll) {
+  // `count`: for goods counted in pieces, how many of the box go — the
+  // whole of what is free when not given.
+  function npWorkRender(roll, count) {
     const wrap = document.getElementById('npWorkRows');
     const row = document.createElement('div');
-    row.className = 'np-work-row';
+    row.className = 'np-work-row' + (roll.counted ? ' counted' : '');
     row.dataset.barcode = roll.barcode;
     row.dataset.qty = roll.quantity;
     row.dataset.unit = roll.unit;
+    row.dataset.printed = roll.printed || '';
 
     const info = document.createElement('div');
     info.className = 'np-work-roll';
     const code = document.createElement('b');
-    code.textContent = roll.barcode;
+    code.textContent = roll.counted ? roll.name : roll.barcode;
     const what = document.createElement('div');
-    what.textContent = roll.label + ' · ' + roll.quantity + ' ' + roll.unit + ' · ' + roll.warehouse;
+    const unit = NP_UNIT_SHORT[roll.unit] || roll.unit;
+    what.textContent = roll.label + ' · ' + roll.quantity + ' ' + unit + ' · ' + roll.warehouse;
     info.appendChild(code); info.appendChild(what);
+    row.appendChild(info);
+
+    if (roll.counted) {
+      const box = document.createElement('label');
+      box.className = 'np-work-count';
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.step = 'any'; input.max = roll.free;
+      input.inputMode = 'decimal';
+      input.className = 'np-work-n';
+      input.value = (count !== undefined && count !== null && count !== '') ? count : roll.free;
+      input.setAttribute('aria-label', NP_WORK_HOW_MANY);
+      input.oninput = function () { window.npDirty = true; npSummaryUpdate(); };
+      box.appendChild(input);
+      box.appendChild(document.createTextNode(NP_WORK_OF + ' ' + roll.free + ' ' + unit));
+      row.appendChild(box);
+      row.dataset.free = roll.free;
+    }
 
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'np-work-x';
@@ -3510,7 +3541,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
     x.innerHTML = '<i class="fa fa-times"></i>';
     x.onclick = function () { row.remove(); window.npDirty = true; npSummaryUpdate(); npWorkRecheckBack(); };
 
-    row.appendChild(info); row.appendChild(x);
+    row.appendChild(x);
     if (roll.problem) {
       const p = document.createElement('div');
       p.className = 'np-work-problem';
@@ -3519,6 +3550,28 @@ site's menus and the page's own way back are left out.{% endcomment %}
     }
     wrap.appendChild(row);
     return row;
+  }
+  // A printed barcode read again is one more piece of the box it found,
+  // until that box is all going. True when it was counted that way.
+  function npWorkBump(code) {
+    const c = (code || '').trim().toUpperCase();
+    if (!c) return false;
+    const row = Array.prototype.find.call(document.querySelectorAll('#npWorkRows .np-work-row.counted'),
+      function (r) {
+        const n = parseFloat(r.querySelector('.np-work-n').value || '0');
+        return (r.dataset.printed || '').toUpperCase() === c && n < parseFloat(r.dataset.free || '0');
+      });
+    if (!row) return false;
+    const input = row.querySelector('.np-work-n');
+    input.value = Math.round((parseFloat(input.value || '0') + 1) * 1000) / 1000;
+    window.npDirty = true;
+    npSummaryUpdate();
+    return true;
+  }
+  // The boxes already on the list, for the lookup to pass over.
+  function npWorkSkip() {
+    return Array.prototype.map.call(document.querySelectorAll('#npWorkRows .np-work-row.counted'),
+      function (r) { return r.dataset.barcode; }).join(',');
   }
   function npWorkTaken(code) {
     return Array.prototype.some.call(document.querySelectorAll('#npWorkRows .np-work-row'),
@@ -3536,17 +3589,28 @@ site's menus and the page's own way back are left out.{% endcomment %}
   function npWorkRecheckBack() {
     npBcRows().forEach(function (el) { if ((el.value || '').trim()) window.npBarcodeInput(el); });
   }
+  // A box found by its printed barcode starts at one piece, as a scan of
+  // one piece is; found by its own key, all of it that is free goes.
   function npWorkPut(roll) {
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
       if (npCardUntouched(card)) card.remove();
     });
-    npWorkRender(roll);
+    npWorkRender(roll, roll.counted && roll.printed && roll.foundBy === 'printed' ? 1 : undefined);
     window.npDirty = true;
     npSummaryUpdate();
     npWorkRecheckBack();
   }
   const NP_WORK_NEEDS_GATE = '{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}';
   const NP_WORK_TWICE = '{% filter escapejs %}{% trans "This is already on the list." %}{% endfilter %}';
+  const NP_WORK_HOW_MANY = '{% filter escapejs %}{% trans "How many go out" %}{% endfilter %}';
+  const NP_WORK_OF = '{% filter escapejs %}{% trans "of" %}{% endfilter %}';
+  // What the lookup found the item by: its own key, or the barcode
+  // printed on every piece of its product.
+  function npWorkFoundBy(roll, code) {
+    roll.foundBy = (roll.printed && roll.printed.toUpperCase() === (code || '').trim().toUpperCase())
+      ? 'printed' : 'own';
+    return roll;
+  }
   // The codes in the box: one a line (spaces, commas and semicolons
   // split them too), each once.
   function npWorkTyped() {
@@ -3579,11 +3643,12 @@ site's menus and the page's own way back are left out.{% endcomment %}
     const refused = [];
     codes.reduce(function (chain, code) {
       return chain.then(function () {
+        if (npWorkBump(code)) return;               // one more of a box on the list
         if (npWorkTaken(code)) return;              // already on: nothing to do
         return npWorkFetch(code).then(function (d) {
           if (!d || !d.ok) { refused.push([code, (d && d.error) || '{% filter escapejs %}{% trans "Not found." %}{% endfilter %}']); return; }
           if (d.roll.problem) { refused.push([code, d.roll.problem]); return; }
-          npWorkPut(d.roll);
+          npWorkPut(npWorkFoundBy(d.roll, code));
         }, function () {
           refused.push([code, '{% filter escapejs %}{% trans "Network error." %}{% endfilter %}']);
         });
@@ -3619,18 +3684,19 @@ site's menus and the page's own way back are left out.{% endcomment %}
       addOnRead: true,
       lookup: function (code) {
         found = null;
+        if (npWorkBump(code)) return {ok: true, title: code};
         if (npWorkTaken(code)) return {ok: false, kind: 'warn', headline: NP_WORK_TWICE};
         return npWorkFetch(code).then(function (d) {
           if (!d || !d.ok) return {ok: false, kind: 'bad', headline: (d && d.error) || code};
           if (d.roll.problem) return {ok: false, kind: 'bad', headline: d.roll.problem};
-          found = d.roll;
+          found = npWorkFoundBy(d.roll, code);
           return {ok: true, title: d.roll.label,
-                  facts: [['{% filter escapejs %}{% trans "On it" %}{% endfilter %}', d.roll.quantity + ' ' + d.roll.unit],
+                  facts: [['{% filter escapejs %}{% trans "On it" %}{% endfilter %}', d.roll.quantity + ' ' + (NP_UNIT_SHORT[d.roll.unit] || d.roll.unit)],
                           ['{% filter escapejs %}{% trans "Warehouse" %}{% endfilter %}', d.roll.warehouse]]};
         });
       },
       confirm: function () {
-        if (!found) return false;
+        if (!found) return true;     // counted onto a box already on the list
         npWorkPut(found);
         return true;
       },
@@ -3644,7 +3710,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
     rows.forEach(function (saved) {
       chain = chain.then(function () {
         return npWorkFetch(saved.barcode).then(function (d) {
-          if (d && d.ok) npWorkRender(d.roll);
+          if (d && d.ok) npWorkRender(d.roll, saved.quantity);
           else alert((d && d.error) || saved.barcode);
         });
       }).catch(npFailed).then(function () {
@@ -3658,7 +3724,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   function npWorkCollect() {
     const out = [];
     document.querySelectorAll('#npWorkRows .np-work-row').forEach(function (row) {
-      out.push({ barcode: row.dataset.barcode });
+      const n = row.querySelector('.np-work-n');
+      out.push(n ? { barcode: row.dataset.barcode, quantity: (n.value || '').trim() }
+                 : { barcode: row.dataset.barcode });
     });
     npWorkTyped().forEach(function (code) {
       if (!npWorkTaken(code)) out.push({ barcode: code });
@@ -3671,7 +3739,8 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (!rows.length) return '';
     const totals = {};
     rows.forEach(function (r) {
-      const q = parseFloat(r.dataset.qty || '0');
+      const n = r.querySelector('.np-work-n');
+      const q = parseFloat((n ? n.value : r.dataset.qty) || '0');
       if (q > 0) totals[r.dataset.unit || 'm'] = (totals[r.dataset.unit || 'm'] || 0) + q;
     });
     return '{% filter escapejs %}{% trans "Sent out" %}{% endfilter %}: <b>' + rows.length + '</b> ' + npBatchNoun() +

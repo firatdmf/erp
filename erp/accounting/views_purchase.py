@@ -1141,7 +1141,7 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
                 [{"barcode": p.split(":")[0], "order_ids": []} for p in problems],
             )
         unreceive_lines(invoice, user=user, keep_away=False)
-        release_lines(invoice)
+        release_lines(invoice, user=user)
 
         _remove_purchase_rolls(rolls, reason="Purchase cancelled", user=user)
 
@@ -1431,7 +1431,11 @@ class ProcessingRoll(View):
         purchase = (request.GET.get("purchase") or "").strip()
         invoice = (Invoice.objects.filter(pk=int(purchase), type="purchase").first()
                    if purchase.isdigit() else None)
-        found = lookup(code, book=account.book, invoice=invoice)
+        # Boxes already on the list, so a printed barcode scanned again
+        # finds the next one ("#12,#15").
+        skip = {int(k.lstrip("#")) for k in (request.GET.get("skip") or "").split(",")
+                if k.strip().lstrip("#").isdigit()}
+        found = lookup(code, book=account.book, invoice=invoice, skip=skip)
         if found is None:
             return JsonResponse({"ok": False,
                                  "error": _gettext("Nothing in stock has this barcode.")},

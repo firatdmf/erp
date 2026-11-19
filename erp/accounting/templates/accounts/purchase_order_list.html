@@ -163,7 +163,7 @@
             <span class="po-badge {{ inv.status }}">{{ inv.get_status_display }}</span>
             {% if inv.away_rolls %}
               <div style="font-size:11.5px; color:#92400E; margin-top:2px;">
-                {% blocktrans count n=inv.away_rolls %}{{ n }} item away{% plural %}{{ n }} items away{% endblocktrans %}{% if inv.away_quantity is not None %} · {{ inv.away_quantity|floatformat:"-2" }} {{ inv.away_unit }}{% endif %}
+                {% blocktrans count n=inv.away_rolls %}{{ n }} item away{% plural %}{{ n }} items away{% endblocktrans %}{% if inv.away_quantity is not None %} · {{ inv.away_quantity|floatformat:"-2" }} {{ inv.away_unit|unit_loc }}{% endif %}
               </div>
             {% endif %}
           </td>

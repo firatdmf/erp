@@ -46,7 +46,19 @@ def _left(roll):
     return Decimal(left or 0)
 
 
-def _find_roll(row):
+def _free(roll):
+    """What of `roll` no order holds — all of it may go only when this is
+    all of it."""
+    from operating.views import _roll_available_meters
+    return _roll_available_meters(roll)
+
+
+def _find_roll(row, *, book=None, skip=()):
+    """(item, by_printed) for a goods-out row: the item its id, barcode or
+    "#id" names — or, for goods counted in pieces, the oldest box of the
+    product whose printed barcode it is that has some free (`book`'s
+    shelves, leaving out the ids in `skip`). by_printed says it was found
+    the second way: the code named the product, not one box of it."""
     from operating.models import WarehouseProductItem
 
     qs = WarehouseProductItem.objects.select_related(
@@ -54,15 +66,29 @@ def _find_roll(row):
         "processing_line__invoice")
     stock_id = str(row.get("stock_item_id") or "").strip()
     if stock_id.isdigit():
-        return qs.filter(pk=int(stock_id)).first()
+        return qs.filter(pk=int(stock_id)).first(), False
     code = str(row.get("barcode") or "").strip()
     if not code:
-        return None
-    return WarehouseProductItem.matching_pick_key(qs, code).first()
+        return None, False
+    item = WarehouseProductItem.matching_pick_key(qs, code).first()
+    if item is None and book is not None:
+        from operating.views import _batches_by_printed_barcode
+        for batch in _batches_by_printed_barcode(code, [book]):
+            if batch.pk not in skip and _free(batch) > 0:
+                return qs.get(pk=batch.pk), True
+    return item, False
 
 
 def _roll_name(roll):
-    return roll.barcode or f"#{roll.pk}"
+    if roll.barcode:
+        return roll.barcode
+    if roll.lot_number:
+        return f"{roll.product.item_noun} {roll.lot_number}"
+    return f"#{roll.pk}"
+
+
+def _qty(value):
+    return format(Decimal(value).normalize(), "f")
 
 
 def _unit(roll):
@@ -80,10 +106,12 @@ def variant_label(variant):
     return " · ".join([variant.variant_sku or variant.product.title, *values[:3]])
 
 
-def send_problem(roll, *, book, invoice=None):
+def send_problem(roll, *, book, invoice=None, count=None):
     """Why `roll` can't go out to be worked on, as a sentence naming it, or
     None: used up, on another book's shelves, held for an order, or already
-    away on another purchase (`invoice` is the one being saved)."""
+    away on another purchase (`invoice` is the one being saved). `count`:
+    only so many of it go (goods counted in pieces) — then it is enough
+    that no order holds those."""
     name = _roll_name(roll)
     if roll.status == "consumed" or _left(roll) <= 0:
         return _("%(code)s is used up — there is nothing left of it to send.") % {"code": name}
@@ -91,46 +119,79 @@ def send_problem(roll, *, book, invoice=None):
     if book is not None and warehouse.accounting_book_id != book.pk:
         return (_("%(code)s is on the shelves of %(book)s — send it on a purchase "
                   "of that book.") % {"code": name, "book": warehouse.accounting_book})
+    line = roll.processing_line
+    if line is not None and (invoice is None or line.invoice_id != invoice.pk):
+        return (_("%(code)s is already away on purchase %(number)s.")
+                % {"code": name, "number": line.invoice.display_number})
+    if count is not None:
+        if count > _left(roll):
+            return (_("%(code)s holds %(left)s — there aren't %(count)s of it to send.")
+                    % {"code": name, "left": _qty(_left(roll)), "count": _qty(count)})
+        if roll.barcode and count < _left(roll):
+            return (_("%(code)s goes out whole — it has a barcode of its own.")
+                    % {"code": name})
+        if line is None and count > _free(roll):
+            return (_("Only %(free)s of %(code)s are free to send — orders hold the rest.")
+                    % {"code": name, "free": _qty(_free(roll))})
+        if count < _left(roll):
+            return None
     holds = list(roll.reservations.filter(consumed=False).select_related("order"))
     if holds:
         orders = sorted({str(h.order.order_number or h.order_id) for h in holds})
         return (_("%(code)s is reserved for order %(orders)s — take it off the order "
                   "before sending it.") % {"code": name, "orders": ", ".join(orders)})
-    line = roll.processing_line
-    if line is not None and (invoice is None or line.invoice_id != invoice.pk):
-        return (_("%(code)s is already away on purchase %(number)s.")
-                % {"code": name, "number": line.invoice.display_number})
     return None
 
 
-def lookup(code, *, book, invoice=None):
-    """A roll as the purchase form shows it in goods out: what it is, how
-    much is on it, where, and why it can't go, if it can't. None when no
-    roll has `code`."""
-    roll = _find_roll({"barcode": code})
+def _own_split(invoice, roll):
+    """How many this purchase has already split off `roll` to send."""
+    if invoice is None or invoice.pk is None:
+        return ZERO
+    return sum((Decimal(l.quantity) for l in invoice.processing_lines.filter(
+        split_from=roll, received_at__isnull=True)), ZERO)
+
+
+def lookup(code, *, book, invoice=None, skip=()):
+    """An item as the purchase form shows it in goods out: what it is, how
+    much is on it, where, and why it can't go, if it can't. A box of goods
+    counted in pieces is `counted`: the form asks how many of it go
+    (`free` at most). None when nothing has `code`."""
+    roll, by_printed = _find_roll({"barcode": code}, book=book, skip=skip)
     if roll is None:
         return None
     wp = roll.product
     variant = wp.catalog_variant
+    counted = not roll.barcode
+    own = _own_split(invoice, roll) if counted else ZERO
+    free = (_free(roll) if roll.processing_line_id is None else _left(roll)) + own
     return {
         "stock_item_id": roll.pk,
-        "barcode": roll.barcode or "",
+        "barcode": roll.pick_key,
+        "printed": (code if by_printed else (wp.printed_barcode if counted else "")),
+        "counted": counted,
+        "name": _roll_name(roll),
         "sku": (variant.variant_sku if variant is not None else None) or wp.sku or "",
         "label": variant_label(variant) if variant is not None else wp.name,
-        "quantity": format(_left(roll).normalize(), "f"),
+        "quantity": _qty(_left(roll) + own),
+        "free": _qty(free),
         "unit": _unit(roll),
         "warehouse": wp.warehouse.name,
-        "problem": send_problem(roll, book=book, invoice=invoice),
+        "problem": (send_problem(roll, book=book, invoice=invoice, count=ZERO + 1)
+                    if counted and free > 0 else
+                    send_problem(roll, book=book, invoice=invoice)),
     }
 
 
-def resolve(plan, *, book, invoice=None):
-    """The plan's goods-out rolls, checked. Raises ProcessingError naming
-    the roll when one can't go: not found, sent twice, or any of
-    send_problem's reasons."""
+def _wanted(plan, *, book):
+    """[(item, count)] the plan sends: count is how many of it, None for
+    all of it. A row found by a product's printed barcode is one piece,
+    as a scan of it is. Raises ProcessingError for a row that names
+    nothing, a count that isn't one, or an item named twice."""
+    from decimal import InvalidOperation
+
     out, seen = [], set()
     for row in plan_rows(plan):
-        roll = _find_roll(row)
+        roll, by_printed = _find_roll(row, book=book, skip=seen)
         if roll is None:
             code = str(row.get("barcode") or row.get("stock_item_id") or "?").strip()
             raise ProcessingError(_("Nothing in stock has the barcode %(code)s.") % {"code": code})
@@ -138,49 +199,140 @@ def resolve(plan, *, book, invoice=None):
             raise ProcessingError(_("%(code)s is on this purchase twice.")
                                   % {"code": _roll_name(roll)})
         seen.add(roll.pk)
-        problem = send_problem(roll, book=book, invoice=invoice)
-        if problem:
-            raise ProcessingError(problem)
-        out.append(roll)
+        raw = str(row.get("quantity") or "").strip()
+        if raw:
+            try:
+                count = Decimal(raw)
+            except InvalidOperation:
+                count = None
+            if count is None or not count.is_finite() or count <= 0:
+                raise ProcessingError(_("How many of %(code)s go out? Enter a number above 0, "
+                                        "not “%(qty)s”.") % {"code": _roll_name(roll), "qty": raw})
+        else:
+            count = Decimal(1) if by_printed else None
+        out.append((roll, count))
     return out
+
+
+def _split(box, count, *, invoice, user=None):
+    """`count` of `box` taken out into an item of their own, to go out for
+    work: the box holds that many fewer. Value moves with them and nothing
+    is posted — it is still the same stock."""
+    from operating.models import StockMovement, WarehouseProductItem
+
+    piece = WarehouseProductItem.objects.create(
+        product=box.product, quantity=count, quantity_remaining=count, status="in_stock",
+        lot_number=box.lot_number, supplier_barcode=box.supplier_barcode,
+        is_second=box.is_second, unit_cost_base=box.unit_cost_base,
+        purchase_invoice_item=box.purchase_invoice_item, scanned_by=user)
+    box.quantity = Decimal(box.quantity or 0) - count
+    box.quantity_remaining = _left(box) - count
+    box.save(update_fields=["quantity", "quantity_remaining"])
+    reason = f"{invoice.display_number}: {_qty(count)} taken out of {_roll_name(box)} for work"
+    StockMovement.objects.create(product=box.product, stock_item=box, movement_type="adjustment",
+                                 quantity=-count, reason=reason, created_by=user)
+    StockMovement.objects.create(product=box.product, stock_item=piece, movement_type="adjustment",
+                                 quantity=count, reason=reason, created_by=user)
+    return piece
+
+
+def _put_back(line, *, user=None):
+    """A split-off part home unworked: back into the box it came out of,
+    which may have been emptied since. The part is left used up."""
+    from operating.models import StockMovement, WarehouseProductItem
+
+    piece = WarehouseProductItem.objects.select_for_update(of=("self",)).filter(
+        pk=line.stock_item_id).first()
+    box = WarehouseProductItem.objects.select_for_update(of=("self",)).filter(
+        pk=line.split_from_id).first()
+    if piece is None or box is None or piece.status == "consumed":
+        return
+    count = _left(piece)
+    box.quantity = Decimal(box.quantity or 0) + count
+    box.quantity_remaining = _left(box) + count
+    box.status = "in_stock" if box.quantity_remaining >= box.quantity else "partial"
+    box.save(update_fields=["quantity", "quantity_remaining", "status"])
+    piece.quantity_remaining = ZERO
+    piece.status = "consumed"
+    piece.processing_line = None
+    piece.save(update_fields=["quantity_remaining", "status", "processing_line"])
+    reason = f"{line.invoice.display_number}: {_qty(count)} back into {_roll_name(box)}"
+    StockMovement.objects.create(product=piece.product, stock_item=piece, movement_type="adjustment",
+                                 quantity=-count, reason=reason, created_by=user)
+    StockMovement.objects.create(product=box.product, stock_item=box, movement_type="adjustment",
+                                 quantity=count, reason=reason, created_by=user)
+
+
+def _bring_home(line, *, user=None):
+    from operating.models import WarehouseProductItem
+
+    if line.split_from_id:
+        _put_back(line, user=user)
+    else:
+        WarehouseProductItem.objects.filter(pk=line.stock_item_id, processing_line=line) \
+            .update(processing_line=None)
 
 
 @transaction.atomic
 def save_draft_lines(invoice, plan, *, user=None):
-    """Make the draft's goods out what its plan says: rolls taken off it
-    come home, new ones go away. Raises ProcessingError, the caller rolling
-    the save back."""
+    """Make the draft's goods out what its plan says: items taken off it
+    come home, new ones go away, a part of a box is split off it. Raises
+    ProcessingError, the caller rolling the save back."""
     from operating.models import WarehouseProductItem
     from .models_processing import ProcessingLine
 
-    rolls = {r.pk: r for r in resolve(plan, book=invoice.book, invoice=invoice)}
-    old = {line.stock_item_id: line for line in
-           invoice.processing_lines.select_for_update().filter(received_at__isnull=True)}
-    list(WarehouseProductItem.objects.select_for_update()
-         .filter(pk__in=set(rolls) | {k for k in old if k}))
+    wanted = _wanted(plan, book=invoice.book)
+    lines = list(invoice.processing_lines.select_for_update(of=("self",))
+                 .filter(received_at__isnull=True))
+    list(WarehouseProductItem.objects.select_for_update(of=("self",)).filter(
+        pk__in={r.pk for r, _n in wanted} | {l.stock_item_id for l in lines if l.stock_item_id}
+        | {l.split_from_id for l in lines if l.split_from_id}))
 
-    for roll_id, line in old.items():
-        if roll_id not in rolls:
-            WarehouseProductItem.objects.filter(pk=roll_id, processing_line=line) \
-                .update(processing_line=None)
-            line.delete()
-    for roll_id, roll in rolls.items():
-        line = old.get(roll_id) or ProcessingLine(invoice=invoice, stock_item=roll)
-        line.barcode = roll.barcode or ""
-        line.quantity = _left(roll)
-        line.unit = _unit(roll)
+    want = {roll.pk: count for roll, count in wanted}
+    kept = {}
+    for line in lines:
+        origin = line.split_from_id or line.stock_item_id
+        if origin in want and origin not in kept:
+            count = want[origin]
+            if (count == line.quantity if line.split_from_id
+                    else count is None or count == line.quantity):
+                kept[origin] = line
+                continue
+        _bring_home(line, user=user)
+        line.delete()
+
+    sent = []
+    for roll, count in wanted:
+        if roll.pk in kept:
+            sent.append(kept[roll.pk].stock_item)
+            continue
+        roll.refresh_from_db()
+        whole = count is None or count == _left(roll)
+        problem = send_problem(roll, book=invoice.book, invoice=invoice,
+                               count=None if whole else count)
+        if problem:
+            raise ProcessingError(problem)
+        line = ProcessingLine(invoice=invoice, unit=_unit(roll))
+        if whole:
+            line.stock_item, line.quantity = roll, _left(roll)
+        else:
+            line.stock_item = _split(roll, count, invoice=invoice, user=user)
+            line.split_from, line.quantity = roll, count
+        line.barcode = _roll_name(roll)
         line.save()
-        WarehouseProductItem.objects.filter(pk=roll_id).update(processing_line=line)
-    return list(rolls.values())
+        WarehouseProductItem.objects.filter(pk=line.stock_item_id).update(processing_line=line)
+        sent.append(line.stock_item)
+    return sent
 
 
 @transaction.atomic
-def release_lines(invoice):
-    """A draft cancelled: its out rolls are back on the shelf as they were."""
-    from operating.models import WarehouseProductItem
-
-    lines = list(invoice.processing_lines.filter(received_at__isnull=True))
-    WarehouseProductItem.objects.filter(processing_line__in=lines).update(processing_line=None)
+def release_lines(invoice, *, user=None):
+    """A draft cancelled: its out items are back on the shelf as they were,
+    a part split off a box back in it."""
+    lines = list(invoice.processing_lines.select_related("invoice")
+                 .filter(received_at__isnull=True))
+    for line in lines:
+        _bring_home(line, user=user)
     return lines
 
 

@@ -206,6 +206,152 @@ class GoodsOutTest(TestCase):
         self.assertAlmostEqual(row["ledger"], Decimal("368"), places=2)
         self.assertAlmostEqual(row["subsidiary"], row["ledger"], places=2)
 
+    # ── goods counted in pieces: so many of a box ────────────────────────
+    PRINTED = "8690000000017"
+
+    def _receive_pillowcases(self):
+        """Two boxes of white pillowcases at $3 a piece, 12 and 5, bought
+        from the mill. They are counted, not labelled one by one: every
+        piece carries the printed barcode of its variant."""
+        data = {
+            "warehouse_id": self.wh.pk, "current_account_id": self.mill.pk,
+            "unit": "piece", "date": "2026-11-11",
+            "products": [{
+                "main_product": {"mode": "new", "name": "PILLOW", "sku": "PILLOW"},
+                "tracking": "variant", "pack_type": "box",
+                "has_variants": True,
+                "variants": [{"attributes": [{"name": "color", "value": "white"}],
+                              "sku": "PILLOW.WHITE", "price": "3", "currency": "USD",
+                              "tops": [{"qty": 12, "barcode": ""}, {"qty": 5, "barcode": ""}]}],
+            }],
+        }
+        r = self._post("accounts:purchase_order_save", data, {"kwargs": {"book_id": self.book.pk}})
+        self.assertTrue(r.json()["success"], r.json())
+        c = self.client.post(reverse("accounts:purchase_order_confirm", args=[r.json()["invoice_id"]]))
+        self.assertTrue(c.json()["success"], c.json())
+        Product.objects.get(sku="PILLOW").variants.filter(variant_sku="PILLOW.WHITE") \
+            .update(variant_barcode=self.PRINTED)
+        big, small = (WarehouseProductItem.objects.filter(product__sku="PILLOW.WHITE")
+                      .order_by("-quantity"))
+        self.assertEqual((big.barcode, big.quantity, small.quantity), (None, 12, 5))
+        return big, small
+
+    def _send(self, rows, goods_in=(), pk=None):
+        data = {"warehouse_id": self.wh.pk, "current_account_id": self.hakan.pk,
+                "date": "2026-11-16", "unit": "piece", "goods_out": rows,
+                "products": list(goods_in)}
+        if pk:
+            return self._post("accounts:purchase_order_update", data, {"args": [pk]})
+        return self._post("accounts:purchase_order_save", data, {"kwargs": {"book_id": self.book.pk}})
+
+    def _left_in(self, item):
+        item.refresh_from_db()
+        return item.quantity_remaining
+
+    def test_part_of_a_box_goes_out_split_off_it(self, _up):
+        big, small = self._receive_pillowcases()
+        r = self._send([{"barcode": big.pick_key, "quantity": "4"}])
+        self.assertTrue(r.json()["success"], r.json())
+        line = ProcessingLine.objects.get(invoice_id=r.json()["invoice_id"])
+        piece = line.stock_item
+        self.assertEqual((line.split_from_id, line.quantity), (big.pk, Decimal("4")))
+        self.assertEqual((piece.quantity_remaining, piece.unit_cost_base, piece.is_away, piece.barcode),
+                         (Decimal("4"), Decimal("3"), True, None))
+        self.assertEqual(self._left_in(big), Decimal("8"))
+        self.assertFalse(big.is_away)
+        # Still the same 17 pieces on the books, and nothing owed.
+        self.assertEqual(sum(WarehouseProductItem.objects.filter(product=big.product)
+                             .values_list("quantity_remaining", flat=True)), Decimal("17"))
+        self.assertEqual(self._balance(self.hakan), Decimal("0.00"))
+
+    def test_saving_again_keeps_the_part_and_a_new_count_or_none_puts_it_back(self, _up):
+        big, _small = self._receive_pillowcases()
+        pk = self._send([{"barcode": big.pick_key, "quantity": "4"}]).json()["invoice_id"]
+        first = ProcessingLine.objects.get(invoice_id=pk).stock_item_id
+        self.assertTrue(self._send([{"barcode": big.pick_key, "quantity": "4"}], pk=pk).json()["success"])
+        self.assertEqual(ProcessingLine.objects.get(invoice_id=pk).stock_item_id, first)
+        self.assertTrue(self._send([{"barcode": big.pick_key, "quantity": "6"}], pk=pk).json()["success"])
+        self.assertEqual(self._left_in(big), Decimal("6"))
+        self.assertEqual(WarehouseProductItem.objects.get(pk=first).status, "consumed")
+        r = self._send([{"barcode": "KZL-A"}], pk=pk)
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual((self._left_in(big), big.quantity, big.status),
+                         (Decimal("12"), Decimal("12"), "in_stock"))
+        self.assertEqual(sum(WarehouseProductItem.objects.filter(product=big.product)
+                             .values_list("quantity_remaining", flat=True)), Decimal("17"))
+
+    def test_a_whole_box_goes_as_it_is(self, _up):
+        _big, small = self._receive_pillowcases()
+        pk = self._send([{"barcode": small.pick_key, "quantity": "5"}]).json()["invoice_id"]
+        line = ProcessingLine.objects.get(invoice_id=pk)
+        self.assertEqual((line.stock_item_id, line.split_from_id), (small.pk, None))
+        self.assertTrue(WarehouseProductItem.objects.get(pk=small.pk).is_away)
+
+    def test_the_printed_barcode_finds_the_oldest_box_with_some_free(self, _up):
+        big, small = self._receive_pillowcases()
+        url = reverse("accounts:processing_roll", args=[self.hakan.pk])
+        d = self.client.get(url, {"code": self.PRINTED}).json()["roll"]
+        self.assertEqual((d["stock_item_id"], d["counted"], d["free"], d["printed"], d["problem"]),
+                         (big.pk, True, "12", self.PRINTED, None))
+        nxt = self.client.get(url, {"code": self.PRINTED, "skip": big.pick_key}).json()["roll"]
+        self.assertEqual(nxt["stock_item_id"], small.pk)
+        # Typed into the box and saved as it is, the printed barcode is one piece.
+        pk = self._send([{"barcode": self.PRINTED}]).json()["invoice_id"]
+        self.assertEqual(ProcessingLine.objects.get(invoice_id=pk).quantity, Decimal("1"))
+        # Saved, the box shows what this purchase takes out of it.
+        d = self.client.get(url, {"code": big.pick_key, "purchase": pk}).json()["roll"]
+        self.assertEqual((d["quantity"], d["free"]), ("12", "12"))
+
+    def test_only_what_no_order_holds_may_go(self, _up):
+        big, _small = self._receive_pillowcases()
+        OrderStockReservation.objects.create(order=Order.objects.create(), stock_item=big,
+                                             warehouse_product=big.product, quantity=Decimal("10"))
+        r = self._send([{"barcode": big.pick_key, "quantity": "4"}])
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Only 2", r.json()["error"])
+        self.assertEqual(self._left_in(big), Decimal("12"))
+        self.assertTrue(self._send([{"barcode": big.pick_key, "quantity": "2"}]).json()["success"])
+
+    def test_a_labelled_roll_goes_out_whole_and_a_count_must_be_one(self, _up):
+        for rows, words in (([{"barcode": "KZL-A", "quantity": "10"}], "goes out whole"),
+                            ([{"barcode": "KZL-A", "quantity": "lots"}], "above 0"),
+                            ([{"barcode": "KZL-A", "quantity": "60"}], "there aren't 60")):
+            r = self._send(rows)
+            self.assertEqual(r.status_code, 400, (rows, r.content))
+            self.assertIn(words, r.json()["error"])
+        self.assertFalse(self._roll("KZL-A").is_away)
+
+    def test_a_part_comes_back_worked_and_undo_and_cancel_put_it_back_in_its_box(self, _up):
+        from accounting.services_ledger import reconcile
+        big, _small = self._receive_pillowcases()
+        pk = self._send([{"barcode": big.pick_key, "quantity": "4"}]).json()["invoice_id"]
+        back = [{"main_product": {"mode": "existing", "id": big.product.catalog_variant.product_id,
+                                  "title": "PILLOW", "sku": "PILLOW"},
+                 "has_variants": True,
+                 "variants": [{"attributes": [{"name": "color", "value": "white+lace"}],
+                               "sku": "PILLOW.WHITE_LACE", "price": "1", "currency": "USD",
+                               "tops": [{"qty": 4, "barcode": ""}]}]}]
+        self.assertTrue(self._send([{"barcode": big.pick_key, "quantity": "4"}], back,
+                                   pk=pk).json()["success"])
+        c = self._confirm(pk)
+        self.assertTrue(c.json()["success"], c.json())
+        line = ProcessingLine.objects.get(invoice_id=pk)
+        self.assertEqual((line.outcome, line.stock_item.status), ("used", "consumed"))
+        lace = WarehouseProductItem.objects.get(product__sku="PILLOW.WHITE_LACE")
+        # $3 a piece went out, $1 of work on each.
+        self.assertEqual((lace.quantity_remaining, lace.unit_cost_base), (Decimal("4"), Decimal("4")))
+        row = next(r for r in reconcile(self.book)["rows"] if r["control"] == "1300")
+        self.assertAlmostEqual(row["subsidiary"], row["ledger"], places=2)
+
+        self.assertEqual(self.client.post(reverse("accounts:purchase_undo_receipt", args=[pk]))
+                         .status_code, 200)
+        self.assertTrue(ProcessingLine.objects.get(invoice_id=pk).stock_item.is_away)
+        r = self.client.post(reverse("accounts:purchase_cancel", args=[pk]), {"reason": "not sent"})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self._left_in(big), Decimal("12"))
+        row = next(r for r in reconcile(self.book)["rows"] if r["control"] == "1300")
+        self.assertAlmostEqual(row["subsidiary"], row["ledger"], places=2)
+
     # ── bought for an order ──────────────────────────────────────────────
     def _order_for_crystal(self):
         """A customer order with a line for the crystal variant, the way

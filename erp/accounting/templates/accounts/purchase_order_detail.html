@@ -223,7 +223,7 @@
       {% for line in goods_out %}
       <div class="po-roll">
         <code>{{ line.barcode|default:"—" }}</code>
-        <span class="m">{{ line.quantity|floatformat:"2g" }} {{ line.unit }}</span>
+        <span class="m">{{ line.quantity|floatformat:"2g" }} {{ line.unit|unit_loc }}</span>
         {% if line.stock_item.product.catalog_variant %}<span class="wh">{{ line.stock_item.product.catalog_variant.variant_sku }}</span>{% endif %}
         <span class="wh">
           {% if not line.received_at %}{% trans "away" %}{% elif line.outcome == "returned" %}{% blocktrans with qty=line.quantity_back|floatformat:"2g" %}came back, {{ qty }}{% endblocktrans %}{% else %}{% trans "used up in the work" %}{% endif %}

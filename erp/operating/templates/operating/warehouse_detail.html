@@ -3808,6 +3808,17 @@
   // until the order ships, so without this the roll scans as free stock and
   // someone can walk off with meters another order is counting on. Shown
   // whether or not the order ever reached a packing list.
+  // Away at a supplier being worked on: still ours, not on the shelf.
+  function blAwayBanner(roll) {
+    var a = roll && roll.away;
+    if (!a) return '';
+    return '<div style="color:#5B21B6; background:#F5F3FF; border:1px solid #DDD6FE;' +
+           ' border-radius:8px; padding:8px 10px; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
+             '<i class="fa fa-truck-arrow-right"></i> {% trans "Away for work" %} · ' +
+             '<a href="' + a.url + '" style="color:inherit; text-decoration:underline;">' + blEsc(a.number) + '</a>' +
+             '<div style="font-weight:500; margin-top:3px;">{% trans "It can be picked again when it comes back." %}</div>' +
+           '</div>';
+  }
   function blHeldBanner(roll) {
     var h = roll && roll.reserved;
     if (!h) return '';
@@ -3925,6 +3936,7 @@
           '<div class="bl-prod-name">' + blEsc(p.name || '—') + '</div>' +
           (p.sku ? '<span class="bl-sku-pill">' + blEsc(p.sku) + '</span>' : '') +
           (p.main_product ? '<div class="bl-main-line">{% trans "Main product" %}: ' + blEsc(p.main_product) + '</div>' : '') +
+          blAwayBanner(d.roll) +
           blHeldBanner(d.roll) +
           blUsedBanner(d.roll) +
           '<div class="bl-tiles">' + tiles + '</div>' +
@@ -3947,6 +3959,7 @@
             '<i class="fa fa-triangle-exclamation"></i> ' +
             '{% trans "This roll is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
           '</p>' +
+          blAwayBanner(er) +
           blHeldBanner(er) +
           blUsedBanner(er) +
           '<div class="bl-tiles">' +

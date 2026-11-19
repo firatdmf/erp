@@ -153,6 +153,18 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or _fallback_prefix())[:6]
 
 
+def _roll_away_info(roll):
+    """The purchase a stock item is away on being worked on
+    (accounting.processing), for the barcode lookup to say so — scanned
+    at the counter, an item at the supplier's must not read as plainly on
+    the shelf. None when it is here."""
+    if roll.processing_line_id is None:
+        return None
+    invoice = roll.processing_line.invoice
+    return {"number": invoice.display_number,
+            "url": reverse("accounts:purchase_order_detail", args=[invoice.pk])}
+
+
 def _roll_reservation_info(roll):
     """Orders this roll is already spoken for, with nothing deducted yet.
 
@@ -2699,7 +2711,7 @@ def _roll_section(product):
     # Consumed rolls are gone from the floor — the row's roll count and the
     # product page's list both leave them out, so this agrees with both.
     qs = (product.stock_items.exclude(status="consumed")
-          .select_related("scanned_by")
+          .select_related("scanned_by", "processing_line__invoice")
           .order_by("-scanned_at"))
     # One row past the cap tells us whether there are more WITHOUT a second
     # COUNT query — almost every product is well under it, and this endpoint
@@ -2805,6 +2817,7 @@ def warehouse_barcode_lookup(request, pk):
                     "consumed": other_roll.status == "consumed",
                     "usage": _roll_usage_info(other_roll),
                     "reserved": _roll_reservation_info(other_roll),
+                    "away": _roll_away_info(other_roll),
                 },
             })
         if other_roll:
@@ -2828,6 +2841,7 @@ def warehouse_barcode_lookup(request, pk):
                     "consumed": other_roll.status == "consumed",
                     "usage": _roll_usage_info(other_roll),
                     "reserved": _roll_reservation_info(other_roll),
+                    "away": _roll_away_info(other_roll),
                 },
                 # No move offer for a stock item that has already been used up —
                 # there is nothing physical left to carry over, and the row
@@ -2897,6 +2911,7 @@ def warehouse_barcode_lookup(request, pk):
             "consumed": roll.status == "consumed",
             "usage": _roll_usage_info(roll),
             "reserved": _roll_reservation_info(roll),
+            "away": _roll_away_info(roll),
         } if roll else None),
     })
 
@@ -7385,7 +7400,8 @@ class WarehouseProductDetail(View):
         # Hide fully-consumed rolls — their stock is 0 and they only clutter
         # the list. Movement history below still preserves them.
         rolls = list(product.stock_items.exclude(status="consumed")
-                     .select_related("purchase_invoice_item__invoice__currency")
+                     .select_related("purchase_invoice_item__invoice__currency",
+                                     "processing_line__invoice")
                      .order_by("-scanned_at"))
         movements = _decorate_movements(list(
             product.movements.all().select_related("stock_item", "created_by", "order")[:200]))

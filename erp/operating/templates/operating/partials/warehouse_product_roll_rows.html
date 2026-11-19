@@ -69,6 +69,9 @@ page — the line itself has no single page to open.{% endcomment %}
               </a>
             {% endfor %}
           {% endif %}
+          {% if r.processing_line_id %}
+            {% include "operating/partials/_item_away.html" with invoice=r.processing_line.invoice %}
+          {% endif %}
         </div>
 
         <div class="wh-roll-when">

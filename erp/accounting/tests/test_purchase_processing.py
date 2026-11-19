@@ -325,6 +325,24 @@ class GoodsOutTest(TestCase):
         crm = self.client.get(reverse("crm:company_detail", args=[self.hakan_co.pk]))
         self.assertContains(crm, "2 items away · 90 m")
 
+    def test_the_warehouse_says_an_item_is_away_and_on_which_purchase(self, _up):
+        pk = self._save(["KZL-A"]).json()["invoice_id"]
+        number = Invoice.objects.get(pk=pk).display_number
+        roll = self._roll("KZL-A")
+        page = reverse("accounts:purchase_order_detail", args=[pk])
+        for url in (reverse("operating:warehouse_product_detail", args=[self.wh.pk, roll.product_id]),
+                    reverse("operating:warehouse_product_rolls", args=[self.wh.pk, roll.product_id])):
+            r = self.client.get(url)
+            self.assertContains(r, "Away for work", count=1)
+            self.assertContains(r, page)
+            self.assertContains(r, number)
+        found = self.client.get(reverse("operating:warehouse_barcode_lookup", args=[self.wh.pk]),
+                                {"barcode": "KZL-A"}).json()
+        self.assertEqual(found["roll"]["away"], {"number": number, "url": page})
+        home = self.client.get(reverse("operating:warehouse_barcode_lookup", args=[self.wh.pk]),
+                               {"barcode": "KZL-B"}).json()
+        self.assertIsNone(home["roll"]["away"])
+
     def test_a_draft_opens_in_the_form_with_its_goods_out(self, _up):
         pk = self._save(["KZL-A"]).json()["invoice_id"]
         r = self.client.get(reverse("accounts:goods_receipt_edit", args=[pk]))

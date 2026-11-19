@@ -1,0 +1,10 @@
+{% load i18n %}{% comment %}A stock item away at a supplier being worked on
+(WarehouseProductItem.processing_line): still ours and still valued, but no
+order can pick it until it comes back. Names the purchase that sent it; a
+sales rep, who doesn't see purchases, gets the words without the link.{% endcomment %}
+<span class="item-away" style="display:inline-flex;align-items:center;gap:4px;font:700 10.5px var(--font-sans);color:#6D28D9;white-space:nowrap;"
+      title="{% trans 'Sent out for work on a purchase — it can be picked again when it comes back.' %}">
+  <i class="fa fa-truck-arrow-right" style="font-size:9px;"></i>
+  {% trans "Away for work" %}{% if invoice %} ·
+  {% if is_sales_rep %}{{ invoice.display_number }}{% else %}<a href="{% url 'accounts:purchase_order_detail' invoice.pk %}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">{{ invoice.display_number }}</a>{% endif %}{% endif %}
+</span>

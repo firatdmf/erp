@@ -825,6 +825,9 @@
                   {% elif r.status == 'partial' %}<i class="fa fa-circle-half-stroke"></i>{% trans "Partial" %}
                   {% else %}<i class="fa fa-circle-xmark"></i>{% trans "Consumed" %}{% endif %}
                 </span>
+                {% if r.processing_line_id %}
+                  <div style="margin-top:3px;">{% include "operating/partials/_item_away.html" with invoice=r.processing_line.invoice %}</div>
+                {% endif %}
               </td>
               <td>
                 <span class="roll-time">{{ r.scanned_at|date:"M d, Y" }}<br><small>{{ r.scanned_at|date:"H:i" }}{% if r.scanned_by %} · {{ r.scanned_by.username }}{% endif %}</small></span>

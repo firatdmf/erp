@@ -374,7 +374,7 @@ class SalesRepRoleTests(TestCase):
         # palette is open to her, and what it hands back is filtered to
         # what she may open. See test_the_palette_only_returns_doors_that_open.
         for path in ("/accounting/", "/accounting/sales-dashboard/",
-                     "/crm/", "/team/", "/operating/procurement/",
+                     "/crm/", "/team/",
                      "/admin/", "/settings/"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 403)

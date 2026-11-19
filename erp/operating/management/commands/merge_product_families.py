@@ -142,7 +142,7 @@ class Command(BaseCommand):
         """Repoint everything that references the absorbed product.
 
         OrderItem.product is PROTECT, so a single order line left behind
-        would abort the delete — and an InvoiceItem or PurchaseRequestItem
+        would abort the delete — and an InvoiceItem
         would silently become NULL instead, quietly losing which product a
         line was for. Both are moved rather than left to on_delete.
         """

@@ -67,16 +67,6 @@ class BookWallsForMembers(TestCase):
         self.client = Client()
         self.client.force_login(self.user)
 
-    # ── Purchase forms ──────────────────────────────────────────────
-
-    def test_the_purchase_request_form_offers_only_her_products(self):
-        for path in ("/operating/procurement/requests/create/",
-                     "/operating/procurement/requests/create/partial/"):
-            with self.subTest(path=path):
-                page = self.client.get(path)
-                self.assertContains(page, "STEPPE-LINEN")
-                self.assertNotContains(page, "BOSPHORUS-TULLE")
-
     # ── Raw-material receipt ────────────────────────────────────────
 
     def test_the_receipt_form_offers_only_her_books(self):

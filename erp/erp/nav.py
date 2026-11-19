@@ -205,7 +205,6 @@ NAV_SECTIONS = [
                 {"label": _("Add warehouse"), "icon": "plus-circle", "url": "operating:create_warehouse", "admin": True},
             ]},
             {"title": _("PURCHASING"), "items": [
-                {"label": _("Purchase requests"), "icon": "file-text",    "url": "operating:purchase_request_list"},
                 {"label": _("Purchase orders"),   "icon": "receipt",      "url": "accounts:legacy_purchase_order_list"},
             ]},
         ],

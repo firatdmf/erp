@@ -39,11 +39,6 @@ def of_a_customer_in_reach(view):
                             book="current_account__book")
 
 urlpatterns = [
-    # Purchasing, moved in from the old `procurement` app. Mounted here so its
-    # names resolve as `operating:purchase_request_list`, and so the sales-rep
-    # path gate keeps seeing it as a prefix it does not allow.
-    path("procurement/", include("operating.urls_procurement")),
-
     path("", views.index.as_view(), name="index"),
     # Warehouse. Every page under one warehouse is `in_reach`: open to
     # whoever works with that warehouse's stock, 404 for anyone else

@@ -2592,6 +2592,13 @@ site's menus and the page's own way back are left out.{% endcomment %}
     if (value && own && value.toUpperCase() === own.toUpperCase()) {
       npBcMark(el, null, ''); npBcSyncDupes(); return;
     }
+    // One of this purchase's own goods out, coming back: the same item
+    // keeps its barcode (accounting.processing). Taken — by that item —
+    // so asking the server would only ever call it a clash.
+    if (value && npWorkOut(value)) {
+      npBcMark(el, 'ok', '{% filter escapejs %}{% trans "Sent out on this purchase — the same item comes back" %}{% endfilter %}');
+      npBcSyncDupes(); npApplyBarcodePlaceholders(); return;
+    }
     if (!value) { npBcMark(el, null, ''); npBcSyncDupes(); npApplyBarcodePlaceholders(); return; }
     npBcMark(el, 'busy', '');
     npBcSyncDupes();
@@ -3501,7 +3508,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
     x.type = 'button'; x.className = 'np-work-x';
     x.title = '{% filter escapejs %}{% trans "Take this off" %}{% endfilter %}';
     x.innerHTML = '<i class="fa fa-times"></i>';
-    x.onclick = function () { row.remove(); window.npDirty = true; npSummaryUpdate(); };
+    x.onclick = function () { row.remove(); window.npDirty = true; npSummaryUpdate(); npWorkRecheckBack(); };
 
     row.appendChild(info); row.appendChild(x);
     if (roll.problem) {
@@ -3519,6 +3526,16 @@ site's menus and the page's own way back are left out.{% endcomment %}
   }
   // Put a looked-up item on the list. The empty card the page opened with
   // goes: what comes back is entered when it is known.
+  // Is `code` going out on this purchase — on the list, or in the box?
+  function npWorkOut(code) {
+    const c = (code || '').trim().toUpperCase();
+    return !!c && (npWorkTaken(c) || npWorkTyped().some(function (t) { return t.toUpperCase() === c; }));
+  }
+  // Goods out changed: the barcodes under What comes back are asked
+  // again, so one that is now (or no longer) going out says so.
+  function npWorkRecheckBack() {
+    npBcRows().forEach(function (el) { if ((el.value || '').trim()) window.npBarcodeInput(el); });
+  }
   function npWorkPut(roll) {
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
       if (npCardUntouched(card)) card.remove();
@@ -3526,6 +3543,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
     npWorkRender(roll);
     window.npDirty = true;
     npSummaryUpdate();
+    npWorkRecheckBack();
   }
   const NP_WORK_NEEDS_GATE = '{% filter escapejs %}{% trans "Pick the warehouse and the account above first." %}{% endfilter %}';
   const NP_WORK_TWICE = '{% filter escapejs %}{% trans "This is already on the list." %}{% endfilter %}';
@@ -3631,7 +3649,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
         });
       }).catch(npFailed).then(function () {
         npWorkPending -= 1;
-        if (!npWorkPending) npSummaryUpdate();
+        if (!npWorkPending) { npSummaryUpdate(); npWorkRecheckBack(); }
       });
     });
   }

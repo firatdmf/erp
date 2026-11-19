@@ -185,6 +185,19 @@ class GoodsOutTest(TestCase):
         self.assertEqual(Invoice.objects.get(pk=pk).total, Decimal("148.00"))
         self.assertEqual(self._balance(self.hakan), Decimal("-148.00"))
 
+    def test_only_its_own_goods_out_may_come_back_under_their_barcode(self, _up):
+        """KZL-A went out, so it may come back as KZL-A. KZL-C is in stock
+        and did not go out: its barcode is someone else's, and is refused."""
+        pk = self._save(["KZL-A"]).json()["invoice_id"]
+        self._save(["KZL-A"], self._goods_in(
+            self._variant("ecru+crystal", [{"qty": 48, "barcode": "KZL-C"}], price="1.5")), pk=pk)
+        r = self._confirm(pk)
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("KZL-C", r.json()["error"])
+        self.assertEqual(Invoice.objects.get(pk=pk).status, "ordered")
+        self.assertTrue(self._roll("KZL-A").is_away)
+        self.assertEqual(WarehouseProductItem.objects.filter(barcode="KZL-C").count(), 1)
+
     def test_the_ledger_still_matches_the_shelves(self, _up):
         from accounting.services_ledger import reconcile
         self._sent_and_back()
@@ -256,6 +269,17 @@ class GoodsOutTest(TestCase):
         self.assertContains(r, "came back")
         self.assertContains(r, "used up in the work")
         self.assertNotContains(r, reverse("accounts:goods_receipt_edit", args=[pk]))
+
+    def test_a_returned_roll_shows_and_prints_under_the_line_it_came_back_as(self, _up):
+        pk = self._sent_and_back()
+        inv = Invoice.objects.get(pk=pk)
+        crystal = inv.items.get(variant__variant_sku="HAVANA.ECRU_CRYSTAL")
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[pk]))
+        self.assertContains(page, "<code>KZL-A</code>", html=False)
+        with patch("operating.warehouse_label.labels_pdf_bytes", return_value=b"%PDF") as pdf:
+            r = self.client.get(reverse("accounts:purchase_item_labels", args=[pk, crystal.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([roll.barcode for _wp, roll in pdf.call_args[0][0]], ["KZL-A"])
 
     def test_rolls_away_show_on_the_list_and_on_the_suppliers_page(self, _up):
         self._save(["KZL-A", "KZL-B"])

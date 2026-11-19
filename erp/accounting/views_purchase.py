@@ -190,8 +190,15 @@ class PurchaseOrderDetail(View):
         # A line is packed the way its product is: rolls of cloth, boxes of
         # fitted sheets. The page names the stock items by that pack, so a
         # receiver counting boxes is not told to count rolls.
+        from .processing import rolls_back_on
+        # Asked once: only a purchase that sent our goods out for work has
+        # any that came back, and only then is each line looked at.
+        any_back = invoice.processing_lines.filter(outcome="returned").exists()
         for i, it in enumerate(items):
-            rolls = it.warehouse_stock_items.all()
+            # Its own rolls, and ours that came back from the work as its
+            # variant under their own barcode (accounting.processing).
+            rolls = list(it.warehouse_stock_items.all()) + (rolls_back_on(it) if any_back else [])
+            it.rolls_all = rolls
             plan = planned[i] if planned else None
             it.planned_rolls = plan["rolls"] if plan else []
             it.plan = plan
@@ -288,11 +295,14 @@ class PurchaseItemLabels(View):
             InvoiceItem.objects.select_related("invoice"),
             pk=item_pk, invoice_id=pk, invoice__type="purchase",
         )
+        # Ours that came back from the work as this line's variant print
+        # with it: their old sticker names the variant they were.
+        from .processing import rolls_back_on
         rolls = list(
             item.warehouse_stock_items
             .select_related("product", "product__warehouse")
             .order_by("id")
-        )
+        ) + rolls_back_on(item)
         if not rolls:
             raise Http404("This purchase line has no rolls to label.")
 

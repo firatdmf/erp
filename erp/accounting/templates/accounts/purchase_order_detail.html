@@ -313,7 +313,7 @@
     </div>
     {% if it.pack_count %}
     <div class="po-rolls">
-      {% for r in it.warehouse_stock_items.all %}
+      {% for r in it.rolls_all %}
       <div class="po-roll">
         <code>{{ r.barcode|default:"—" }}</code>
         <span class="m">{{ r.quantity|floatformat:"2g" }} {{ r.product.unit_short }}</span>

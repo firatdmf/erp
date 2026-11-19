@@ -425,3 +425,22 @@ def away_summary(invoices):
         inv.away_quantity = row["q"] if one_unit else None
         inv.away_unit = next(iter(row["units"])) if one_unit else ""
     return invoices
+
+
+def rolls_back_on(item):
+    """Our own items that came back from the work as the variant of this
+    purchase line, under their own barcode. They are still linked to the
+    purchase that first bought them, so a line's own rolls never include
+    them; its page and its labels add them (PurchaseOrderDetail,
+    PurchaseItemLabels)."""
+    from operating.models import WarehouseProductItem
+
+    if not item.variant_id:
+        return []
+    return list(WarehouseProductItem.objects
+                .filter(processing_history__invoice_id=item.invoice_id,
+                        processing_history__outcome="returned",
+                        product__catalog_variant_id=item.variant_id)
+                .select_related("product", "product__warehouse",
+                                "product__catalog_variant__product")
+                .distinct().order_by("id"))

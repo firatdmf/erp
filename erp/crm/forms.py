@@ -266,7 +266,26 @@ class ContactCreateForm(ModelForm):
                 )
         return instance
     
-class ContactUpdateForm(ModelForm):
+class KeepUnsentFieldsMixin:
+    """On an edit, a field the page did not send keeps what is stored.
+
+    A ModelForm saves an omitted field as empty, and the edit side panels
+    show only some fields — every save there used to wipe a contact's
+    company, country, group and background info, and a company's group.
+    The widget tells "not sent" from "sent empty" (a cleared box, an
+    unticked checkbox), so clearing a field still works.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound and self.instance.pk:
+            for name in list(self.fields):
+                widget = self.fields[name].widget
+                if widget.value_omitted_from_data(self.data, self.files, self.add_prefix(name)):
+                    del self.fields[name]
+
+
+class ContactUpdateForm(KeepUnsentFieldsMixin, ModelForm):
     # Hidden fields to store JSON arrays
     emails_data = forms.CharField(
         required=False,
@@ -309,18 +328,20 @@ class ContactUpdateForm(ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         # Set email and phone arrays
-        instance.email = self.cleaned_data.get("emails_data", [])
-        instance.phone = self.cleaned_data.get("phones_data", [])
+        if "emails_data" in self.fields:
+            instance.email = self.cleaned_data.get("emails_data", [])
+        if "phones_data" in self.fields:
+            instance.phone = self.cleaned_data.get("phones_data", [])
         if commit:
             instance.save()
         return instance
-    
+
     class Meta:
         model = Contact
         exclude = ["email", "phone"]
 
 
-class CompanyForm(ModelForm):
+class CompanyForm(KeepUnsentFieldsMixin, ModelForm):
     # Contact selector field. `contact_ids` is what the sidebar posts now —
     # a company has many contacts, so it attaches several at once, as a
     # comma-separated list of pks. `contact_id` stays for a stale tab
@@ -415,7 +436,8 @@ class CompanyForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["task_due_date"].initial = date.today()
+        if "task_due_date" in self.fields:
+            self.fields["task_due_date"].initial = date.today()
 
     def clean_emails_data(self):
         import json
@@ -449,8 +471,10 @@ class CompanyForm(ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         # Set email and phone arrays
-        instance.email = self.cleaned_data.get("emails_data", [])
-        instance.phone = self.cleaned_data.get("phones_data", [])
+        if "emails_data" in self.fields:
+            instance.email = self.cleaned_data.get("emails_data", [])
+        if "phones_data" in self.fields:
+            instance.phone = self.cleaned_data.get("phones_data", [])
         if commit:
             instance.save()
         return instance

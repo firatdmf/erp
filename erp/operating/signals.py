@@ -133,6 +133,10 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
     (apply_order_status_change), not one per half as each is saved."""
     if getattr(instance, "_one_notice_for_split", False):
         return
+    # A step the customer need not hear of: the re-open on the way to
+    # cancelling a completed order (views_warehouse.cancel_order).
+    if getattr(instance, "_no_status_notice", False):
+        return
     if not instance.notify_customer:
         return
     new_status = instance.order_status

@@ -1171,11 +1171,15 @@ class OrderDetail(DetailView):
         # All status changes funnel through the single atomic helper so
         # the ship gate (cargo required) + the reservation → stock-out
         # conversion can never be bypassed or partially applied.
-        from .views_warehouse import apply_order_status_change
-        ok, code = apply_order_status_change(
-            order, new_status, carrier=carrier, tracking=tracking, user=request.user,
-            require_cargo_for_ship=not skip_cargo,
-        )
+        from .views_warehouse import apply_order_status_change, cancel_order
+        if cancelling:
+            # A completed order is re-opened and cancelled in one step.
+            ok, code = cancel_order(order, request.user)
+        else:
+            ok, code = apply_order_status_change(
+                order, new_status, carrier=carrier, tracking=tracking, user=request.user,
+                require_cargo_for_ship=not skip_cargo,
+            )
         if not ok:
             discard_cargo_receipts(new_receipts)
             if code == "cargo_required":
@@ -1213,8 +1217,28 @@ class OrderDetail(DetailView):
             )
             messages.success(
                 request,
+                _g("Order cancelled — its goods went back into stock and its sale was "
+                   "taken back from the account.") if was_shipped else
                 _g("Order cancelled — its reservations were released and its account "
                    "entry was removed."),
+            )
+            _counter_settled_notice(request, order)
+            return redirect("operating:order_detail", pk=order.pk)
+
+        # Marked returned — from the Cancel dialog, which asks why, or
+        # from the status list, which doesn't.
+        if new_status == "returned" and was_shipped:
+            if cancel_reason:
+                from .models import OrderChange
+                OrderChange.objects.create(
+                    order=order, action="field", field="return_reason",
+                    new_value=cancel_reason,
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+            messages.success(
+                request,
+                _g("Order marked returned — its goods went back into stock and its sale "
+                   "was taken back from the account."),
             )
             _counter_settled_notice(request, order)
             return redirect("operating:order_detail", pk=order.pk)

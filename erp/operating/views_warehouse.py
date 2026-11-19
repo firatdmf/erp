@@ -7143,13 +7143,52 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         # what the caller still holds in memory.
         order.refresh_from_db()
         return False, refused.args[0]
-    if moving:
+    if moving and not getattr(order, "_no_status_notice", False):
         # One notice for the whole order, from a half that asks for one,
         # and only once the change is really in the database.
         teller = next((h for h in halves if h.notify_customer), None)
         if teller is not None:
             from .signals import notify_customer_of_status
             _tx.on_commit(lambda: notify_customer_of_status(teller, new_status))
+    return True, None
+
+
+def cancel_order(order, user):
+    """Cancel `order` wherever it stands — the "Cancel order" button.
+
+    An open order is cancelled through apply_order_status_change as it
+    always was. A completed one can't be cancelled there directly
+    ('cancel_requires_reopen'), so it takes both of the steps that rule
+    asks for, in one transaction: re-opened to packaging (the stock it
+    took goes back and its sale is taken back), then cancelled. If
+    either is refused, neither happens and the refusal's code comes
+    back. The re-open in between is no news to the customer: they hear
+    only that the order was cancelled.
+
+    Returns (ok, code) as apply_order_status_change does."""
+    if order.order_status not in SHIPPED_CLASS:
+        return apply_order_status_change(order, "cancelled", user=user)
+
+    from django.db import transaction as _tx
+
+    class _Refused(Exception):
+        pass
+
+    try:
+        with _tx.atomic():
+            order._no_status_notice = True
+            try:
+                ok, code = apply_order_status_change(order, "packaging", user=user)
+            finally:
+                order._no_status_notice = False
+            if not ok:
+                raise _Refused(code)
+            ok, code = apply_order_status_change(order, "cancelled", user=user)
+            if not ok:
+                raise _Refused(code)
+    except _Refused as refused:
+        order.refresh_from_db()
+        return False, refused.args[0]
     return True, None
 
 

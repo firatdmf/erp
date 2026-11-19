@@ -16571,3 +16571,33 @@ msgstr "Bir ad girin, ör. İndirim — ad olmadan bu satır kaydedilmez."
 
 msgid "Add an amount, negative for a discount — without one this line is not saved."
 msgstr "Bir tutar girin, indirim için eksi — tutar olmadan bu satır kaydedilmez."
+
+msgid "This order was completed. Cancelling puts its goods back into stock — if they are still with the customer, don't cancel: the stock would show goods you don't have."
+msgstr "Bu sipariş tamamlanmıştı. İptal etmek ürünlerini stoğa geri koyar — ürünler hâlâ müşterideyse iptal etmeyin: stok elinizde olmayan ürünleri gösterir."
+
+msgid "Where are the goods?"
+msgstr "Ürünler nerede?"
+
+msgid "They went out and came back"
+msgstr "Gönderildi ve geri geldi"
+
+msgid "the order is marked Returned"
+msgstr "sipariş İade Edildi olarak işaretlenir"
+
+msgid "They never went out"
+msgstr "Hiç gönderilmedi"
+
+msgid "it was completed by mistake; the order is cancelled"
+msgstr "yanlışlıkla tamamlandı; sipariş iptal edilir"
+
+msgid "The goods it took go back into stock"
+msgstr "Aldığı ürünler stoğa geri döner"
+
+msgid "The customer is emailed that the order was cancelled or returned"
+msgstr "Müşteriye siparişin iptal ya da iade edildiği e-postayla bildirilir"
+
+msgid "Order cancelled — its goods went back into stock and its sale was taken back from the account."
+msgstr "Sipariş iptal edildi — ürünleri stoğa geri döndü ve satışı cari hesaptan geri alındı."
+
+msgid "Order marked returned — its goods went back into stock and its sale was taken back from the account."
+msgstr "Sipariş iade edildi olarak işaretlendi — ürünleri stoğa geri döndü ve satışı cari hesaptan geri alındı."

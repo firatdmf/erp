@@ -4,6 +4,11 @@ The order page has a "Cancel order" button whose dialog insists on a
 reason; the reason lands in the change history. A completed order can't
 be cancelled in one step — it is re-opened first. A cancelled order keeps
 its lines on the page, struck through.
+
+A completed order is cancelled from the same button: the dialog asks
+where the goods are. Back with us, it is marked returned; never sent, it
+is re-opened and cancelled in one step (views_warehouse.cancel_order) —
+the funnel itself still refuses a completed order's direct cancel.
 """
 from decimal import Decimal
 from unittest.mock import patch
@@ -17,7 +22,7 @@ from accounting.models_accounts import CurrentAccount
 from authentication.models import Permission
 from marketing.models import Product, ProductVariant
 from operating.models import Order, OrderChange, OrderItem
-from operating.views_warehouse import apply_order_status_change
+from operating.views_warehouse import apply_order_status_change, cancel_order
 
 
 class OrderCancelBase(TestCase):
@@ -77,12 +82,57 @@ class CancellingFromTheOrderPage(OrderCancelBase):
             self.assertEqual(order.order_status, "pending")
         self.assertFalse(OrderChange.objects.filter(field="cancel_reason").exists())
 
-    def test_a_completed_order_is_refused(self):
+    def test_a_completed_order_is_re_opened_and_cancelled(self):
         order = self.order(status="shipped")
         self.cancel(order)
         order.refresh_from_db()
+        self.assertEqual(order.order_status, "cancelled")
+        # Both steps are in the history: re-opened, then cancelled.
+        self.assertEqual(
+            list(OrderChange.objects.filter(order=order, action="status")
+                 .order_by("pk").values_list("old_value", "new_value")),
+            [("shipped", "packaging"), ("packaging", "cancelled")])
+        self.assertEqual(OrderChange.objects.get(order=order, field="cancel_reason").new_value,
+                         "Customer changed their mind")
+
+    def test_a_completed_order_needs_a_reason_too(self):
+        order = self.order(status="shipped")
+        self.cancel(order, reason="")
+        order.refresh_from_db()
         self.assertEqual(order.order_status, "shipped")
-        self.assertFalse(OrderChange.objects.filter(field="cancel_reason").exists())
+
+    def test_goods_that_came_back_mark_it_returned(self):
+        order = self.order(status="shipped")
+        self.client.post(self.detail_url(order), {
+            "action": "update_status", "order_status": "returned",
+            "cancel_reason": "Wrong colour, sent back"})
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "returned")
+        self.assertEqual(OrderChange.objects.get(order=order, field="return_reason").new_value,
+                         "Wrong colour, sent back")
+
+    def test_the_customer_hears_only_of_the_cancel(self):
+        order = self.order(status="shipped")
+        order.notify_customer = True
+        order.save(update_fields=["notify_customer"])
+        with patch("operating.order_notifications.send_order_event_email") as sent:
+            self.cancel(order)
+        self.assertEqual([c.args[1] for c in sent.call_args_list], ["cancelled"])
+
+    def test_a_refused_cancel_leaves_it_completed(self):
+        order = self.order(status="shipped")
+        real = apply_order_status_change
+
+        def refuse_the_cancel(o, status, **kw):
+            if status == "cancelled":
+                return False, "cancel_pending"
+            return real(o, status, **kw)
+
+        with patch("operating.views_warehouse.apply_order_status_change", refuse_the_cancel):
+            self.assertEqual(cancel_order(order, self.user), (False, "cancel_pending"))
+        order.refresh_from_db()
+        self.assertEqual(order.order_status, "shipped")
+        self.assertFalse(OrderChange.objects.filter(order=order, action="status").exists())
 
     def test_the_funnel_refuses_every_completed_status(self):
         for status in ("shipped", "in_transit", "out_for_delivery", "delivered"):
@@ -107,10 +157,16 @@ class TheOrderPage(OrderCancelBase):
         self.assertContains(resp, 'id="odCancelModal"')
         self.assertNotContains(resp, 'data-status="cancelled"')
 
-    def test_a_completed_order_offers_no_cancel(self):
+    def test_a_completed_order_offers_cancel_asking_where_the_goods_are(self):
         resp = self.client.get(self.detail_url(self.order(status="shipped")))
-        self.assertNotContains(resp, 'id="od-cancel-order-btn"')
-        self.assertNotContains(resp, 'id="odCancelModal"')
+        self.assertContains(resp, 'id="od-cancel-order-btn"')
+        self.assertContains(resp, 'id="odCancelModal"')
+        self.assertContains(resp, 'name="odx_goods" value="returned"')
+        self.assertContains(resp, 'name="odx_goods" value="cancelled"')
+
+    def test_an_open_order_is_not_asked_where_the_goods_are(self):
+        resp = self.client.get(self.detail_url(self.order()))
+        self.assertNotContains(resp, 'type="radio" name="odx_goods"')
 
     def test_a_sales_rep_gets_no_cancel(self):
         perm, _ = Permission.objects.get_or_create(name="sales_rep")

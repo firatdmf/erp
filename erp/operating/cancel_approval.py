@@ -219,8 +219,8 @@ def approve(req, actor):
         else:
             _log(order, "cancel_request", _("Approved"), user)
             if req.action == "cancel":
-                from .views_warehouse import apply_order_status_change
-                ok, code = apply_order_status_change(order, "cancelled", user=user)
+                from .views_warehouse import cancel_order
+                ok, code = cancel_order(order, user)
                 if not ok:
                     raise ApprovalError(_("The order could not be cancelled: %(code)s")
                                         % {"code": code})

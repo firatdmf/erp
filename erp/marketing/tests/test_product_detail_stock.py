@@ -85,20 +85,17 @@ class ProductDetailStockTest(TestCase):
         self.assertIn("Out of stock", html)
         self.assertIn("Made to order", html)
 
-    def test_the_warehouse_name_stands_beside_the_catalog_attributes(self):
-        """"2003 A. BEYAZ" next to colour white is how a wrong colour shows."""
+    def test_the_warehouse_row_name_is_not_shown(self):
+        """The row name is the mill's label text, typed in Turkish; the
+        Attributes column says what the variant is in the reader's
+        language, and the label text stays on the warehouse pages."""
         variant = self._variant("2003.23-101")
         WarehouseProduct.objects.create(
             warehouse=self.warehouse, name="2003 A. BEYAZ", sku="2003.23-101",
             quantity=Decimal("500"), catalog_variant=variant)
-        WarehouseProduct.objects.create(
-            warehouse=Warehouse.objects.create(name="Depo", accounting_book=self.book),
-            name="2003 A. BEYAZ", sku="2003.23-101.2", quantity=Decimal("0"), catalog_variant=variant)
-        self._variant("S-BAKLAVA.NEVER-305")
         html = self._html()
-        self.assertIn("Warehouse name", html)
-        # Read the same in two warehouses: said once.
-        self.assertEqual(html.count('<span class="stock-line-name">2003 A. BEYAZ</span>'), 1)
+        self.assertNotIn("Warehouse name", html)
+        self.assertNotIn("2003 A. BEYAZ", html)
 
     def test_a_second_variant_costs_no_extra_query(self):
         self._variant("S-BAKLAVA.ONE-305", "40.00")

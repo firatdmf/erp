@@ -399,12 +399,6 @@ class ProductDetail(generic.DetailView):
             # never read as one pile of 622.60 to cut from.
             held = [row for row in variant.warehouse_products.all() if row.quantity]
             variant.stock_locations = held if len(held) > 1 else []
-            # What the warehouse calls it, beside what the catalog says it
-            # is: "2003 A. BEYAZ" next to colour white is how a wrong
-            # attribute gets noticed. Each name once — the same line in
-            # two warehouses usually reads the same.
-            variant.stock_line_names = list(dict.fromkeys(
-                row.name for row in variant.warehouse_products.all() if row.name))
             variant.product = self.object   # its markup, without a query each
         # Why the storefront hides a variant, said where it can be fixed:
         # no stock, no photo of its own (the group's rule), or by hand.

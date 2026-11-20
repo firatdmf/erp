@@ -411,31 +411,19 @@ class OrderDetail(DetailView):
 
     def _supplier_purchases(self):
         """Purchases bought for this order, each with how much of what it
-        brought in this order still holds. What it brought in is its own
-        stock items, and our own items that came back from work done on it
-        (accounting.processing): those keep the purchase that first bought
-        them, so they are found through its processing lines."""
+        brought in this order still holds (order_purchases.rolls_brought_in:
+        our own items back from work done on it count too)."""
         from decimal import Decimal
         from django.db.models import Sum
-        from accounting.models_processing import ProcessingLine
-        from .models import OrderStockReservation, WarehouseProductItem
+        from .models import OrderStockReservation
+        from .order_purchases import rolls_brought_in
         purchases = list(
             self.object.supplier_purchases
             .exclude(status="cancelled")
             .select_related("current_account", "intake_warehouse")
             .order_by("-date", "-pk")
         )
-        pks = [p.pk for p in purchases]
-        brought = {}  # purchase pk → stock item pks
-        for item_id, inv_id in (WarehouseProductItem.objects
-                                .filter(purchase_invoice_item__invoice_id__in=pks)
-                                .values_list("pk", "purchase_invoice_item__invoice_id")):
-            brought.setdefault(inv_id, set()).add(item_id)
-        for item_id, inv_id in (ProcessingLine.objects
-                                .filter(invoice_id__in=pks, outcome="came_back",
-                                        stock_item__isnull=False)
-                                .values_list("stock_item_id", "invoice_id")):
-            brought.setdefault(inv_id, set()).add(item_id)
+        brought = rolls_brought_in(p.pk for p in purchases)
         held = dict(OrderStockReservation.objects
                     .filter(order=self.object,
                             stock_item_id__in=set().union(*brought.values()))
@@ -518,15 +506,15 @@ class OrderDetail(DetailView):
         # lands in), and isn't frozen by a cancel request.
         ctx["can_link_purchase"] = (ctx["billed_on_completion"]
                                     and ctx["cancel_request"] is None)
-        # Each purchase row's Cancel: only for whoever the cancel endpoint
-        # lets through (accounts:purchase_cancel is admin-gated), with what
-        # it does to this order said first, as on the purchase's own page.
-        from .views_warehouse import _is_admin
-        ctx["can_cancel_purchases"] = _is_admin(self.request.user)
-        if ctx["can_cancel_purchases"]:
-            from .order_purchases import purchase_cancel_warning
+        # Each purchase row's Detach takes it off this order — the purchase
+        # itself stays. Only while the order is open and not frozen by a
+        # cancel request, with what it does to the order said first.
+        from .order_purchases import order_is_open, purchase_cancel_warning
+        ctx["can_detach_purchases"] = (order_is_open(self.object)
+                                       and ctx["cancel_request"] is None)
+        if ctx["can_detach_purchases"]:
             for p in ctx["supplier_purchases"]:
-                p.cancel_warning = purchase_cancel_warning(p)
+                p.detach_warning = purchase_cancel_warning(p, detaching=True)
         # Each line names the supplier purchases that bring it in — the
         # ones whose plans list its SKU — so which lines are bought for
         # the order, and from where, reads off the line itself. Until its

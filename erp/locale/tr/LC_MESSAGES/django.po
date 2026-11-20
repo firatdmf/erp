@@ -16902,3 +16902,46 @@ msgid "%(n)s document"
 msgid_plural "%(n)s documents"
 msgstr[0] "%(n)s belge"
 msgstr[1] "%(n)s belge"
+
+#: detaching a purchase from its order
+msgid "Detach"
+msgstr "Siparişten çıkar"
+
+msgid "Detach %(number)s from this order? The purchase itself stays."
+msgstr "%(number)s bu siparişten çıkarılsın mı? Alımın kendisi kalır."
+
+msgid "Could not detach."
+msgstr "Siparişten çıkarılamadı."
+
+msgid "Not allowed."
+msgstr "İzin verilmiyor."
+
+msgid "Order %(number)s: all its lines come from this purchase and are removed; the order stays open with nothing on it."
+msgstr "%(number)s siparişi: tüm satırları bu alımdan geliyor ve çıkarılır; sipariş boş olarak açık kalır."
+
+msgid "%(number)s detached — %(count)s line(s) removed"
+msgstr "%(number)s siparişten çıkarıldı — %(count)s satır çıkarıldı"
+
+msgid "Its %(count)s line(s) were removed from order %(number)s, which has nothing left on it. It stays open: add goods to it or cancel it."
+msgstr "%(count)s satırı %(number)s siparişinden çıkarıldı; siparişte bir şey kalmadı. Sipariş açık kalır: mal ekleyin ya da iptal edin."
+
+msgid "This purchase is not on an order."
+msgstr "Bu alım bir siparişte değil."
+
+msgid "Order %(number)s is closed: its purchases stay on it."
+msgstr "%(number)s siparişi kapandı: alımları üzerinde kalır."
+
+msgid "Roll(s) %(codes)s from this purchase went out with order %(number)s, so it can't be detached."
+msgstr "Bu alımın %(codes)s topları %(number)s siparişiyle çıktı, bu yüzden siparişten çıkarılamaz."
+
+msgid "Order %(number)s"
+msgstr "%(number)s siparişi"
+
+msgid "detached from the order"
+msgstr "siparişten çıkarıldı"
+
+msgid "%(purchase)s is no longer on order %(number)s."
+msgstr "%(purchase)s artık %(number)s siparişinde değil."
+
+msgid "Roll(s) %(codes)s are back on the shelf."
+msgstr "%(codes)s topları rafa geri döndü."

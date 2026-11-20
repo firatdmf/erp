@@ -1390,3 +1390,83 @@ class PurchaseForCustomerTest(TestCase):
         self.assertContains(page, "Purchase changes")
         self.assertContains(page, "Item added")
         self.assertContains(page, "K24644.G07")
+
+    # ── Detaching a purchase from its order ─────────────────────────
+    # The purchase stays as it is; the order lets go of the lines it fed
+    # and the rolls it brought, and stays open even with nothing left.
+
+    def _detach(self, inv_id):
+        return self.client.post(reverse("accounts:purchase_detach", args=[inv_id]))
+
+    def test_detaching_a_received_purchase_frees_its_rolls_and_lines(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        self.assertEqual(self._held(order), [Decimal("30"), Decimal("25")])
+
+        r = self._detach(inv_id)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["success"], r.json())
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertIsNone(inv.for_order)
+        self.assertEqual(inv.status, "received")
+        # The rolls are still ours, on the shelf, held for nobody.
+        self.assertEqual(WarehouseProductItem.objects.filter(
+            purchase_invoice_item__invoice=inv, status="in_stock").count(), 2)
+        self.assertEqual(self._held(order), [])
+        # Its only line is gone, and the empty order stays open.
+        order.refresh_from_db()
+        self.assertFalse(order.items.exists())
+        self.assertEqual(order.status, "pending")
+        self.assertIn(("field", "order", "order", "Order %s" % order.order_number,
+                       "detached from the order"), self._purchase_log(inv_id))
+        self.assertIn(("field", "purchase", "%s detached — 1 line(s) removed" % inv.number),
+                      self._order_log(order))
+
+    def test_detaching_keeps_the_orders_own_lines_and_shelf_rolls(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        self._hold_shelf_roll(self._stock_line(order), barcode="SHELF09")
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+
+        self.assertTrue(self._detach(inv_id).json()["success"])
+        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
+                         ["STK0001.1"])
+        self.assertEqual(list(OrderStockReservation.objects.filter(order=order)
+                              .values_list("stock_item__barcode", flat=True)), ["SHELF09"])
+
+    def test_detaching_a_draft_takes_its_lines_off(self):
+        inv_id, order = self._two_row_purchase()
+        self._stock_line(order)
+        self.assertTrue(self._detach(inv_id).json()["success"])
+        inv = Invoice.objects.get(pk=inv_id)
+        self.assertEqual((inv.status, inv.for_order), ("ordered", None))
+        self.assertEqual(list(order.items.values_list("product_variant__variant_sku", flat=True)),
+                         ["STK0001.1"])
+
+    def test_a_shipped_order_keeps_its_purchase(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        self.assertTrue(self._confirm(inv_id).json()["success"])
+        Order.objects.update(status="shipped")
+        r = self._detach(inv_id)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("is closed", r.json()["error"])
+        self.assertIsNotNone(Invoice.objects.get(pk=inv_id).for_order)
+
+    def test_the_order_page_offers_detach_and_says_what_it_does(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        order = Invoice.objects.get(pk=inv_id).for_order
+        page = self.client.get(reverse("operating:order_detail", args=[order.pk]))
+        self.assertContains(page, reverse("accounts:purchase_detach", args=[inv_id]))
+        self.assertNotContains(page, reverse("accounts:purchase_cancel", args=[inv_id]))
+        [p] = page.context["supplier_purchases"]
+        self.assertEqual(p.detach_warning,
+                         "Order %s: all its lines come from this purchase and are removed; "
+                         "the order stays open with nothing on it." % order.order_number)
+
+    def test_sales_reps_cannot_detach(self):
+        inv_id = self._save(self._plan()).json()["invoice_id"]
+        with patch("erp.roles.is_sales_rep", lambda user: True):
+            r = self._detach(inv_id)
+        self.assertEqual(r.status_code, 403)
+        self.assertIsNotNone(Invoice.objects.get(pk=inv_id).for_order)

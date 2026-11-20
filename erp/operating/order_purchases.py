@@ -105,21 +105,46 @@ def _figure(value):
     return str(d.quantize(Decimal(1)) if d == d.to_integral() else d.normalize())
 
 
+def rolls_brought_in(invoice_ids):
+    """{purchase pk: stock item pks} — what each purchase brought in: the
+    items its own lines created, and our own items that came back from
+    work done on it (accounting.processing). Those keep the purchase that
+    first bought them, so they are found through its processing lines."""
+    from accounting.models_processing import ProcessingLine
+    from .models import WarehouseProductItem
+
+    ids = list(invoice_ids)
+    out = {}
+    for item_id, inv_id in (WarehouseProductItem.objects
+                            .filter(purchase_invoice_item__invoice_id__in=ids)
+                            .values_list("pk", "purchase_invoice_item__invoice_id")):
+        out.setdefault(inv_id, set()).add(item_id)
+    for item_id, inv_id in (ProcessingLine.objects
+                            .filter(invoice_id__in=ids, outcome="came_back",
+                                    stock_item__isnull=False)
+                            .values_list("stock_item_id", "invoice_id")):
+        out.setdefault(inv_id, set()).add(item_id)
+    return out
+
+
 def reserved_from_warehouse(item, invoice):
     """(meters, barcodes) of the rolls already reserved for line `item`
-    that none of its order's other purchases brought — stock that was in
-    the warehouse and was set aside for the customer. When `invoice`'s row
+    that none of its order's purchases brought — stock that was in the
+    warehouse and was set aside for the customer. When `invoice`'s row
     for the line goes (deleted, or the purchase cancelled), the line keeps
     these: only what the purchase was to bring comes off."""
     from .models import OrderStockReservation
 
-    other_ids = set(item.order.supplier_purchases.exclude(status="cancelled")
-                    .exclude(pk=invoice.pk).values_list("pk", flat=True))
+    ids = set(item.order.supplier_purchases.exclude(status="cancelled")
+              .values_list("pk", flat=True)) | {invoice.pk}
+    # What the purchases brought in, our own items back from work done on
+    # them included. `invoice`'s own are not the warehouse's either: they
+    # go with it (a cancel deletes them, a detach lets them go).
+    brought = set().union(*rolls_brought_in(ids).values())
     meters, codes = Decimal("0"), []
     for r in (OrderStockReservation.objects.filter(order_item=item, consumed=False)
-              .select_related("stock_item__purchase_invoice_item").order_by("pk")):
-        bought = r.stock_item.purchase_invoice_item
-        if bought is not None and bought.invoice_id in other_ids:
+              .select_related("stock_item").order_by("pk")):
+        if r.stock_item_id in brought:
             continue
         meters += r.quantity or Decimal("0")
         codes.append(r.stock_item.barcode or "#%s" % r.stock_item_id)
@@ -347,12 +372,16 @@ def locked_line_error(item, invoices, *, removing=False):
     return _("%(sku)s comes from purchase %(numbers)s — change its quantity there.") % what
 
 
-def purchase_cancel_warning(invoice):
+def purchase_cancel_warning(invoice, *, detaching=False):
     """What cancelling `invoice` will do to the customer order it was
     bought for, said before the cancel is confirmed: which of its lines
     come off, which stay at what other purchases bring, which rolls go back
     on the shelf, and whether the order is cancelled too. Empty when there
-    is no open order to speak of."""
+    is no open order to speak of.
+
+    `detaching`: said before the purchase is detached from the order
+    instead (detach_purchase). The same lines come off, but an order left
+    with nothing on it stays open."""
     order = invoice.for_order
     if order is None or invoice.status == "cancelled" or not order_is_open(order):
         return ""
@@ -376,6 +405,10 @@ def purchase_cancel_warning(invoice):
     rolls_note = (" " + _("Lines with roll(s) %(codes)s already reserved for them stay, "
                           "with those rolls.") % {"codes": ", ".join(codes)}) if codes else ""
     if items and len(going) == len(items):
+        if detaching:
+            return (_("Order %(number)s: all its lines come from this purchase and are "
+                      "removed; the order stays open with nothing on it.")
+                    % {"number": number}) + rolls_note
         return (_("Order %(number)s: all its lines come from this purchase, so the order "
                   "is cancelled too.") % {"number": number}) + rolls_note
     warning = (_("Order %(number)s: its %(count)s line(s) from this purchase are removed; "
@@ -1166,11 +1199,15 @@ def cancel_purchases_for_cancelled_order(order, *, user=None, deleted=False):
     return cancelled
 
 
-def drop_purchase_lines_from_order(invoice, *, user=None):
+def drop_purchase_lines_from_order(invoice, *, user=None, detached=False):
     """The purchase was cancelled on its own page: take the lines it put
     on the customer's order off again, and cancel an order left empty.
     Returns the sentence the purchase page shows about the order, or None
-    when there is nothing to say."""
+    when there is nothing to say.
+
+    `detached`: the purchase was detached from the order instead
+    (detach_purchase). The same lines come off, but an order left empty
+    stays open, for whoever detached it to fill or cancel."""
     from .audit import log_change
     from .models import Order, OrderChange
     from .views import _as_line_decimal
@@ -1207,7 +1244,8 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
                 item.delete()
                 removed += 1
         log_change(order, "field", field="purchase",
-                   new=_("%(number)s cancelled — %(count)s line(s) removed")
+                   new=(_("%(number)s detached — %(count)s line(s) removed") if detached
+                        else _("%(number)s cancelled — %(count)s line(s) removed"))
                    % {"number": invoice.number, "count": removed})
         if order.items.exists():
             said = (_("Its %(count)s line(s) were removed from order %(number)s, which "
@@ -1220,6 +1258,10 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
                 said += " " + (_("Lines with roll(s) %(codes)s already reserved for them "
                                  "stay, with those rolls.") % {"codes": ", ".join(kept)})
             return said
+        if detached:
+            return (_("Its %(count)s line(s) were removed from order %(number)s, which has "
+                      "nothing left on it. It stays open: add goods to it or cancel it.")
+                    % {"count": removed, "number": number})
         # A half of a split order emptied while another half still has goods
         # on it: only this half is called off. The status funnel moves every
         # half together, so it would cancel the goods the customer still
@@ -1248,3 +1290,67 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         said = (_("Order %(number)s had nothing else on it and was cancelled too.")
                 % {"number": number})
     return said
+
+
+def detach_purchase(invoice, *, user=None):
+    """Take `invoice` off the customer order it was bought for. The
+    purchase stays as it is (a draft still on its way, or received stock
+    still owed to the supplier); only the order lets go of it. Its rolls
+    reserved for the order go back on the shelf, and the lines it fed come
+    off the order as a cancel takes them (drop_purchase_lines_from_order):
+    other purchases' share and warehouse rolls set aside for a line stay.
+    An order left with nothing on it stays open.
+
+    Refused (CustomerOrderError) when it isn't on an open order, or when
+    rolls it brought already went out with the order. Returns the sentence
+    to show about the order."""
+    from accounting.purchase_audit import log_purchase
+    from accounting.services_accounts import post_order_movement
+    from .audit import _item_label, log_change
+    from .models import OrderStockReservation
+
+    order = invoice.for_order
+    if order is None:
+        raise CustomerOrderError(_("This purchase is not on an order."))
+    number = order.order_number or order.pk
+    if invoice.status == "cancelled" or not order_is_open(order):
+        raise CustomerOrderError(
+            _("Order %(number)s is closed: its purchases stay on it.") % {"number": number})
+    rolls = rolls_brought_in([invoice.pk]).get(invoice.pk, set())
+    holds = OrderStockReservation.objects.filter(order=order, stock_item_id__in=rolls)
+    gone = list(holds.filter(consumed=True).select_related("stock_item"))
+    if gone:
+        raise CustomerOrderError(
+            _("Roll(s) %(codes)s from this purchase went out with order %(number)s, so it "
+              "can't be detached.")
+            % {"codes": ", ".join(r.stock_item.barcode or "#%s" % r.stock_item_id for r in gone),
+               "number": number})
+
+    freed = []
+    with transaction.atomic():
+        by_line = {}
+        for r in holds.select_related("stock_item", "order_item").order_by("pk"):
+            by_line.setdefault(r.order_item, []).append(
+                r.stock_item.barcode or "#%s" % r.stock_item_id)
+        for item, codes in by_line.items():
+            log_change(order.pk, "item_updated", field="rolls",
+                       item_label=_item_label(item) if item is not None else None,
+                       old=", ".join(codes), new=_("no longer reserved for the order"))
+            freed += codes
+        holds.delete()
+        said = drop_purchase_lines_from_order(invoice, user=user, detached=True)
+        invoice.for_order = None
+        invoice.save(update_fields=["for_order", "updated_at"])
+        log_purchase(invoice, "field", field="order", origin="order", user=user,
+                     old=_("Order %(number)s") % {"number": number},
+                     new=_("detached from the order"))
+        # Nothing of this purchase is on its way for the order any more,
+        # so a bill held back for it may be due now.
+        post_order_movement(order, member=getattr(user, "member", None))
+    out = [_("%(purchase)s is no longer on order %(number)s.")
+           % {"purchase": invoice.number, "number": number}]
+    if freed:
+        out.append(_("Roll(s) %(codes)s are back on the shelf.") % {"codes": ", ".join(freed)})
+    if said:
+        out.append(said)
+    return " ".join(out)

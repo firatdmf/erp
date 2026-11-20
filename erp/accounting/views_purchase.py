@@ -1415,6 +1415,31 @@ class PurchaseCancel(View):
 
 
 @method_decorator(login_required, name="dispatch")
+class PurchaseDetach(View):
+    """Take a purchase off the customer order it was bought for
+    (order_purchases.detach_purchase). The purchase and its stock stay; the
+    order lets go of its lines and rolls. For whoever sees the order's
+    purchases card: not sales reps, who are not shown purchases yet."""
+
+    def post(self, request, pk):
+        from erp.roles import is_sales_rep
+        from operating.order_purchases import CustomerOrderError, detach_purchase
+
+        if is_sales_rep(request.user):
+            return JsonResponse({"success": False, "error": _gettext("Not allowed.")}, status=403)
+        with transaction.atomic():
+            invoice = get_object_or_404(
+                Invoice.objects.select_for_update(of=("self",)).select_related("for_order"),
+                pk=pk, type="purchase")
+            try:
+                said = detach_purchase(invoice, user=request.user)
+            except CustomerOrderError as exc:
+                return JsonResponse({"success": False, "error": str(exc)}, status=400)
+        messages.success(request, said)
+        return JsonResponse({"success": True})
+
+
+@method_decorator(login_required, name="dispatch")
 class ProcessingRoll(View):
     """GET ?code=&purchase= — one of our rolls as the purchase form shows it
     before sending it to this account to be worked on (processing.lookup):

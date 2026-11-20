@@ -467,22 +467,14 @@ class LinkPurchaseToOrderTest(TestCase):
         page = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertTrue(any("K24644.G07" in str(m) for m in page.context["messages"]))
 
-    # ── Each purchase row: Edit and Cancel ──────────────────────────
-    def test_each_purchase_row_offers_edit_and_cancel(self):
+    # ── Each purchase row: Edit only ────────────────────────────────
+    # Cancelling a purchase deletes the stock it brought in, so it is done
+    # on the purchase's own page, not from a row on the order.
+    def test_each_purchase_row_offers_edit_but_not_cancel(self):
         first = Invoice.objects.get(pk=self.first_id)
         r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[first.pk]))
-        self.assertContains(r, reverse("accounts:purchase_cancel", args=[first.pk]))
-        self.assertContains(r, 'id="odPoCancelDlg"')
-        [p] = r.context["supplier_purchases"]
-        self.assertIn("cancelled too", p.cancel_warning)   # its only line goes
-
-    def test_cancel_is_only_offered_to_whoever_may_cancel(self):
-        first = Invoice.objects.get(pk=self.first_id)
-        with patch("operating.views_warehouse._is_admin", lambda user: False):
-            r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertNotContains(r, reverse("accounts:purchase_cancel", args=[first.pk]))
-        self.assertContains(r, reverse("accounts:goods_receipt_edit", args=[first.pk]))
 
     def test_the_edit_form_opens_framed(self):
         r = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.first_id]),

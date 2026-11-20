@@ -44,6 +44,7 @@ from . import (
     views_payment,
     views_fx,
     views_purchase,
+    views_purchase_documents,
     views_report,
 )
 from . import views_accounts as views
@@ -152,6 +153,10 @@ urlpatterns = [
     owned("accounts/purchases/<int:pk>/order/", views_purchase.PurchaseOrderSave.as_view(), "purchase_order_update", Invoice),
     owned("accounts/purchases/<int:pk>/confirm/", views_purchase.PurchaseOrderConfirm.as_view(), "purchase_order_confirm", Invoice),
     owned("accounts/purchases/<int:pk>/print/", views_purchase.PurchaseOrderPrint.as_view(), "purchase_order_print", Invoice),
+    # Its documents (views_purchase_documents): walled with the purchase.
+    owned("accounts/purchases/<int:pk>/documents/", views_purchase_documents.purchase_documents, "purchase_documents", Invoice),
+    owned("accounts/purchases/<int:pk>/documents/<int:doc_pk>/", views_purchase_documents.purchase_document_file, "purchase_document_file", Invoice),
+    owned("accounts/purchases/<int:pk>/documents/<int:doc_pk>/delete/", views_purchase_documents.purchase_document_delete, "purchase_document_delete", Invoice),
     owned("accounts/purchases/<int:pk>/items/<int:item_pk>/labels/", label_printers_only(views_purchase.PurchaseItemLabels.as_view()), "purchase_item_labels", Invoice),
     owned("accounts/purchases/<int:pk>/", views_purchase.PurchaseOrderDetail.as_view(), "purchase_order_detail", Invoice),
     owned("accounts/purchases/<int:pk>/invoice/", views_invoice.PurchaseInvoice.as_view(), "purchase_invoice", Invoice),

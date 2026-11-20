@@ -901,6 +901,22 @@ site's menus and the page's own way back are left out.{% endcomment %}
       </button>
     </section>
 
+    {% comment %}A saved purchase's files go up as they are picked; a new one's
+       wait and go up with its first save (pdDocs.uploadTo, in the saves below).{% endcomment %}
+    <section class="gr-sec">
+      <div class="gr-sec-h">
+        <span class="gr-sec-n"><i class="fa fa-paperclip"></i></span>
+        <span class="gr-sec-t">{% trans "Documents" %}</span>
+      </div>
+      {% if order_invoice %}
+        {% include "accounts/partials/_purchase_documents.html" with invoice=order_invoice %}
+      {% elif edit_invoice %}
+        {% include "accounts/partials/_purchase_documents.html" with invoice=edit_invoice %}
+      {% else %}
+        {% include "accounts/partials/_purchase_documents.html" with invoice=None %}
+      {% endif %}
+    </section>
+
   </div>
 
   {% comment %}
@@ -4051,8 +4067,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
       body: JSON.stringify(payload),
     }).then(npReadJson)
       .then(function (d) {
-        if (d && d.success) { npGoAfterSave(d.detail_url, d.notices); }
-        else { alert((d && d.error) || '{% trans "Could not save." %}'); npUnbusy(btn); }
+        if (d && d.success) {
+          return pdDocs.uploadTo(d.invoice_id).then(function () { npGoAfterSave(d.detail_url, d.notices); });
+        }
+        alert((d && d.error) || '{% trans "Could not save." %}'); npUnbusy(btn);
       });
     }).catch(function (err) { npFailed(err); npUnbusy(btn); });
   };
@@ -4083,9 +4101,11 @@ site's menus and the page's own way back are left out.{% endcomment %}
           npUnbusy(btn);
           return;
         }
-        return fetch(GR_CONFIRM_TPL.replace('/0/', '/' + d.invoice_id + '/'), {
-          method: 'POST',
-          headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+        return pdDocs.uploadTo(d.invoice_id).then(function () {
+          return fetch(GR_CONFIRM_TPL.replace('/0/', '/' + d.invoice_id + '/'), {
+            method: 'POST',
+            headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+          });
         }).then(npReadJson)
           .then(function (c) {
             if (c && c.success) {
@@ -4140,7 +4160,10 @@ site's menus and the page's own way back are left out.{% endcomment %}
           const goTo = (d.purchase && d.purchase.invoice_id)
             ? NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + d.purchase.invoice_id + '/')
             : NP_LIST_URL;
-          setTimeout(function () { window.location.href = goTo; }, 1200);
+          window.npDirty = false;
+          pdDocs.uploadTo(d.purchase && d.purchase.invoice_id).then(function () {
+            setTimeout(function () { window.location.href = goTo; }, 1200);
+          });
         } else {
           alert((d && d.error) || '{% trans "Could not save." %}');
           btn.disabled = false; btn.innerHTML = orig;

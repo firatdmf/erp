@@ -20,7 +20,7 @@
          href="{% if inv.type == 'purchase' %}{% url 'accounts:purchase_order_detail' inv.pk %}{% else %}{% url 'accounts:invoice_detail' inv.pk %}{% endif %}">
         <div class="od-order-id">
           <div class="od-order-num">{{ inv.display_number }}</div>
-          <div class="od-order-date">{{ inv.date|date:"M d, Y" }} · {{ inv.book.name }}{% if inv.away_rolls %} · {% blocktrans count n=inv.away_rolls %}{{ n }} item away{% plural %}{{ n }} items away{% endblocktrans %}{% if inv.away_quantity is not None %} · {{ inv.away_quantity|floatformat:"-2" }} {{ inv.away_unit|unit_loc }}{% endif %}{% endif %}</div>
+          <div class="od-order-date">{{ inv.date|date:"M d, Y" }} · {{ inv.book.name }}{% if inv.away_rolls %} · {% blocktrans count n=inv.away_rolls %}{{ n }} item away{% plural %}{{ n }} items away{% endblocktrans %}{% if inv.away_quantity is not None %} · {{ inv.away_quantity|floatformat:"-2" }} {{ inv.away_unit|unit_loc }}{% endif %}{% endif %}{% if inv.n_documents %} · <span title="{% blocktrans count n=inv.n_documents %}{{ n }} document{% plural %}{{ n }} documents{% endblocktrans %}"><i class="fa fa-paperclip"></i> {{ inv.n_documents }}</span>{% endif %}</div>
         </div>
         <span class="ord-status {{ inv.pill }}">
           <span class="ord-status-dot"></span>

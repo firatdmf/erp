@@ -5,6 +5,8 @@ the kind of record it is (CR14 retired the Supplier record, 2026-11-17):
 whoever has purchases on one of their accounts shows them, beside the
 orders they placed with us.
 """
+from django.db.models import Count
+
 from .models import of_books_in_reach
 
 
@@ -21,6 +23,9 @@ def purchase_history(**account_filter):
             type__in=("purchase", "purchase_return"), **filters,
         ).exclude(status="cancelled"))
         .select_related("book", "currency")
+        # How many documents each has: the files themselves stay on the
+        # purchase, so this page says only where they are.
+        .annotate(n_documents=Count("attachments"))
         .order_by("-date", "-id")[:25]
     )
     # Blue while it is on its way, green once received.

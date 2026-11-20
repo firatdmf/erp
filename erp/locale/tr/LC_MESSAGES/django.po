@@ -16871,3 +16871,34 @@ msgstr "Bugün gönderildi"
 msgctxt "warehouse sheet"
 msgid "Away for work (m)"
 msgstr "Fasonda (m)"
+
+#: a purchase's documents (accounting.views_purchase_documents)
+msgid "Add files"
+msgstr "Dosya ekle"
+
+msgid "The supplier's invoice, delivery notes, photos of the goods. Or drop files here."
+msgstr "Tedarikçinin faturası, irsaliyeler, malların fotoğrafları. Ya da dosyaları buraya bırakın."
+
+msgid "The supplier's invoice, delivery notes, photos of the goods. They are uploaded when the purchase is saved."
+msgstr "Tedarikçinin faturası, irsaliyeler, malların fotoğrafları. Alım kaydedilince yüklenir."
+
+msgid "The upload failed. Please try again."
+msgstr "Yükleme başarısız oldu. Lütfen tekrar deneyin."
+
+msgid "The purchase was saved, but its documents were not uploaded. Add them on the purchase page."
+msgstr "Alım kaydedildi, ancak belgeleri yüklenemedi. Onları alım sayfasından ekleyin."
+
+msgid "Delete {name}?"
+msgstr "{name} silinsin mi?"
+
+msgid "uploaded when saved"
+msgstr "kaydedilince yüklenecek"
+
+msgid "No documents yet."
+msgstr "Henüz belge yok."
+
+#, python-format
+msgid "%(n)s document"
+msgid_plural "%(n)s documents"
+msgstr[0] "%(n)s belge"
+msgstr[1] "%(n)s belge"

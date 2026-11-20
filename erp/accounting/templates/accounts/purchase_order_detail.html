@@ -59,6 +59,9 @@
   .po-card-sub .dot { color: #CBD5E1; margin: 0 4px; }
 
   .po-items-h { font: 700 15px var(--font-sans); margin: 0 0 10px; }
+  /* Looks like a product card, but is not one: tests and readers count
+     .po-item as the purchase's lines. */
+  .po-docs-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
   .po-item { background: white; border:1px solid #E2E8EE; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
   .po-item-h { display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .po-item-name { font: 700 14.5px var(--font-sans); color: var(--ink); }
@@ -210,6 +213,14 @@
     {% trans "This purchase's stock links are missing, so it can only be cancelled from here — not edited." %}
   </div>
   {% endif %}
+
+  {% comment %}The supplier's invoice, delivery notes, photos — on any purchase,
+     cancelled ones included: the papers of a cancelled purchase are still
+     its papers.{% endcomment %}
+  <h2 class="po-items-h">{% trans "Documents" %}</h2>
+  <div class="po-docs-card">
+    {% include "accounts/partials/_purchase_documents.html" with invoice=invoice %}
+  </div>
 
   {% if goods_out %}
   {% comment %}Our own rolls this purchase sends out to be worked on

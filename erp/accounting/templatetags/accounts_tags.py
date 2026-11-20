@@ -155,3 +155,13 @@ def money(value, decimals=2):
     # replaces, rounds it. Quantise first so the digits do not change.
     amount = amount.quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
     return number_format(amount, decimal_pos=decimals, force_grouping=True)
+
+
+@register.simple_tag
+def purchase_documents_of(invoice):
+    """A purchase's documents, newest first (accounting.views_purchase_documents).
+
+    Not invoice.attachments: that goes through the CRM's walled manager,
+    which keeps only contacts' and companies' files."""
+    from accounting.views_purchase_documents import documents_of
+    return documents_of(invoice) if invoice else []

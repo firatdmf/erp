@@ -1,0 +1,24 @@
+{% load i18n %}
+{% comment %}A purchase's documents, one row each (accounting.views_purchase_documents).
+The box around it (_purchase_documents.html) swaps this list in after an
+upload or a delete.{% endcomment %}
+{% for d in documents %}
+<div class="pd-doc">
+  <span class="pd-doc-ico">
+    {% if d.is_image %}<i class="fa fa-file-image"></i>
+    {% elif d.extension == 'PDF' %}<i class="fa fa-file-pdf"></i>
+    {% elif d.extension in 'XLSX,XLS,CSV' %}<i class="fa fa-file-excel"></i>
+    {% elif d.extension in 'DOC,DOCX' %}<i class="fa fa-file-word"></i>
+    {% else %}<i class="fa fa-file"></i>{% endif %}
+  </span>
+  <span class="pd-doc-body">
+    <a class="pd-doc-name" href="{% url 'accounts:purchase_document_file' invoice.pk d.pk %}" target="_blank" rel="noopener">{{ d.name }}</a>
+    <span class="pd-doc-meta">{{ d.pretty_size }} · {{ d.uploaded_at|date:"d.m.Y" }}{% if d.uploaded_by %} · {{ d.uploaded_by.get_full_name|default:d.uploaded_by.username }}{% endif %}</span>
+  </span>
+  <button type="button" class="pd-doc-del" title="{% trans 'Delete' %}" aria-label="{% trans 'Delete' %} {{ d.name }}"
+          data-url="{% url 'accounts:purchase_document_delete' invoice.pk d.pk %}" data-name="{{ d.name }}"
+          onclick="pdDocs.remove(this)"><i class="fa fa-trash"></i></button>
+</div>
+{% empty %}
+<div class="pd-empty">{% trans "No documents yet." %}</div>
+{% endfor %}

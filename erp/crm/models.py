@@ -764,7 +764,14 @@ def validate_attachment_size(file):
 
 
 class Attachment(models.Model):
-    """A file hung off a CRM record — a contact or a company.
+    """A file hung off a record — a contact, a company, or a purchase
+    (the supplier's invoice, a delivery note, photos of the goods).
+
+    A purchase's files are reached through the purchase's own pages
+    (accounting.views_purchase_documents), which its book walls: they
+    are purchasing papers, open to whoever may open the purchase, and
+    not part of the CRM. The CRM routes find only contacts' and
+    companies' files (OwnedRecordManager).
 
     The bytes live in the Bunny Storage Zone and the row keeps only the
     storage `path` — never a CDN URL. Readers go through the
@@ -787,6 +794,10 @@ class Attachment(models.Model):
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True,
+        related_name="attachments",
+    )
+    invoice = models.ForeignKey(
+        "accounting.Invoice", on_delete=models.CASCADE, blank=True, null=True,
         related_name="attachments",
     )
     name = models.CharField(max_length=255)

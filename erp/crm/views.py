@@ -1804,6 +1804,19 @@ def upload_attachments(request, kind, pk):
     if request.method != "POST":
         return _render_attachment_list(request, kind, owner)
 
+    skipped = save_uploads(request, kind, owner)
+    return _render_attachment_list(request, kind, owner, errors=skipped)
+
+
+def save_uploads(request, kind, owner, folder=None):
+    """Store each file in `request.FILES` as an Attachment on `owner`,
+    whose field on Attachment is `kind` ("contact", "company",
+    "invoice"); returns a complaint per file that was not kept.
+
+    The ones that made it are kept whatever happened to the others,
+    because their bytes are already safe. `folder` names the storage
+    folder under the zone's attachments folder, `kind` by default.
+    """
     uploads = request.FILES.getlist("files") or request.FILES.getlist("file")
     skipped = []
     for upload in uploads:
@@ -1824,7 +1837,7 @@ def upload_attachments(request, kind, pk):
                 upload = SimpleUploadedFile(
                     jpeg.name, jpeg.getvalue(), jpeg.content_type)
         try:
-            path, local = _store_attachment(upload, kind, owner)
+            path, local = _store_attachment(upload, folder or kind, owner)
         except AttachmentStorageError as exc:
             skipped.append(f"{upload.name}: {exc}")
             continue
@@ -1838,7 +1851,7 @@ def upload_attachments(request, kind, pk):
                 upload.name, getattr(upload, "content_type", "")),
             uploaded_by=request.user if request.user.is_authenticated else None,
         )
-    return _render_attachment_list(request, kind, owner, errors=skipped)
+    return skipped
 
 
 @login_required
@@ -1850,9 +1863,13 @@ def download_attachment(request, pk):
     address never appears in a page. Anyone without a session gets the
     login screen instead of the document.
     """
+    return attachment_response(get_object_or_404(Attachment, pk=pk))
+
+
+def attachment_response(attachment):
+    """The file behind `attachment`, for a reader already let in."""
     from django.http import FileResponse, StreamingHttpResponse
 
-    attachment = get_object_or_404(Attachment, pk=pk)
     # A short allowlist, not "any image": an SVG is a document that can
     # carry script, and rendering one here would run it on our own origin
     # as the signed-in user. Everything outside this list downloads.

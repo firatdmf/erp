@@ -514,6 +514,15 @@ class GoodsOutTest(TestCase):
         self.assertContains(group, "Away for work: 50")
         listing = self.client.get(reverse("operating:warehouse_list"), follow=True)
         self.assertContains(listing, reverse("operating:warehouse_away"))
+        # The Excel export says it too, row and total.
+        from operating.warehouse_excel import build_warehouse_workbook
+        ws = build_warehouse_workbook(self.wh).active
+        rows = [[c.value for c in row] for row in ws.iter_rows()]
+        head = next(row for row in rows if row[0] == "SKU")
+        col = head.index("Away for work (m)")
+        mine = next(row for row in rows if row[0] == roll.product.sku)
+        self.assertEqual(mine[col], 50.0)
+        self.assertEqual(rows[-1][col], 50.0)
 
     def test_everything_away_is_listed_by_supplier(self, _up):
         pk = self._save(["KZL-A", "KZL-B"]).json()["invoice_id"]

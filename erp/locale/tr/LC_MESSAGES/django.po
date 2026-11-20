@@ -16866,3 +16866,8 @@ msgstr "Fasonda hiçbir şey yok."
 
 msgid "Sent today"
 msgstr "Bugün gönderildi"
+
+#: operating/warehouse_excel.py
+msgctxt "warehouse sheet"
+msgid "Away for work (m)"
+msgstr "Fasonda (m)"

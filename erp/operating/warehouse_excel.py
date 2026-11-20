@@ -1,7 +1,10 @@
 """Excel (.xlsx) export of a Warehouse's product list — a plain data table
 (SKU / Name / Model / Barcode / [Location] / Stock / Stock items / Reserved /
-Unit cost / Total value), honoring the same search + sort as the on-screen
-list.
+Away for work / Unit cost / Total value), honoring the same search + sort as
+the on-screen list.
+
+Stock still counts what is away at a supplier being worked on; the Away
+column says how much of it is not on the shelf, as the page does.
 
 A combined (ortak) warehouse exports its members' stock, so it grows a
 Location column naming the member each row stands on — the same column the
@@ -27,10 +30,11 @@ from erp.xlsx_utils import (
 )
 
 from .models import Warehouse, WarehouseProduct
-from .views_warehouse import (_to_base_rate, reserved_meters_subquery,
+from .views_warehouse import (_to_base_rate, away_quantity_subquery,
+                              reserved_meters_subquery,
                               warehouse_search_mode, warehouse_search_q)
 
-NCOLS = 9  # A..I — plus a Location column on a combined (ortak) warehouse
+NCOLS = 10  # A..J — plus a Location column on a combined (ortak) warehouse
 
 
 def _dec(v):
@@ -91,7 +95,8 @@ def _filtered_products(warehouse, search, sort, search_by="text",
                                       filter=~Q(stock_items__status='consumed')),
                       line_usd=ExpressionWrapper(F('stock_value'),
                                                  output_field=_money),
-                      reserved=reserved_meters_subquery())
+                      reserved=reserved_meters_subquery(),
+                      away=away_quantity_subquery())
 
     _sort_map = {
         "name_asc": "name", "name_desc": "-name",
@@ -140,7 +145,7 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
     ws = wb.active
     ws.title = pgettext("warehouse sheet", "Warehouse")
     ws.sheet_view.showGridLines = False
-    widths = [16, 34, 16, 18, 12, 8, 12, 14, 14]
+    widths = [16, 34, 16, 18, 12, 8, 12, 12, 14, 14]
     if not show_total:
         widths.pop()
     if show_location:
@@ -177,7 +182,7 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
     X = "warehouse sheet"
     heads = ["SKU", pgettext(X, "Product name"), pgettext(X, "Model"), pgettext(X, "Barcode"),
              pgettext(X, "Stock (m)"), pgettext(X, "Rolls"), pgettext(X, "Reserved (m)"),
-             pgettext(X, "Unit cost"), pgettext(X, "Total (USD)")]
+             pgettext(X, "Away for work (m)"), pgettext(X, "Unit cost"), pgettext(X, "Total (USD)")]
     if not show_total:
         heads[-2:] = [pgettext(X, "Unit price")]
     if show_location:
@@ -190,7 +195,7 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
              align=(RIGHT if i >= first_num else LEFT))
     r += 1
 
-    total_qty = total_usd = 0.0
+    total_qty = total_usd = total_away = 0.0
     for p in products:
         # The WEIGHTED AVERAGE cost of the stock on the floor — the same
         # number the screen shows, and the one the total is built from. This
@@ -220,6 +225,8 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
         cell(ws, r, c, _dec(p.quantity), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
         cell(ws, r, c, p.roll_count or 0, font=F_VAL, border=GRID, align=RIGHT); c += 1
         cell(ws, r, c, _dec(p.reserved), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
+        cell(ws, r, c, _dec(p.away), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
+        total_away += _dec(p.away)
         cell(ws, r, c, unit_cost or "—", font=F_VAL, border=GRID, align=RIGHT); c += 1
         if show_total:
             cell(ws, r, c, _dec(p.line_usd), font=F_VAL, border=GRID, align=RIGHT, fmt='#,##0.00" USD"')
@@ -232,6 +239,8 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
         cell(ws, r, c, "", font=F_VALB, border=GRID, fill=FILL_LBL)
     cell(ws, r, first_num - 1, pgettext(X, "TOTAL"), font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT)
     cell(ws, r, first_num, total_qty, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt="#,##0.00")
+    # Stock, Rolls, Reserved, then Away.
+    cell(ws, r, first_num + 3, total_away, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt="#,##0.00")
     if show_total:
         cell(ws, r, ncols, total_usd, font=F_VALB, border=GRID, fill=FILL_LBL, align=RIGHT, fmt='#,##0.00" USD"')
 

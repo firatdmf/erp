@@ -22,11 +22,21 @@ the same reason. Any row in a currency other than its book's asks for
 the day's rate, and two dozen accounting tests got theirs from whichever
 public API answered — so they passed wherever one did and failed, for
 nothing they assert, wherever none did. They get a fixed table instead.
+
+And every test starts in the site's language. A test that asks for a page
+in Turkish leaves Turkish switched on behind it: LocaleMiddleware turns a
+language on for the request and nothing turns it off. Each test after it
+in the same worker that builds a form or a message outside a request then
+reads Turkish, and one that checks an English sentence fails, but only
+when the parallel run happens to put it there.
 """
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.conf import settings
+from django.test import SimpleTestCase
 from django.test.runner import DiscoverRunner, ParallelTestSuite
+from django.utils import translation
 
 # What one unit is worth in dollars. Roughly true, so a test that only
 # says "300 lira is well under 50 dollars" still means something; a test
@@ -50,9 +60,21 @@ def _fixed_rate(from_currency, to_currency, on_date=None):
     return (_IN_DOLLARS[fc] / _IN_DOLLARS[tc]).quantize(Decimal("0.000001"))
 
 
+_pre_setup = SimpleTestCase._pre_setup
+
+
+def _pre_setup_in_site_language(self):
+    """SimpleTestCase._pre_setup, after switching to the site's language
+    (see the module docstring)."""
+    translation.activate(settings.LANGUAGE_CODE)
+    return _pre_setup(self)
+
+
 def _offline_patches():
-    """The stubs, started: the CDN, WhatsApp and the rate services."""
+    """The stubs, started: the CDN, WhatsApp and the rate services — and
+    every test starting in the site's language."""
     patches = [
+        patch.object(SimpleTestCase, "_pre_setup", _pre_setup_in_site_language),
         patch("marketing.utils.bunny_storage.upload_to_bunny",
               return_value="https://mock-cdn.invalid/test.png"),
         # WhatsApp too: nothing in the suite may reach Meta, whatever a

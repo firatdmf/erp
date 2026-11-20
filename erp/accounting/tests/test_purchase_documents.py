@@ -63,7 +63,7 @@ class PurchaseDocumentsTest(TestCase):
         self.assertIsNone(doc.contact_id)
         self.assertIsNone(doc.company_id)
         self.assertEqual(doc.uploaded_by, self.user)
-        self.assertTrue(doc.path.startswith(f"Marketing/crm/purchase/{self.purchase.pk}/"), doc.path)
+        self.assertTrue(doc.path.startswith(f"Accounting/purchases/{self.purchase.pk}/"), doc.path)
 
     def test_a_program_is_refused_by_name_and_the_rest_kept(self, upload, _delete):
         r = self._upload(self._pdf(), SimpleUploadedFile("setup.exe", b"MZ", "application/octet-stream"))
@@ -112,7 +112,7 @@ class PurchaseDocumentsTest(TestCase):
                 default_currency=self.purchase.currency),
             currency=self.purchase.currency, type="purchase", number="PUR-L-1",
             date=date(2026, 11, 20), due_date=date(2026, 12, 20))
-        doc = Attachment.everywhere.create(invoice=theirs, name="theirs.pdf", path="Marketing/crm/purchase/x.pdf",
+        doc = Attachment.everywhere.create(invoice=theirs, name="theirs.pdf", path="Accounting/purchases/x.pdf",
                                            content_type="application/pdf")
         self.assertEqual(self._upload(self._pdf(), purchase=theirs).status_code, 404)
         self.assertEqual(self.client.get(self._url("purchase_document_file", doc.pk, purchase=theirs)).status_code, 404)

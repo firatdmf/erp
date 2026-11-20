@@ -1746,8 +1746,9 @@ class AttachmentStorageError(Exception):
     """The file could not be put somewhere it will survive."""
 
 
-def _store_attachment(upload, kind, owner):
-    """Put an uploaded file where it will survive, and say where.
+def _store_attachment(upload, folder, owner):
+    """Put an uploaded file where it will survive, and say where: under
+    `folder`/<owner's id>/ in the storage zone.
 
     Returns `(storage_path, local_file)`, exactly one of which is set.
 
@@ -1778,8 +1779,7 @@ def _store_attachment(upload, kind, owner):
     # A random prefix, so two uploads of "contract.pdf" onto the same
     # record do not overwrite one another.
     safe = _re.sub(r"[^A-Za-z0-9._-]", "-", upload.name)[-80:].strip("-._")
-    path = (f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}/{owner.pk}/"
-            f"{get_random_string(8)}_{safe}")
+    path = f"{folder}/{owner.pk}/{get_random_string(8)}_{safe}"
     try:
         upload_to_bunny(
             upload, path, content_type=getattr(upload, "content_type", None))
@@ -1814,8 +1814,9 @@ def save_uploads(request, kind, owner, folder=None):
     "invoice"); returns a complaint per file that was not kept.
 
     The ones that made it are kept whatever happened to the others,
-    because their bytes are already safe. `folder` names the storage
-    folder under the zone's attachments folder, `kind` by default.
+    because their bytes are already safe. `folder` is where in the storage
+    zone they go, each owner in a folder of its own under it; a CRM
+    record's by default (Marketing/crm/contact/, Marketing/crm/company/).
     """
     uploads = request.FILES.getlist("files") or request.FILES.getlist("file")
     skipped = []
@@ -1837,7 +1838,8 @@ def save_uploads(request, kind, owner, folder=None):
                 upload = SimpleUploadedFile(
                     jpeg.name, jpeg.getvalue(), jpeg.content_type)
         try:
-            path, local = _store_attachment(upload, folder or kind, owner)
+            path, local = _store_attachment(
+                upload, folder or f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}", owner)
         except AttachmentStorageError as exc:
             skipped.append(f"{upload.name}: {exc}")
             continue

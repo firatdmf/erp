@@ -19,8 +19,9 @@ from crm.views import attachment_response, save_uploads
 
 from .models import Invoice
 
-# Their folder in the storage zone, beside the CRM's contact/ and company/.
-FOLDER = "purchase"
+# Their folder in the storage zone: accounting's, as a cargo receipt sits
+# under Operating/orders/. One folder per purchase under it.
+FOLDER = "Accounting/purchases"
 
 
 def _purchase(pk):

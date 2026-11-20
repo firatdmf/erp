@@ -1314,15 +1314,14 @@ def get_user_orders(request, user_id):
         orders_list = []
         for order in orders:
             items_count = order.items.count()
-            order_status_display = (
-                dict(order._meta.get_field('order_status').choices).get(order.order_status)
-                if order.order_status else None
+            status_display = (
+                dict(order._meta.get_field('status').choices).get(order.status)
+                if order.status else None
             )
             orders_list.append({
                 'id': order.id,
-                'status': order.order_status,
-                'order_status': order.order_status,
-                'order_status_display': order_status_display,
+                'status': order.status,
+                'status_display': status_display,
                 'order_number': order.order_number,
                 'payment_status': order.payment_status,
                 'original_currency': order.original_currency,
@@ -1415,16 +1414,15 @@ def get_order_detail(request, user_id, order_id):
         except:
             total_value = str(order.original_price) if order.original_price else '0'
         
-        order_status_display = (
-            dict(order._meta.get_field('order_status').choices).get(order.order_status)
-            if order.order_status else None
+        status_display = (
+            dict(order._meta.get_field('status').choices).get(order.status)
+            if order.status else None
         )
         order_data = {
             'id': order.id,
             'order_number': order.order_number,
-            'status': order.order_status,
-            'order_status': order.order_status,
-            'order_status_display': order_status_display,
+            'status': order.status,
+            'status_display': status_display,
             'payment_status': order.payment_status,
             'payment_method': order.payment_method,
             'original_currency': order.original_currency,

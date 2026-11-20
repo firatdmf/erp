@@ -92,7 +92,7 @@ def open_halves(order):
     if not order.split_group:
         return [order]
     return list(Order.objects.filter(split_group=order.split_group)
-                .exclude(order_status="cancelled")
+                .exclude(status="cancelled")
                 .select_related("current_account__book", "currency")
                 .order_by("pk"))
 

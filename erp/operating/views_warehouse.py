@@ -4920,7 +4920,7 @@ def _variant_uses(variant, item=None, *, invoice=None):
             continue
         uses.append(_gettext("order %(number)s (%(status)s)")
                     % {"number": order.order_number or order.pk,
-                       "status": order.get_order_status_display()})
+                       "status": order.get_status_display()})
     # A draft purchase names its variants by SKU in its plan.
     drafts = (Invoice.objects.filter(type="purchase", status="ordered")
               .annotate(plan_text=Cast("intake_plan", TextField()))
@@ -7119,7 +7119,7 @@ def reservation_shortfall_message(order):
 
 def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                              user=None, require_cargo_for_ship=True):
-    """THE single funnel for changing an order's order_status. Every
+    """THE single funnel for changing an order's status. Every
     write path (order detail page, JSON API, web-order edit) must go
     through here so the lifecycle rules can't diverge:
 
@@ -7188,7 +7188,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     from .cancel_approval import needs_approval, pending_request
     if pending_request(order) is not None:
         return False, "cancel_pending"
-    if (user is not None and new_status == "cancelled" and order.order_status != "cancelled"
+    if (user is not None and new_status == "cancelled" and order.status != "cancelled"
             and needs_approval(user, order)):
         return False, "needs_cancel_approval"
     if not order.split_group:
@@ -7202,7 +7202,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
     halves = [order] + list(
         Order.objects.filter(split_group=order.split_group)
-        .exclude(pk=order.pk).exclude(order_status="cancelled")
+        .exclude(pk=order.pk).exclude(status="cancelled")
         .select_related("current_account__book").order_by("pk"))
     # One status for the whole order: every half is brought to where this
     # one stands once the change is made — so even a save that leaves this
@@ -7210,14 +7210,14 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     # elsewhere. Not from a cancelled half, though: it is the one left
     # behind, and saving on it must not cancel the rest.
     moving = _is_status_change(order, new_status)
-    was = order.order_status
+    was = order.status
     target = new_status if moving else (None if was == "cancelled" else was)
 
     def touches_the_books(half):
         if not _is_status_change(half, target):
             return False
         return (target == "cancelled"
-                or (target in SHIPPED_CLASS) != (half.order_status in SHIPPED_CLASS))
+                or (target in SHIPPED_CLASS) != (half.status in SHIPPED_CLASS))
 
     # `user` is None for the system's own changes, which answer to no book.
     if user is not None and any(touches_the_books(h) for h in halves):
@@ -7273,7 +7273,7 @@ def cancel_order(order, user):
     only that the order was cancelled.
 
     Returns (ok, code) as apply_order_status_change does."""
-    if order.order_status not in SHIPPED_CLASS:
+    if order.status not in SHIPPED_CLASS:
         return apply_order_status_change(order, "cancelled", user=user)
 
     from django.db import transaction as _tx
@@ -7302,7 +7302,7 @@ def cancel_order(order, user):
 def _is_status_change(order, new_status):
     from .models import ORDER_STATUS_CHOICES
     return (bool(new_status) and new_status in {k for k, _ in ORDER_STATUS_CHOICES}
-            and new_status != order.order_status)
+            and new_status != order.status)
 
 
 def _status_change_refusal(order, new_status):
@@ -7311,7 +7311,7 @@ def _status_change_refusal(order, new_status):
     before any of them is written."""
     if not _is_status_change(order, new_status):
         return None
-    old_status = order.order_status
+    old_status = order.status
     if old_status == "cancelled":
         return "order_cancelled_terminal"
     if new_status == "cancelled" and old_status in SHIPPED_CLASS:
@@ -7338,7 +7338,7 @@ def _apply_status_to_one(order, new_status, carrier=None, tracking=None,
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
 
     valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
-    old_status = order.order_status
+    old_status = order.status
 
     changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
     refusal = _status_change_refusal(order, new_status)
@@ -7379,12 +7379,12 @@ def _apply_status_to_one(order, new_status, carrier=None, tracking=None,
     try:
         with _tx.atomic():
             if changing:
-                order.order_status = new_status
+                order.status = new_status
                 if new_status == "shipped" and not order.shipped_at:
                     order.shipped_at = _tz.now()
                 if new_status == "delivered" and not order.delivered_at:
                     order.delivered_at = _tz.now()
-            order.save(update_fields=["order_status", "carrier", "tracking_number",
+            order.save(update_fields=["status", "carrier", "tracking_number",
                                       "shipped_at", "delivered_at", "updated_at"])
             if entering_ship:
                 consume_reservations_for_order(order, user=user)

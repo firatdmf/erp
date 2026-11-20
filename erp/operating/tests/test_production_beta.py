@@ -33,7 +33,7 @@ class ProductionBeta(TestCase):
             get_user_model().objects.create_superuser("boss", "b@t.com", "pw"))
 
     def _order(self, book, number, status):
-        return Order.objects.create(order_number=number, order_status=status,
+        return Order.objects.create(order_number=number, status=status,
                                     current_account=self.accounts[book.pk])
 
     def test_the_list_holds_the_books_open_orders(self):

@@ -7,7 +7,7 @@ from operating.models import Order, OrderItem
 
 
 class OneOrderStatusTest(TestCase):
-    """An order has one status, order_status. Its lines' production
+    """An order has one status, status. Its lines' production
     statuses no longer roll up into a second one, so a line edit leaves
     the order alone, and nothing reads the retired field."""
 
@@ -26,7 +26,7 @@ class OneOrderStatusTest(TestCase):
         after = Order.objects.get(pk=self.order.pk)
         self.assertEqual(after.status, before.status)
         self.assertEqual(after.updated_at, before.updated_at)
-        self.assertEqual(after.order_status, "pending")
+        self.assertEqual(after.status, "pending")
 
     def test_the_rollup_is_gone(self):
         self.assertFalse(hasattr(Order, "update_status_from_items"))

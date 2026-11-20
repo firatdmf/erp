@@ -223,7 +223,7 @@ def halves_in_step(order):
     among them — the ones a notice to the customer speaks for. A half
     cancelled on its own earlier is no part of an order that has shipped."""
     return [h for h in split_halves(order)
-            if h.pk == order.pk or h.order_status == order.order_status]
+            if h.pk == order.pk or h.status == order.status]
 
 
 def half_number(order):
@@ -313,7 +313,7 @@ def order_rows(orders):
             o.row_numbers = [half_number(h) for h in halves]
             # Not a half cancelled on its own: it is no part of what the
             # order comes to. A half merely a stage ahead of the other is.
-            standing = [h for h in halves if h.order_status != "cancelled"]
+            standing = [h for h in halves if h.status != "cancelled"]
             o.row_totals = combined_totals(standing or halves)
         else:
             o.row_numbers = [half_number(o)]

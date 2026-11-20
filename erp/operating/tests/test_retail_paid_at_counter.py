@@ -99,7 +99,7 @@ class PaidAtTheCounter(TestCase):
         # Retail Sales account square — the payment never runs ahead.
         self.post(self.tenge)
         order = Order.objects.get()
-        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.status, "shipped")
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.quantity_remaining, Decimal("3"))
         counter = order.current_account
@@ -109,7 +109,7 @@ class PaidAtTheCounter(TestCase):
     def test_a_customer_s_order_is_not_completed_for_them(self):
         dana = Contact.objects.create(name="Dana Akhmet")
         self.post(self.tenge, customer_type="contact", customer_pk=dana.pk)
-        self.assertNotEqual(Order.objects.get().order_status, "shipped")
+        self.assertNotEqual(Order.objects.get().status, "shipped")
 
     def test_a_deposit_on_a_customer_s_order_is_linked_too(self):
         dana = Contact.objects.create(name="Dana Akhmet")
@@ -152,7 +152,7 @@ class PaidAtTheCounter(TestCase):
 
     def test_a_cancelled_sale_gives_it_all_back_when_asked(self):
         order = self._made()
-        Order.objects.filter(pk=order.pk).update(order_status="cancelled")
+        Order.objects.filter(pk=order.pk).update(status="cancelled")
         order.refresh_from_db()
         self.assertEqual(order.counter_gap()[2], Decimal("-20000.00"))
         self.client.post(reverse("operating:settle_counter", kwargs={"pk": order.pk}))
@@ -165,9 +165,9 @@ class PaidAtTheCounter(TestCase):
     def _reopened(self):
         order = self._made()
         detail = reverse("operating:order_detail", kwargs={"pk": order.pk})
-        self.client.post(detail, {"action": "update_status", "order_status": "pending"})
+        self.client.post(detail, {"action": "update_status", "status": "pending"})
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "pending")
+        self.assertEqual(order.status, "pending")
         return order, detail
 
     def _square(self, order):
@@ -187,10 +187,10 @@ class PaidAtTheCounter(TestCase):
 
     def test_cancelling_gives_it_all_back(self):
         order, detail = self._reopened()
-        self.client.post(detail, {"action": "update_status", "order_status": "cancelled",
+        self.client.post(detail, {"action": "update_status", "status": "cancelled",
                                   "cancel_reason": "trial"})
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "cancelled")
+        self.assertEqual(order.status, "cancelled")
         refund = Payment.objects.get(type="refund_in")
         self.assertEqual((refund.amount, refund.cash_account, refund.status),
                          (Decimal("20000.00"), self.tenge, "confirmed"))
@@ -201,9 +201,9 @@ class PaidAtTheCounter(TestCase):
         from operating.views import save_order_adjustments
         order, detail = self._reopened()
         save_order_adjustments(order, [{"label": "Discount", "amount": "-1500"}])
-        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
+        self.client.post(detail, {"action": "update_status", "status": "shipped"})
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.status, "shipped")
         refund = Payment.objects.get(type="refund_in")
         self.assertEqual((refund.amount, refund.cash_account), (Decimal("1500.00"), self.tenge))
         self.assertIsNone(order.counter_gap())
@@ -212,7 +212,7 @@ class PaidAtTheCounter(TestCase):
     def test_a_dearer_order_collects_the_rest_on_completion(self):
         order, detail = self._reopened()
         order.items.update(price=Decimal("11000"))
-        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
+        self.client.post(detail, {"action": "update_status", "status": "shipped"})
         more = Payment.objects.filter(type="collection").order_by("-pk").first()
         self.assertEqual((more.amount, more.cash_account), (Decimal("2000.00"), self.tenge))
         self.assertIsNone(order.counter_gap())
@@ -235,7 +235,7 @@ class PaidAtTheCounter(TestCase):
             "adjustments_json": json.dumps([{"label": "Discount", "amount": "-1500"}]),
         })
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.status, "shipped")
         self.assertEqual(order.billable_value(), Decimal("18500.00"))
         refund = Payment.objects.get(type="refund_in")
         self.assertEqual((refund.amount, refund.cash_account), (Decimal("1500.00"), self.tenge))
@@ -245,7 +245,7 @@ class PaidAtTheCounter(TestCase):
 
     def test_completing_again_unchanged_moves_no_money(self):
         order, detail = self._reopened()
-        self.client.post(detail, {"action": "update_status", "order_status": "shipped"})
+        self.client.post(detail, {"action": "update_status", "status": "shipped"})
         self.assertEqual(Payment.objects.count(), 1)
 
     def test_an_older_retail_order_never_linked_says_nothing(self):

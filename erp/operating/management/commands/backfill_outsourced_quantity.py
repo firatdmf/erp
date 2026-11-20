@@ -137,7 +137,7 @@ class Command(BaseCommand):
                        else (it.product.sku if it.product_id else "-"))
                 value = (it.quantity or 0) * (it.price or 0)
                 self.stdout.write(
-                    f"  order {order.pk:>5} ({order.order_status:<12}) item {it.pk:>5} "
+                    f"  order {order.pk:>5} ({order.status:<12}) item {it.pk:>5} "
                     f"{sku:<22} qty={it.quantity} x {it.price} = {value} unbilled"
                 )
             self.stdout.write(

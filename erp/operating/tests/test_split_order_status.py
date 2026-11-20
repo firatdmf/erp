@@ -60,17 +60,17 @@ class _ASplitOrder:
 
     def _move(self, order, status, *files, **extra):
         return self.client.post(self._url(order), {
-            "action": "update_status", "order_status": status,
+            "action": "update_status", "status": status,
             "carrier": "yurtici", "tracking_number": "TRK-1",
             "cargo_receipts": list(files), **extra})
 
     def _states(self):
-        return [(o.order_status, o.carrier, o.tracking_number)
+        return [(o.status, o.carrier, o.tracking_number)
                 for o in Order.objects.filter(pk__in=[self.laleli_half.pk, self.ergene_half.pk]).order_by("pk")]
 
     def _save_cargo(self, order):
         return self.client.post(self._url(order), {
-            "action": "update_status", "order_status": order.order_status,
+            "action": "update_status", "status": order.status,
             "carrier": "yurtici", "tracking_number": "TRK-9"}, HTTP_ACCEPT="application/json")
 
 
@@ -104,13 +104,13 @@ class SplitOrderStatus(_ASplitOrder, TestCase):
         self.assertEqual([s[0] for s in self._states()], ["packaging", "packaging"])
 
     def test_saving_cargo_info_brings_a_half_that_stands_elsewhere_along(self, upload):
-        Order.objects.filter(pk=self.laleli_half.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.laleli_half.pk).update(status="shipped")
         self.laleli_half.refresh_from_db()
         self.assertTrue(self._save_cargo(self.laleli_half).json()["ok"])
         self.assertEqual(self._states(), [("shipped", "yurtici", "TRK-9")] * 2)
 
     def test_which_completes_it_so_takes_every_book_as_completing_does(self, upload):
-        Order.objects.filter(pk=self.laleli_half.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.laleli_half.pk).update(status="shipped")
         self.laleli_half.refresh_from_db()
         self.user.member.books.remove(self.ergene)
         resp = self._save_cargo(self.laleli_half)
@@ -118,13 +118,13 @@ class SplitOrderStatus(_ASplitOrder, TestCase):
         self.assertEqual(self._states(), [("shipped", None, None), ("pending", None, None)])
 
     def test_saving_on_a_cancelled_half_does_not_cancel_the_rest(self, upload):
-        Order.objects.filter(pk=self.laleli_half.pk).update(order_status="cancelled")
+        Order.objects.filter(pk=self.laleli_half.pk).update(status="cancelled")
         self.laleli_half.refresh_from_db()
         self._save_cargo(self.laleli_half)
         self.assertEqual([s[0] for s in self._states()], ["cancelled", "pending"])
 
     def test_a_cancelled_half_stays_cancelled_and_holds_nothing_back(self, upload):
-        Order.objects.filter(pk=self.ergene_half.pk).update(order_status="cancelled")
+        Order.objects.filter(pk=self.ergene_half.pk).update(status="cancelled")
         self._move(self.laleli_half, "shipped")
         self.assertEqual([s[0] for s in self._states()], ["shipped", "cancelled"])
 
@@ -154,8 +154,8 @@ class SplitOrderStatus(_ASplitOrder, TestCase):
 
     def test_cargo_saved_on_one_half_before_reads_the_same_on_the_other(self, upload):
         Order.objects.filter(pk=self.laleli_half.pk).update(
-            order_status="shipped", carrier="yurtici", tracking_number="OLD-1")
-        Order.objects.filter(pk=self.ergene_half.pk).update(order_status="shipped")
+            status="shipped", carrier="yurtici", tracking_number="OLD-1")
+        Order.objects.filter(pk=self.ergene_half.pk).update(status="shipped")
         self.assertContains(self.client.get(self._url(self.ergene_half)), "OLD-1")
 
 

@@ -519,7 +519,7 @@
             Order Status
         </div>
         <div class="status-timeline">
-            {% with current_status=order.order_status %}
+            {% with current_status=order.status %}
             <div
                 class="timeline-step {% if current_status == 'pending' %}current{% elif current_status in 'confirmed,preparing,shipped,in_transit,out_for_delivery,delivered' %}completed{% endif %}">
                 <div class="step-circle"><i class="fas fa-clock"></i></div>
@@ -564,9 +564,9 @@
         <div class="form-grid">
             <div class="form-group">
                 <label class="form-label">{% trans "Order Status" %}</label>
-                <select name="order_status" class="form-select" id="orderStatus">
+                <select name="status" class="form-select" id="orderStatus">
                     {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if order.order_status == value %}selected{% endif %}>{{ label }}
+                    <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}
                     </option>
                     {% endfor %}
                 </select>

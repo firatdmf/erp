@@ -51,10 +51,10 @@
           {% for number in o.row_numbers %}<div class="od-order-num">{{ number }}</div>{% endfor %}
           <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
         </div>
-        {% with disp_status=o.order_status %}
+        {% with disp_status=o.status %}
         <span class="ord-status {% if o.is_pre_order %}pre_order{% else %}{{ disp_status }}{% endif %}">
           <span class="ord-status-dot"></span>
-          {% comment %} The customer-facing order_status, matching
+          {% comment %} The customer-facing status, matching
              order_list and order_detail — including their relabel of
              "shipped" as Completed. This used to render the production
              STATUS_CHOICES label instead, because ORDER_STATUS_CHOICES

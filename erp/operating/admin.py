@@ -15,15 +15,15 @@ class OrderAdjustmentInline(admin.TabularInline):
 
 
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['order_number', 'get_customer_name', 'is_guest_order', 'order_status', 'payment_status', 'paid_amount', 'created_at']
-    list_filter = ['is_guest_order', 'order_status', 'payment_status', 'created_at']
+    list_display = ['order_number', 'get_customer_name', 'is_guest_order', 'status', 'payment_status', 'paid_amount', 'created_at']
+    list_filter = ['is_guest_order', 'status', 'payment_status', 'created_at']
     search_fields = ['order_number', 'guest_email', 'guest_first_name', 'guest_last_name', 'web_client__first_name', 'web_client__last_name']
     readonly_fields = ['order_number', 'created_at', 'updated_at']
     inlines = [OrderItemInline, OrderAdjustmentInline]
     
     fieldsets = (
         ('Order Information', {
-            'fields': ('order_number', 'order_status', 'notes', 'internal_notes', 'created_at', 'updated_at')
+            'fields': ('order_number', 'status', 'notes', 'internal_notes', 'created_at', 'updated_at')
         }),
         ('Customer Information', {
             'fields': ('web_client', 'is_guest_order', 'guest_first_name', 'guest_last_name', 'guest_email', 'guest_phone'),

@@ -37,7 +37,7 @@ class RetailPostingBase(TestCase):
         self.product = Product.objects.create(title="STAR BLACKOUT")
 
         # Shipped: completion is what calls post_retail_order_financials.
-        self.order = Order.objects.create(is_retail_order=True, order_status="shipped")
+        self.order = Order.objects.create(is_retail_order=True, status="shipped")
         OrderItem.objects.create(
             order=self.order, product=self.product,
             product_variant=ProductVariant.objects.create(
@@ -47,7 +47,7 @@ class RetailPostingBase(TestCase):
     def unship(self):
         """What leaving the shipped statuses does: the status moves first,
         then the money follows it."""
-        self.order.order_status = "packaging"
+        self.order.status = "packaging"
         reverse_retail_order_financials(self.order, user=self.user)
 
     def retail_current_account(self):

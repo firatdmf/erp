@@ -535,10 +535,6 @@ class Order(models.Model):
         related_name='orders'
     )
     
-    # Retired: a rollup of the lines' production statuses that nothing
-    # reads or writes any more. order_status is the order's status. The
-    # column goes, and order_status takes the name, in the next release.
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     # Printed on the customer's copy — the order PDF, the emailed PDF, the
     # Excel and the sales invoice all carry it.
     notes = models.TextField(blank=True, null=True)
@@ -622,10 +618,13 @@ class Order(models.Model):
         blank=True,
         help_text="Customer-facing order reference, e.g. ORD-2026-000001"
     )
-    order_status = models.CharField(
+    # The order's one status. The column kept its old name, order_status,
+    # so the rename needed no table change.
+    status = models.CharField(
         max_length=32,
         choices=ORDER_STATUS_CHOICES,
         default="pending",
+        db_column="order_status",
         help_text=_("The order status shown to the customer")
     )
     # Set the moment the catalog stock is first deducted for this
@@ -1268,7 +1267,7 @@ class Order(models.Model):
     @property
     def is_pre_order(self):
         """Open, and the purchase it was bought against is still a draft."""
-        if (self.order_status or "pending") != "pending":
+        if (self.status or "pending") != "pending":
             return False
         flag = getattr(self, "has_draft_purchase", None)
         if flag is None:
@@ -1283,7 +1282,7 @@ class Order(models.Model):
         pre-order."""
         if self.is_pre_order:
             return _("Pre-order")
-        return self.get_order_status_display()
+        return self.get_status_display()
 
     def get_client(self):
         if self.contact:
@@ -1383,7 +1382,7 @@ class Order(models.Model):
         if not self.is_retail_order or not self.payment_links.exists():
             return None
         taken = self.counter_takings()
-        owed = (Decimal("0.00") if self.order_status in ("cancelled", "returned")
+        owed = (Decimal("0.00") if self.status in ("cancelled", "returned")
                 else Decimal(str(self.billable_value() or 0)))
         gap = owed - taken
         if gap == 0:

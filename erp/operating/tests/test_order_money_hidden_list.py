@@ -31,7 +31,7 @@ class OrderListWithoutPricesAndCustomers(TestCase):
         contact = Contact.objects.create(name="Zircon Buyer Ltd", email=["buyer@zircon.test"])
         self.order = Order.objects.create(
             order_number="DK0000901", current_account=account, contact=contact,
-            order_status="packaging", delivery_city="Tashkent", delivery_country="Uzbekistan",
+            status="packaging", delivery_city="Tashkent", delivery_country="Uzbekistan",
             delivery_address="Amir Temur 12")
         product = Product.objects.create(title="Crepe", sku="KZL000901")
         OrderItem.objects.create(

@@ -628,7 +628,7 @@
     var channelData = {{ channel_chart|safe }};
     var prodLabels  = {{ prod_labels|safe }};
     var prodRev     = {{ prod_rev|safe }};
-    var statusRows  = [{% for s in status_rows %}{ status: "{{ s.order_status }}", n: {{ s.n }} }{% if not forloop.last %},{% endif %}{% endfor %}];
+    var statusRows  = [{% for s in status_rows %}{ status: "{{ s.status }}", n: {{ s.n }} }{% if not forloop.last %},{% endif %}{% endfor %}];
 
     if (typeof Chart === 'undefined') return;
 

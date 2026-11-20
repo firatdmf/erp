@@ -20,7 +20,7 @@ class MessagesFollowTheLanguage(SimpleTestCase):
             self.assertEqual(gettext("Package #%(n)s created.") % {"n": 3},
                              "Paket #3 oluşturuldu.")
             self.assertEqual(pgettext("warehouse sheet", "Unit cost"), "Br. Maliyet")
-            self.assertEqual(pgettext("order change", "order status"), "Sipariş durumu")
+            self.assertEqual(pgettext("order change", "status"), "Sipariş durumu")
 
     def test_english_is_english(self):
         with translation.override("en"):

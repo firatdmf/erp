@@ -45,7 +45,7 @@ class ClientWithOrders(TestCase):
     def _order(self, number, day, lines, status="pending"):
         order = Order.objects.create(
             order_number=number, current_account=self.account, contact=self.anna,
-            company=self.firm, currency=self.usd, order_status=status,
+            company=self.firm, currency=self.usd, status=status,
             order_date=datetime.date(2026, 10, day))
         for variant, qty, price in lines:
             OrderItem.objects.create(order=order, product=self.linen, product_variant=variant,

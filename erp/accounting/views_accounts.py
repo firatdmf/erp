@@ -1307,7 +1307,7 @@ class CurrentAccountDetail(View):
         # currency, so what is coming is still in view.
         open_totals = {}
         open_count = 0
-        for order in (current_account.orders.exclude(order_status__in=(
+        for order in (current_account.orders.exclude(status__in=(
                 "shipped", "in_transit", "out_for_delivery", "delivered",
                 "cancelled", "returned"))
                 .select_related("currency")

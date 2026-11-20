@@ -44,7 +44,7 @@ class PreOrderLabelTest(TestCase):
     def _order(self, status="pending"):
         order = Order.objects.create(contact=self.customer,
                                      current_account=self.customer_account,
-                                     order_status=status)
+                                     status=status)
         OrderItem.objects.create(order=order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal("55"), price=Decimal("5"))

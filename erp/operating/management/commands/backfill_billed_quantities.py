@@ -41,7 +41,7 @@ def _ship_moment(order):
     if order.shipped_at:
         return order.shipped_at, "shipped_at"
     change = (OrderChange.objects
-              .filter(order_id=order.pk, action="status", field="order_status",
+              .filter(order_id=order.pk, action="status", field="status",
                       new_value__in=sorted(SHIPPED_CLASS))
               .order_by("-created_at").first())
     if change:
@@ -94,7 +94,7 @@ class Command(BaseCommand):
                 "per-order judgement, never a sweep."))
             return
 
-        qs = Order.objects.filter(order_status__in=SHIPPED_CLASS).order_by("pk")
+        qs = Order.objects.filter(status__in=SHIPPED_CLASS).order_by("pk")
         if only:
             # Naming an order is an explicit instruction to redo it, freeze or no.
             qs = qs.filter(pk=only)

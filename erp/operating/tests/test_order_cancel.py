@@ -47,7 +47,7 @@ class OrderCancelBase(TestCase):
     def order(self, status="pending"):
         order = Order.objects.create(
             order_number=f"DK0000{Order.objects.count() + 401}",
-            current_account=self.account, order_status=status)
+            current_account=self.account, status=status)
         OrderItem.objects.create(order=order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal("40.00"), price=Decimal("3.25"))
@@ -57,7 +57,7 @@ class OrderCancelBase(TestCase):
         return reverse("operating:order_detail", kwargs={"pk": order.pk})
 
     def cancel(self, order, reason="Customer changed their mind"):
-        data = {"action": "update_status", "order_status": "cancelled"}
+        data = {"action": "update_status", "status": "cancelled"}
         if reason is not None:
             data["cancel_reason"] = reason
         return self.client.post(self.detail_url(order), data)
@@ -69,7 +69,7 @@ class CancellingFromTheOrderPage(OrderCancelBase):
         order = self.order()
         self.cancel(order)
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "cancelled")
+        self.assertEqual(order.status, "cancelled")
         log = OrderChange.objects.get(order=order, field="cancel_reason")
         self.assertEqual(log.new_value, "Customer changed their mind")
         self.assertEqual(log.created_by, self.user)
@@ -79,14 +79,14 @@ class CancellingFromTheOrderPage(OrderCancelBase):
         for reason in (None, "", "   "):
             self.cancel(order, reason=reason)
             order.refresh_from_db()
-            self.assertEqual(order.order_status, "pending")
+            self.assertEqual(order.status, "pending")
         self.assertFalse(OrderChange.objects.filter(field="cancel_reason").exists())
 
     def test_a_completed_order_is_re_opened_and_cancelled(self):
         order = self.order(status="shipped")
         self.cancel(order)
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "cancelled")
+        self.assertEqual(order.status, "cancelled")
         # Both steps are in the history: re-opened, then cancelled.
         self.assertEqual(
             list(OrderChange.objects.filter(order=order, action="status")
@@ -99,14 +99,14 @@ class CancellingFromTheOrderPage(OrderCancelBase):
         order = self.order(status="shipped")
         self.cancel(order, reason="")
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.status, "shipped")
 
     def test_returned_from_the_status_list_says_returned(self):
         order = self.order(status="shipped")
         resp = self.client.post(self.detail_url(order), {
-            "action": "update_status", "order_status": "returned"}, follow=True)
+            "action": "update_status", "status": "returned"}, follow=True)
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "returned")
+        self.assertEqual(order.status, "returned")
         self.assertContains(resp, "Order marked returned")
 
     def test_the_customer_hears_only_of_the_cancel(self):
@@ -129,7 +129,7 @@ class CancellingFromTheOrderPage(OrderCancelBase):
         with patch("operating.views_warehouse.apply_order_status_change", refuse_the_cancel):
             self.assertEqual(cancel_order(order, self.user), (False, "cancel_pending"))
         order.refresh_from_db()
-        self.assertEqual(order.order_status, "shipped")
+        self.assertEqual(order.status, "shipped")
         self.assertFalse(OrderChange.objects.filter(order=order, action="status").exists())
 
     def test_the_funnel_refuses_every_completed_status(self):
@@ -139,7 +139,7 @@ class CancellingFromTheOrderPage(OrderCancelBase):
                 apply_order_status_change(order, "cancelled", user=self.user),
                 (False, "cancel_requires_reopen"))
             order.refresh_from_db()
-            self.assertEqual(order.order_status, status)
+            self.assertEqual(order.status, status)
 
     def test_a_re_opened_order_can_be_cancelled(self):
         order = self.order(status="packaging")

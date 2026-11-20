@@ -53,7 +53,7 @@ class OrdersArriveAsDrafts(SyncBase):
         self.run_sync(receipts=[RECEIPT])
         order = Order.objects.get()
         self.assertEqual((order.company, order.current_account), (self.company, self.etsy))
-        self.assertEqual(order.order_status, "pending")
+        self.assertEqual(order.status, "pending")
         self.assertIn("#4197103539", order.notes)
         self.assertIn("Tyche Gage", order.notes)
         [line] = order.items.all()

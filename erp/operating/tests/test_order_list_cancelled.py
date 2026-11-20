@@ -37,7 +37,7 @@ class OrderListCancelledTest(TestCase):
         order = Order.objects.create(
             order_number=number, current_account=self.account,
             is_retail_order=True, order_date=day)
-        Order.objects.filter(pk=order.pk).update(order_date=day, order_status=status)
+        Order.objects.filter(pk=order.pk).update(order_date=day, status=status)
         return order
 
     def test_cancelled_has_its_own_group_after_completed(self):

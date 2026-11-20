@@ -24,7 +24,7 @@ class PricesAndCustomersTests(TestCase):
             book=self.book, code=f"C-{uuid4().hex[:8]}", name="Karven", type="customer",
             default_currency=CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(order_number="ORD-2026-000801",
-                                          order_status="packaging", current_account=account)
+                                          status="packaging", current_account=account)
 
     def role(self, name, *grants):
         role = Role.objects.create(name=name)

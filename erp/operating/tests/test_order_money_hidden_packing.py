@@ -46,7 +46,7 @@ class PackingWithoutPricesOrCustomer(TestCase):
             contact=customer, default_currency=usd)
         self.order = Order.objects.create(
             order_number="ORD-2026-000901", current_account=account, contact=customer,
-            currency=usd, order_status="preparing",
+            currency=usd, status="preparing",
             delivery_address_title="Zircon depot", delivery_address=DELIVERY,
             delivery_city="Tbilisi", delivery_phone="+995 555 000")
         product = Product.objects.create(

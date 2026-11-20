@@ -25,7 +25,7 @@ class CarrierCombobox(TestCase):
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(
-            order_number="DK0000419", current_account=account, order_status="pending")
+            order_number="DK0000419", current_account=account, status="pending")
         user = User.objects.create_user("carrier_cbx", password="pw")
         user.member.books.add(book)
         user.member.default_book = book
@@ -50,7 +50,7 @@ class CarrierCombobox(TestCase):
         self.assertIn('<option value="yurtici" selected>', html)
 
     def test_the_pick_still_posts_as_carrier(self):
-        self.client.post(self.url, {"action": "update_status", "order_status": "pending",
+        self.client.post(self.url, {"action": "update_status", "status": "pending",
                                     "carrier": "aras", "tracking_number": ""})
         self.order.refresh_from_db()
         self.assertEqual(self.order.carrier, "aras")
@@ -61,7 +61,7 @@ class TypedCarriersJoinTheList(CarrierCombobox):
     save; "Other" is no longer offered but still reads on old orders."""
 
     def _save(self, carrier):
-        self.client.post(self.url, {"action": "update_status", "order_status": "pending",
+        self.client.post(self.url, {"action": "update_status", "status": "pending",
                                     "carrier": carrier, "tracking_number": ""})
         self.order.refresh_from_db()
         return self.order.carrier
@@ -105,7 +105,7 @@ class CompletedOrderCargoReadsAsSent(CarrierCombobox):
 
     def test_a_completed_order_shows_its_cargo_read_only(self):
         Order.objects.filter(pk=self.order.pk).update(
-            order_status="shipped", carrier="yurtici", tracking_number="16865")
+            status="shipped", carrier="yurtici", tracking_number="16865")
         html = self._html()
         self.assertIn('id="od-ship-view"', html)
         self.assertIn('<i class="fa fa-truck"></i>Yurtiçi Kargo</span>', html)
@@ -115,13 +115,13 @@ class CompletedOrderCargoReadsAsSent(CarrierCombobox):
         self.assertIn('id="od-ship-cancel"', html)
 
     def test_a_completed_order_without_cargo_says_so(self):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         self.assertIn('class="od-ship-sum-none"', self._html())
 
     def test_a_completed_order_can_still_save_cargo_info(self):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
-        self.client.post(self.url, {"action": "update_status", "order_status": "shipped",
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
+        self.client.post(self.url, {"action": "update_status", "status": "shipped",
                                     "carrier": "aras", "tracking_number": "999"})
         self.order.refresh_from_db()
-        self.assertEqual((self.order.order_status, self.order.carrier, self.order.tracking_number),
+        self.assertEqual((self.order.status, self.order.carrier, self.order.tracking_number),
                          ("shipped", "aras", "999"))

@@ -818,7 +818,7 @@ def _reverse_sale(order, sale, *, member=None):
     if sale.date >= timezone.localdate():
         _delete_movement(sale)
         return None
-    returned = getattr(order, "order_status", "") == "returned"
+    returned = getattr(order, "status", "") == "returned"
     ret = CurrentAccountMovement(
         movement_type="return_sale",
         source_type=ContentType.objects.get_for_model(order.__class__),
@@ -907,7 +907,7 @@ def post_order_movement(order, *, member=None):
     # mean nothing has been sold; completion refuses until they are in
     # (apply_order_status_change), and this holds the same line for any
     # caller that gets here first.
-    if total <= 0 or getattr(order, "order_status", "") not in SOLD_STATUSES \
+    if total <= 0 or getattr(order, "status", "") not in SOLD_STATUSES \
             or order.billing_waits_for_goods():
         if existing:
             _reverse_sale(order, existing, member=member)

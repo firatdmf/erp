@@ -111,13 +111,13 @@ class SplitOrderPacking(TestCase):
                                  args=[self.ergene_half.pk]),
                          {"reservation_id": self.laleli_roll.pk, "pack_id": ""})
         self.laleli_half.refresh_from_db()
-        self.assertEqual(self.laleli_half.order_status, "pending")
+        self.assertEqual(self.laleli_half.status, "pending")
 
         self.client.post(reverse("operating:order_pack_reserve_add", args=[self.ergene_half.pk]),
                          {"barcode": "ERG1", "pack_id": sack.pk, "place_only": "1"})
         for half in (self.laleli_half, self.ergene_half):
             half.refresh_from_db()
-            self.assertEqual(half.order_status, "packaging")
+            self.assertEqual(half.status, "packaging")
 
         # A second sack with the Laleli roll; emptying the first is not
         # emptying the order.
@@ -130,13 +130,13 @@ class SplitOrderPacking(TestCase):
                                  args=[self.laleli_half.pk]),
                          {"reservation_id": self.ergene_roll.pk, "pack_id": ""})
         self.laleli_half.refresh_from_db()
-        self.assertEqual(self.laleli_half.order_status, "packaging")
+        self.assertEqual(self.laleli_half.status, "packaging")
 
         # Deleting the last sack with goods in it leaves nothing packed.
         self._crud(self.laleli_half, action="delete_pack", pack_id=other.pk)
         for half in (self.laleli_half, self.ergene_half):
             half.refresh_from_db()
-            self.assertEqual(half.order_status, "pending")
+            self.assertEqual(half.status, "pending")
 
     def test_unpacking_the_last_roll_opens_the_order_again(self, _upload):
         sack = Pack.objects.create(order=self.laleli_half, pack_number=1)
@@ -145,12 +145,12 @@ class SplitOrderPacking(TestCase):
             self.client.post(url, {"reservation_id": roll.pk, "pack_id": sack.pk})
         self.client.post(url, {"reservation_id": self.laleli_roll.pk, "pack_id": ""})
         self.laleli_half.refresh_from_db()
-        self.assertEqual(self.laleli_half.order_status, "packaging")
+        self.assertEqual(self.laleli_half.status, "packaging")
         self.client.post(reverse("operating:order_pack_reserve_remove", args=[self.ergene_half.pk]),
                          {"reservation_id": self.ergene_roll.pk})
         for half in (self.laleli_half, self.ergene_half):
             half.refresh_from_db()
-            self.assertEqual(half.order_status, "pending")
+            self.assertEqual(half.status, "pending")
 
     def test_the_customer_hears_of_packing_once(self, _upload):
         Order.objects.filter(pk__in=[self.laleli_half.pk, self.ergene_half.pk]).update(notify_customer=True)
@@ -161,7 +161,7 @@ class SplitOrderPacking(TestCase):
                 with self.captureOnCommitCallbacks(execute=True):
                     self.client.post(url, {"reservation_id": self.laleli_roll.pk, "pack_id": pack_id})
         self.laleli_half.refresh_from_db()
-        self.assertEqual(self.laleli_half.order_status, "packaging")
+        self.assertEqual(self.laleli_half.status, "packaging")
         self.assertEqual([c.args[1] for c in send.call_args_list], ["packaging"])
 
     def test_a_roll_off_another_order_is_still_refused(self, _upload):

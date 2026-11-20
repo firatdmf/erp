@@ -73,7 +73,7 @@ class OrderHistoryCard(TestCase):
         group = uuid.uuid4()
         laleli_half = self._order(self.laleli, "ORD-2026-000023", "2.50", group)
         self._order(self.ergene, "ORD-2026-000024", "7.25", group)
-        Order.objects.filter(pk=laleli_half.pk).update(order_status="packaging")
+        Order.objects.filter(pk=laleli_half.pk).update(status="packaging")
         _page, html = self._card()
         self.assertIn("$97.50", html)
 
@@ -81,7 +81,7 @@ class OrderHistoryCard(TestCase):
         group = uuid.uuid4()
         self._order(self.laleli, "ORD-2026-000023", "2.50", group)
         ergene_half = self._order(self.ergene, "ORD-2026-000024", "7.25", group)
-        Order.objects.filter(pk=ergene_half.pk).update(order_status="cancelled")
+        Order.objects.filter(pk=ergene_half.pk).update(status="cancelled")
         _page, html = self._card()
         self.assertIn("$25.00", html)
         self.assertNotIn("$97.50", html)

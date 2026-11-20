@@ -30,7 +30,7 @@ class OrderCostIsHiddenFromSalesRep(TestCase):
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(
-            order_number="DK0000301", current_account=account, order_status="pending")
+            order_number="DK0000301", current_account=account, status="pending")
         product = Product.objects.create(title="Crepe", sku="KZL000315")
         self.item = OrderItem.objects.create(
             order=self.order, product=product,

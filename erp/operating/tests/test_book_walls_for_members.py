@@ -45,7 +45,7 @@ class BookWallsForMembers(TestCase):
                 product=cls.own_product, variant_sku="STEPPE-LINEN.1"),
             quantity=Decimal("3"), price=Decimal("7.50"))
         # From the storefront: no current account, so no book.
-        cls.web_order = Order.objects.create(order_status="pending", is_guest_order=True)
+        cls.web_order = Order.objects.create(status="pending", is_guest_order=True)
 
         cls.user = User.objects.create_user("burak_op_walls", password="pw")
         member = cls.user.member
@@ -61,7 +61,7 @@ class BookWallsForMembers(TestCase):
         account = CurrentAccount.objects.create(
             book=book, code=code, name=f"Customer {code}", type="customer",
             default_currency=cls.usd)
-        return Order.objects.create(current_account=account, order_status="pending")
+        return Order.objects.create(current_account=account, status="pending")
 
     def setUp(self):
         self.client = Client()
@@ -128,7 +128,7 @@ class BookWallsForMembers(TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertIn("/authentication/signin", response["Location"])
         self.own_order.refresh_from_db()
-        self.assertEqual(self.own_order.order_status, "pending")
+        self.assertEqual(self.own_order.status, "pending")
 
     def test_a_web_order_is_the_install_admins(self):
         path = f"/operating/orders/web/{self.web_order.pk}/status/"

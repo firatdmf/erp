@@ -129,7 +129,7 @@ class UndoReceiptTest(TestCase):
         r = self._undo()
         self.assertEqual(r.status_code, 200, r.content)
         order.refresh_from_db()
-        self.assertNotEqual(order.order_status, "cancelled")
+        self.assertNotEqual(order.status, "cancelled")
         self.assertEqual(list(order.items.values_list("product_variant__variant_sku", "quantity")),
                          [("HAVANA.ECRU", Decimal("100.00"))])
         self.assertFalse(OrderStockReservation.objects.filter(order=order).exists())

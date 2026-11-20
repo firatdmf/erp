@@ -44,7 +44,7 @@ class OrderCurrencyTest(TestCase):
     def _order(self, account=None, price="2.00", qty="700", status="pending"):
         order = Order.objects.create(company=self.company,
                                      current_account=account or self.account,
-                                     order_status=status)
+                                     status=status)
         OrderItem.objects.create(order=order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal(qty), price=Decimal(price))

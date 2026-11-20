@@ -110,8 +110,8 @@ def _sync_state(connection):
     # Drafts a person has not completed yet: Etsy has the buyer's money,
     # the books do not have the sale. They are the one expected gap.
     open_orders = [r.order for r in connection.receipts.select_related("order")
-                   if r.order_id and r.order.order_status not in SOLD_STATUSES
-                   and r.order.order_status != "cancelled"]
+                   if r.order_id and r.order.status not in SOLD_STATUSES
+                   and r.order.status != "cancelled"]
     open_total = sum((o.billable_value() for o in open_orders), Decimal("0"))
     erp_balance = account.recompute_balance(save=False) if account else None
     etsy_balance = latest.balance if latest else None

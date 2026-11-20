@@ -40,7 +40,7 @@ class InvoiceDocBase(TestCase):
 
         self.order = Order.objects.create(order_number="DK0000501",
                                           current_account=self.customer,
-                                          order_status="pending")
+                                          status="pending")
         OrderItem.objects.create(order=self.order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal("40.00"), price=Decimal("3.25"))

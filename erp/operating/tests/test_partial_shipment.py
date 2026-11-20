@@ -131,7 +131,7 @@ class PlainOrder(PartialShipmentBase):
         # 60 m × 2 + delivery 150 − discount 20.
         self.assertEqual(sale.amount, Decimal("250.00"))
         f.refresh_from_db()
-        self.assertEqual(f.order_status, "pending")
+        self.assertEqual(f.status, "pending")
         self.assertFalse(f.stock_reservations.filter(consumed=True).exists())
 
     def test_a_line_none_of_which_ships_moves_whole(self):
@@ -185,12 +185,12 @@ class PlainOrder(PartialShipmentBase):
         self.assertRedirects(r, reverse("operating:order_detail", args=[self.o.pk]),
                              fetch_redirect_response=False)
         self.o.refresh_from_db()
-        self.assertEqual((self.o.order_status, self.o.tracking_number), ("shipped", "TRK-1"))
+        self.assertEqual((self.o.status, self.o.tracking_number), ("shipped", "TRK-1"))
         self.assertEqual(self.o.get_carrier_display(), "Sürat Kargo")
         # Only the rolls that went are cut.
         self.assertEqual(set(self.o.stock_reservations.values_list("consumed", flat=True)), {True})
         f = Order.objects.get(continued_from=self.o)
-        self.assertEqual(f.order_status, "pending")
+        self.assertEqual(f.status, "pending")
         self.assertIsNone(f.tracking_number)
         self.assertFalse(f.stock_reservations.filter(consumed=True).exists())
         detail = self.client.get(reverse("operating:order_detail", args=[f.pk]))

@@ -48,11 +48,11 @@ class ShippedWhatsApp(TestCase):
                 code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(
             order_number="DK0000412", current_account=account,
-            order_status="pending", notify_customer=True,
+            status="pending", notify_customer=True,
             delivery_phone="0532 123 45 67", tracking_number="TR 778\n899")
 
     def _ship(self):
-        self.order.order_status = "shipped"
+        self.order.status = "shipped"
         self.order.save()
 
     @patch("operating.order_whatsapp._post", return_value=Mock(status_code=200))
@@ -85,7 +85,7 @@ class ShippedWhatsApp(TestCase):
             ("+966 50 123 4567", "en_US"),     # Arabic isn't approved: the fallback
             ("+81 90 1234 5678", "en_US"),
         ]:
-            self.order.order_status = "pending"
+            self.order.status = "pending"
             self.order.save()
             self.assertEqual(self._language_sent_to(phone, post), language, phone)
 
@@ -96,7 +96,7 @@ class ShippedWhatsApp(TestCase):
     @patch("operating.order_whatsapp._post", return_value=Mock(status_code=200))
     def test_shipping_a_reopened_order_again_messages_again(self, post):
         self._ship()
-        self.order.order_status = "packaging"
+        self.order.status = "packaging"
         self.order.save()
         self._ship()
         self.assertEqual(post.call_count, 2)
@@ -139,11 +139,11 @@ class ShippedWhatsApp(TestCase):
         post.return_value = Mock(status_code=400, text='{"error": "template not found"}')
         self._ship()
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
         self.assertFalse(send_order_shipped_whatsapp(self.order))
 
     @patch("operating.order_whatsapp._post", side_effect=OSError("network down"))
     def test_a_network_failure_does_not_cost_the_shipment(self, post):
         self._ship()
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")

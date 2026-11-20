@@ -48,7 +48,7 @@ class OrderPageWithoutPricesAndCustomers(TestCase):
             type="customer", default_currency=self.usd)
         order = Order.objects.create(
             order_number=number, current_account=account, contact=self.buyer,
-            order_status="pending", delivery_address="Quartz Street 9",
+            status="pending", delivery_address="Quartz Street 9",
             delivery_city="Tekirdağ", **fields)
         product = Product.objects.create(title=f"Crepe {sku}", sku=sku)
         OrderItem.objects.create(

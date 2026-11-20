@@ -40,7 +40,7 @@ class OrderAdjustmentTest(TestCase):
             get_user_model().objects.create_superuser("firat_adj", "a@b.c", "pw"), "member", None)
         # Shipped: an order is a sale, and on the account, only from then.
         self.order = Order.objects.create(company=self.company, current_account=self.account,
-                                          currency=self.eur, order_status="shipped")
+                                          currency=self.eur, status="shipped")
         OrderItem.objects.create(order=self.order, product=self.product,
                                  product_variant=ProductVariant.objects.create(
                                      product=self.product, variant_sku="FS.1"),
@@ -218,7 +218,7 @@ class AdjustmentsThroughTheFormTest(TestCase):
 
     def _ship(self, order):
         """The account is charged when the goods leave, not at create."""
-        Order.objects.filter(pk=order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=order.pk).update(status="shipped")
         order.refresh_from_db()
         post_order_movement(order)
 

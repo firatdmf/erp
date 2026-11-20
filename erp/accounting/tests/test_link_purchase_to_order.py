@@ -95,7 +95,7 @@ class LinkPurchaseToOrderTest(TestCase):
         self.assertContains(r, url)
 
     def test_a_shipped_order_offers_no_link(self):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         r = self.client.get(reverse("operating:order_detail", args=[self.order.pk]))
         self.assertNotContains(r, f"?order={self.order.pk}")
 
@@ -110,7 +110,7 @@ class LinkPurchaseToOrderTest(TestCase):
                          reverse("operating:order_detail", args=[self.order.pk]))
 
     def test_the_form_sends_a_shipped_order_back(self):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         r = self.client.get(
             reverse("accounts:goods_receipt", kwargs={"book_id": self.book.pk}),
             {"order": self.order.pk})
@@ -208,7 +208,7 @@ class LinkPurchaseToOrderTest(TestCase):
                              {"reason": "Supplier ran out"})
         self.assertTrue(r.json()["success"], r.json())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "pending")
+        self.assertEqual(self.order.status, "pending")
         self.assertEqual(self._lines(), {"K24644.G07": Decimal("55.00")})
 
     def test_a_price_set_on_the_order_reaches_both_purchases_quantities_stay(self):
@@ -312,7 +312,7 @@ class LinkPurchaseToOrderTest(TestCase):
 
     # ── Refused ─────────────────────────────────────────────────────
     def test_a_shipped_order_is_refused(self):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         before = Invoice.objects.count()
         r = self._save(self._plan([self._variant(name="G08", sku="K24644.G08")],
                                   for_order=self.order))

@@ -1214,20 +1214,20 @@
           <span class="ord-kind int">INT</span>
         {% endif %}
 
-        {% if order.order_status %}
-          <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.order_status }}{% endif %}">
+        {% if order.status %}
+          <span class="ord-status {% if order.is_pre_order %}pre_order{% else %}{{ order.status }}{% endif %}">
             <span class="ord-status-dot"></span>
             {% if order.is_pre_order %}{% trans "Pre-order" %}
-            {% elif order.order_status == 'pending' %}{% trans "Pending" %}
-            {% elif order.order_status == 'confirmed' %}{% trans "Confirmed" %}
-            {% elif order.order_status == 'preparing' %}{% trans "Preparing" %}
-            {% elif order.order_status == 'shipped' %}{% trans "Completed" %}
-            {% elif order.order_status == 'in_transit' %}{% trans "In transit" %}
-            {% elif order.order_status == 'out_for_delivery' %}{% trans "Out for delivery" %}
-            {% elif order.order_status == 'delivered' %}{% trans "Delivered" %}
-            {% elif order.order_status == 'cancelled' %}{% trans "Cancelled" %}
-            {% elif order.order_status == 'returned' %}{% trans "Returned" %}
-            {% else %}{{ order.order_status }}{% endif %}
+            {% elif order.status == 'pending' %}{% trans "Pending" %}
+            {% elif order.status == 'confirmed' %}{% trans "Confirmed" %}
+            {% elif order.status == 'preparing' %}{% trans "Preparing" %}
+            {% elif order.status == 'shipped' %}{% trans "Completed" %}
+            {% elif order.status == 'in_transit' %}{% trans "In transit" %}
+            {% elif order.status == 'out_for_delivery' %}{% trans "Out for delivery" %}
+            {% elif order.status == 'delivered' %}{% trans "Delivered" %}
+            {% elif order.status == 'cancelled' %}{% trans "Cancelled" %}
+            {% elif order.status == 'returned' %}{% trans "Returned" %}
+            {% else %}{{ order.status }}{% endif %}
           </span>
         {% endif %}
       </div>
@@ -1317,7 +1317,7 @@
         <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-status-form" enctype="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_status">
-          <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
+          <input type="hidden" name="status" id="od-status-input" value="{{ order.status|default:'pending' }}">
 
           {% comment %}3-stage flow — Open → Packing (opens the "Edit & Pack" screen) → Completed (cuts reserved rolls; cargo optional).{% endcomment %}
           <div class="od-stages od-stages-3">
@@ -1333,7 +1333,7 @@
                 </span>
                 {% else %}
                 <a href="{% url 'operating:order_pack_scan' order.pk %}"
-                   class="od-stage od-stage-link {% if s.filled %}filled{% endif %} {% if order.order_status == 'packaging' %}now{% endif %}"
+                   class="od-stage od-stage-link {% if s.filled %}filled{% endif %} {% if order.status == 'packaging' %}now{% endif %}"
                    style="text-decoration:none;">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
                   <span class="od-stage-l">
@@ -1344,14 +1344,14 @@
                 {% endif %}
               {% elif s.key == 'shipped' %}
                 <button type="button"
-                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == 'shipped' %}now{% endif %}"
+                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.status == 'shipped' %}now{% endif %}"
                         data-status="shipped">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
                   <span class="od-stage-l">{% trans "Completed" %}</span>
                 </button>
               {% else %}
                 <button type="button"
-                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == s.key %}now{% endif %}"
+                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.status == s.key %}now{% endif %}"
                         data-status="{{ s.key }}">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
                   <span class="od-stage-l">{% trans "Open" %}</span>
@@ -1454,8 +1454,8 @@
                 <button type="submit" id="od-ship-save" class="ord-btn ghost" title="{% trans "Save cargo info only" %}" {% if cargo_locked %}hidden{% endif %}>
                   <i class="fa fa-save"></i> {% trans "Save" %}
                 </button>
-                {% if order.order_status == 'cancelled' %}
-                {% elif order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
+                {% if order.status == 'cancelled' %}
+                {% elif order.status != 'shipped' and order.status != 'delivered' and order.status != 'in_transit' and order.status != 'out_for_delivery' %}
                 {% if not is_sales_rep and not order.is_retail_order and not needs_all_books %}
                 {% comment %}Some packages go now, the rest moves to a follow-up order (operating.partial_shipment).{% endcomment %}
                 <a href="{% url 'operating:order_ship_part' order.pk %}" class="ord-btn ghost"
@@ -1480,7 +1480,7 @@
           </div>
         </form>
 
-        {% if order.order_status == 'cancelled' %}
+        {% if order.status == 'cancelled' %}
         <div class="od-cancelled-note">
           <i class="fa fa-ban"></i>
           {% trans "This order was cancelled and can't be reopened. Create a new order if needed." %}
@@ -1493,7 +1493,7 @@
             {% comment %}packaging → packing-scan flow, shipped → cargo-gated Complete button, cancelled → the confirmed "Cancel order" button; keep them out of these one-click shortcuts.{% endcomment %}
             {% if code != 'packaging' and code != 'shipped' and code != 'cancelled' %}
             <button type="button" form="od-status-form"
-                    class="od-stage-mini {% if order.order_status == code %}active{% endif %}"
+                    class="od-stage-mini {% if order.status == code %}active{% endif %}"
                     data-status="{{ code }}">
               {{ label }}
             </button>
@@ -1537,13 +1537,13 @@
           {% endif %}
         </div>
 
-        {% if order.order_status == 'cancelled' %}
+        {% if order.status == 'cancelled' %}
         <div class="od-cancelled-banner">
           <i class="fa fa-ban"></i>{% trans "This order was cancelled — its lines are kept for reference only." %}
         </div>
         {% endif %}
         <div class="od-prods-scroll">
-        <table class="od-prods{% if is_sales_rep %} od-no-cost{% endif %}{% if order.order_status == 'cancelled' %} od-prods-cancelled{% endif %}">
+        <table class="od-prods{% if is_sales_rep %} od-no-cost{% endif %}{% if order.status == 'cancelled' %} od-prods-cancelled{% endif %}">
           <thead>
             <tr>
               <th>{% trans "Product" %}</th>
@@ -1818,7 +1818,7 @@
           </div>
         </div>
         {% endif %}
-        <div class="od-totals{% if order.order_status == 'cancelled' %} od-totals-cancelled{% endif %}">
+        <div class="od-totals{% if order.status == 'cancelled' %} od-totals-cancelled{% endif %}">
           {% comment %}A split order has one grand total, for every book's
              lines together; each book's lines are already added up under
              them in the table, so no subtotal is repeated here.{% endcomment %}
@@ -2828,7 +2828,7 @@
         e.preventDefault();
         if (cargoSave) return;
         const fd = new FormData(statusForm);
-        fd.set('order_status', statusInput.defaultValue);  // Save never moves the status
+        fd.set('status', statusInput.defaultValue);  // Save never moves the status
         fd.delete('skip_cargo');
         const taken = takeReceipts();
         if (taken) fd.delete('cargo_receipts');  // appended below, once shrunk

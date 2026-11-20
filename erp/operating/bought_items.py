@@ -27,7 +27,7 @@ def bought_items(orders):
     newest of them), order_count and quantity (the summed amount)."""
     lines = (
         OrderItem.objects
-        .filter(order__in=orders.exclude(order_status__in=LEFT_OUT))
+        .filter(order__in=orders.exclude(status__in=LEFT_OUT))
         .select_related("order__currency", "product", "product_variant")
         .order_by("-order__order_date", "-order__created_at", "-pk")
     )
@@ -89,7 +89,7 @@ def attach_lines(rows):
     for o in rows:
         if len(o.row_numbers) > 1:
             lines = split_lines.get(o.split_group, [])
-            o.row_lines = [l for l in lines if l.order.order_status != "cancelled"] or lines
+            o.row_lines = [l for l in lines if l.order.status != "cancelled"] or lines
         else:
             o.row_lines = list(o.items.all())
             for line in o.row_lines:

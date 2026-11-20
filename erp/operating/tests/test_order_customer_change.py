@@ -41,7 +41,7 @@ class OrderCustomerChangeTest(TestCase):
 
     def test_the_sale_follows_the_order_to_its_new_customer(self):
         order = Order.objects.create(company=self.wrong_co, current_account=self.wrong,
-                                     order_status="shipped")
+                                     status="shipped")
         OrderItem.objects.create(order=order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal("100"), price=Decimal("2.00"))

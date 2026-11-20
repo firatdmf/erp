@@ -36,7 +36,7 @@ class NewOrderNotificationBookTest(TestCase):
             book=book, code=f"C-{book.pk}", name="Ayşe", type="customer",
             default_currency=self.usd)
         return Order.objects.create(web_client=self.web_client, current_account=account,
-                                    order_status="pending")
+                                    status="pending")
 
     def told(self, order):
         return set(Notification.objects.filter(notification_type="new_order", object_id=order.pk)
@@ -51,7 +51,7 @@ class NewOrderNotificationBookTest(TestCase):
         self.assertEqual(self.told(order), {self.ergene_staff.pk, self.both.pk, self.boss.pk})
 
     def test_an_order_with_no_book_is_told_to_superusers_only(self):
-        order = Order.objects.create(web_client=self.web_client, order_status="pending")
+        order = Order.objects.create(web_client=self.web_client, status="pending")
         self.assertEqual(self.told(order), {self.boss.pk})
 
     def test_a_member_who_turned_order_notifications_off_is_not_told(self):

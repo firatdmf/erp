@@ -100,7 +100,7 @@ class ReceivedPurchaseEditTest(TestCase):
         product = Product.objects.create(
             title="Order product", sku=f"ORD-{barcode}", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
-        order = Order.objects.create(order_number=f"DK-{barcode}", order_status="pending")
+        order = Order.objects.create(order_number=f"DK-{barcode}", status="pending")
         item = OrderItem.objects.create(
             order=order, product=product, quantity=qty, price=10,
             product_variant=ProductVariant.objects.create(

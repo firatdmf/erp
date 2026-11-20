@@ -189,7 +189,7 @@ class QuoteTest(TestCase):
                          (self.product, self.variant, Decimal("50.00"), Decimal("2.30")))
         # An order, not yet a sale: the account is charged when it ships.
         self.assertFalse(CurrentAccountMovement.objects.filter(movement_type="order_sale").exists())
-        Order.objects.filter(pk=order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=order.pk).update(status="shipped")
         order.refresh_from_db()
         post_order_movement(order)
         sale = CurrentAccountMovement.objects.get(movement_type="order_sale", source_id=order.pk)

@@ -44,7 +44,7 @@ class OrderListProfitTest(TestCase):
                                      currency=usd)
             OrderItem.objects.create(order=o, product=product, product_variant=self.variant,
                                      quantity=Decimal("25"), price=Decimal("12"))
-            Order.objects.filter(pk=o.pk).update(order_status=status)
+            Order.objects.filter(pk=o.pk).update(status=status)
             return o
 
         self.shipped = order("DK-SHIP", "shipped")

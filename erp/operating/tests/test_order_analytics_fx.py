@@ -32,7 +32,7 @@ class AnalyticsConvertsForeignOrders(TestCase):
         self.url = reverse("operating:order_analytics")
 
     def _order(self, number, **kw):
-        order = Order.objects.create(order_number=number, order_status="pending", **kw)
+        order = Order.objects.create(order_number=number, status="pending", **kw)
         OrderItem.objects.create(order=order, product=self.product,
                                  product_variant=self.variant,
                                  quantity=Decimal("100"), price=Decimal("10.00"))
@@ -69,7 +69,7 @@ class AnalyticsCostsWhatTheOrderSends(TestCase):
         product = Product.objects.create(title="Crepe", sku="KZL000902", price=10)
         variant = ProductVariant.objects.create(product=product, variant_sku="KZL000902.1",
                                                 variant_cost=Decimal("4.00"))
-        order = Order.objects.create(order_number="DK0000910", order_status="pending")
+        order = Order.objects.create(order_number="DK0000910", status="pending")
         line = OrderItem.objects.create(order=order, product=product, product_variant=variant,
                                         quantity=Decimal("100"), price=Decimal("10.00"))
         from accounting.models import Book

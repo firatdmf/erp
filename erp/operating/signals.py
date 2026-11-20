@@ -34,14 +34,14 @@ from django.db import transaction
 # ────────────────────────────────────────────────────────────────────
 @receiver(pre_save, sender=Order)
 def _capture_order_old_status(sender, instance, **kwargs):
-    """Stash the previous order_status on the instance so post_save
+    """Stash the previous status on the instance so post_save
     can decide whether we're transitioning IN or OUT of a deduct state."""
     if not instance.pk:
         instance._old_status = None
         return
     try:
-        old = Order.objects.only("order_status").get(pk=instance.pk)
-        instance._old_status = old.order_status
+        old = Order.objects.only("status").get(pk=instance.pk)
+        instance._old_status = old.status
     except Order.DoesNotExist:
         instance._old_status = None
 
@@ -120,7 +120,7 @@ def notify_customer_of_status(order, new_status):
 
 @receiver(post_save, sender=Order)
 def email_customer_on_status_change(sender, instance, created, **kwargs):
-    """Fire a transactional email when the order's order_status
+    """Fire a transactional email when the order's status
     transitions into a notable state. Gated on Order.notify_customer.
 
     Skips the 'created' event here — that's handled at create-time in
@@ -139,7 +139,7 @@ def email_customer_on_status_change(sender, instance, created, **kwargs):
         return
     if not instance.notify_customer:
         return
-    new_status = instance.order_status
+    new_status = instance.status
     old_status = getattr(instance, "_old_status", None) if not created else None
     if not created and old_status == new_status:
         return

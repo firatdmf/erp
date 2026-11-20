@@ -43,7 +43,7 @@ class _AnOrderToComplete:
             default_currency=CurrencyCategory.objects.create(
                 code="USD", name="US Dollar", symbol="$"))
         self.order = Order.objects.create(
-            order_number="DK0000318", current_account=account, order_status="pending")
+            order_number="DK0000318", current_account=account, status="pending")
         product = Product.objects.create(title="Crepe", sku="KZL000318",
                                          price=10, cost=Decimal("1"))
         OrderItem.objects.create(order=self.order, product=product,
@@ -59,7 +59,7 @@ class _AnOrderToComplete:
 
     def _complete(self, *files, status="shipped"):
         return self.client.post(self.url, {
-            "action": "update_status", "order_status": status,
+            "action": "update_status", "status": status,
             "carrier": "yurtici", "tracking_number": "123",
             "cargo_receipts": list(files),
         })
@@ -71,7 +71,7 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
     def test_completing_keeps_the_receipts(self, upload):
         self._complete(_pdf(), _jpg())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
         receipts = list(self.order.cargo_receipts.all())
         self.assertEqual([r.file_name for r in receipts], ["kargo-fisi.pdf", "IMG_0412.jpg"])
         self.assertEqual([r.content_type for r in receipts], ["application/pdf", "image/jpeg"])
@@ -85,7 +85,7 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         doc = SimpleUploadedFile("notes.docx", b"PK", content_type="application/msword")
         resp = self._complete(doc, _pdf())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
         self.assertEqual(self.order.cargo_receipts.count(), 1)
         self.assertEqual(upload.call_count, 1)
         self.assertIn("notes.docx", " ".join(m.message for m in resp.wsgi_request._messages))
@@ -94,7 +94,7 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         upload.side_effect = Exception("Bunny down")
         self._complete(_pdf())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
         self.assertFalse(self.order.cargo_receipts.exists())
 
     def test_a_refused_completion_stores_nothing(self, upload):
@@ -102,7 +102,7 @@ class CargoReceiptOnCompletion(_AnOrderToComplete, TestCase):
         self.user.member.permissions.add(perm)
         self._complete(_pdf())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "pending")
+        self.assertEqual(self.order.status, "pending")
         self.assertFalse(self.order.cargo_receipts.exists())
         upload.assert_not_called()
 
@@ -201,7 +201,7 @@ class TheShippedEmailCarriesTheReceipt(_AnOrderToComplete, TestCase):
     def test_completing_attaches_the_receipt(self, _get, send, _pdf_render, upload):
         self._complete(_pdf())
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
         shipped = [c for c in send.call_args_list if "receipt" in (c.kwargs.get("text_body") or "")]
         self.assertEqual(len(shipped), 1)
         call = shipped[0]
@@ -225,13 +225,13 @@ class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
     redraws the card from the answer instead of reloading."""
 
     def _save(self, *files, status="shipped", **fields):
-        data = {"action": "update_status", "order_status": status,
+        data = {"action": "update_status", "status": status,
                 "carrier": "Sürat Kargo", "tracking_number": "16865",
                 "cargo_receipts": list(files), **fields}
         return self.client.post(self.url, data, HTTP_ACCEPT="application/json")
 
     def test_save_answers_with_the_saved_cargo(self, upload):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         data = self._save(_pdf()).json()
         self.assertTrue(data["ok"])
         self.assertEqual((data["carrier"], data["carrier_label"], data["tracking_number"]),
@@ -240,10 +240,10 @@ class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
         receipt = self.order.cargo_receipts.get()
         self.assertIn(f'data-receipt-id="{receipt.pk}"', data["receipts_html"])
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "shipped")
+        self.assertEqual(self.order.status, "shipped")
 
     def test_the_answer_reads_the_receipts_and_the_carrier_once(self, upload):
-        Order.objects.filter(pk=self.order.pk).update(order_status="shipped")
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
         self._save(_pdf())
         with CaptureQueriesContext(connection) as queries:
             self._save(carrier="surat-kargo")
@@ -262,7 +262,7 @@ class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
         res = self._save(status="shipped")  # the order is still pending
         self.assertEqual(res.status_code, 409)
         self.order.refresh_from_db()
-        self.assertEqual((self.order.order_status, self.order.tracking_number), ("pending", None))
+        self.assertEqual((self.order.status, self.order.tracking_number), ("pending", None))
 
     @patch("marketing.utils.bunny_storage.delete_from_bunny")
     def test_removing_a_receipt_answers_with_the_card(self, delete, upload):

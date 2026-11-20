@@ -311,18 +311,18 @@ class SalesRepRoleTests(TestCase):
 
         # No recorded creator: admin-only under erp.ownership.can_edit,
         # and still hers to edit.
-        theirs = order_in(laleli, order_status="pending")
+        theirs = order_in(laleli, status="pending")
         self.assertEqual(edit(theirs).status_code, 200)
 
         group = uuid4()
-        her_half = order_in(laleli, order_status="pending", split_group=group)
-        other_half = order_in(ergene, order_status="pending", split_group=group)
+        her_half = order_in(laleli, status="pending", split_group=group)
+        other_half = order_in(ergene, status="pending", split_group=group)
         self.assertEqual(edit(her_half).status_code, 200)
         self.assertEqual(edit(other_half).status_code, 404)
 
-        self.assertEqual(edit(order_in(ergene, order_status="pending")).status_code, 404)
+        self.assertEqual(edit(order_in(ergene, status="pending")).status_code, 404)
 
-        shipped = order_in(laleli, order_status="shipped")
+        shipped = order_in(laleli, status="shipped")
         self.assertEqual(edit(shipped).status_code, 302)
 
     def test_a_customer_stays_editable_by_its_creator_only(self):
@@ -348,7 +348,7 @@ class SalesRepRoleTests(TestCase):
         from operating.views_warehouse import apply_order_status_change
         from operating.models import Order
 
-        order = Order.objects.create(order_status="pending")
+        order = Order.objects.create(status="pending")
         for actor in (self.user, self.user.member):
             with self.subTest(actor=type(actor).__name__):
                 ok, code = apply_order_status_change(
@@ -357,7 +357,7 @@ class SalesRepRoleTests(TestCase):
                 order.refresh_from_db()
                 self.assertFalse(ok)
                 self.assertEqual(code, "forbidden_sales_rep")
-                self.assertEqual(order.order_status, "pending")
+                self.assertEqual(order.status, "pending")
 
     def test_write_pages_are_closed_even_over_get(self):
         # Several views here mutate on GET, so the path gate has to hold

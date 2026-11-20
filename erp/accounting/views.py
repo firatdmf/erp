@@ -3388,7 +3388,7 @@ class SalesDashboardView(View):
                 'currency_symbol': order.currency_symbol,
                 # What this order contributed to the totals above.
                 'revenue_base': order_revenue_base,
-                'status': order.order_status or order.payment_status or 'pending',
+                'status': order.status or order.payment_status or 'pending',
                 'payment_status': order.payment_status,
             })
         

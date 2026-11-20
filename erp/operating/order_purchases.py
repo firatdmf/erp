@@ -73,13 +73,13 @@ def packing_state(order):
     """Whether the packing floor has started on `order`, and how far —
     what the order's cancel confirmation says out loud before anyone
     confirms. Started means it has left "Open" or rolls are held for it."""
-    status = order.order_status or "pending"
+    status = order.status or "pending"
     rolls = order.stock_reservations.filter(consumed=False).count()
     return {
         "started": status != "pending" or rolls > 0,
         "rolls": rolls,
         "status": status,
-        "status_label": order.get_order_status_display(),
+        "status_label": order.get_status_display(),
     }
 
 
@@ -271,7 +271,7 @@ def known_line_costs_for(orders):
         covered[r.order_item_id] += r.quantity
 
     open_ids = (Order.objects.filter(pk__in=ids)
-                .exclude(order_status__in=list(_CLOSED_STATUSES)).values_list("pk", flat=True))
+                .exclude(status__in=list(_CLOSED_STATUSES)).values_list("pk", flat=True))
     coming = {}   # (order pk, SKU lowercased) → [quantity, value]
     for invoice in (Invoice.objects.filter(for_order_id__in=list(open_ids), status="ordered")
                     .select_related("current_account")):
@@ -388,7 +388,7 @@ def purchase_cancel_warning(invoice):
 
 
 def order_is_open(order):
-    return (order.order_status or "pending") not in _CLOSED_STATUSES
+    return (order.status or "pending") not in _CLOSED_STATUSES
 
 
 def order_bought_for(invoice):
@@ -400,7 +400,7 @@ def order_bought_for(invoice):
     step. The link itself (invoice.for_order) stays, as the record of why
     the goods were bought."""
     order = invoice.for_order
-    if order is None or order.order_status == "cancelled":
+    if order is None or order.status == "cancelled":
         return None
     return order
 
@@ -1226,7 +1226,7 @@ def drop_purchase_lines_from_order(invoice, *, user=None):
         # wants. Nobody is told — the order itself goes ahead.
         rest_goes_ahead = bool(order.split_group) and (
             Order.objects.filter(split_group=order.split_group, items__isnull=False)
-            .exclude(pk=order.pk).exclude(order_status="cancelled").exists())
+            .exclude(pk=order.pk).exclude(status="cancelled").exists())
         if rest_goes_ahead:
             from .views_warehouse import _apply_status_to_one
             order._one_notice_for_split = True

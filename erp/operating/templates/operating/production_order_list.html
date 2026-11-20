@@ -52,7 +52,7 @@
           <td><a href="{% url 'operating:order_production' order.pk %}">{{ order.order_number|default:order.pk }}</a></td>
           <td>{% if order.contact %}{{ order.contact.name|capfirst }}{% elif order.company %}{{ order.company.name|capfirst }}{% elif order.web_client %}{{ order.web_client.name|default:order.web_client.username }}{% else %}—{% endif %}</td>
           <td class="po-date">{{ order.order_date|date:"d.m.Y" }}</td>
-          <td class="po-status">{{ order.get_order_status_display }}</td>
+          <td class="po-status">{{ order.get_status_display }}</td>
           <td class="num">{{ order.line_count }}</td>
         </tr>
         {% endfor %}

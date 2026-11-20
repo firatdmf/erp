@@ -95,8 +95,8 @@ class PackingScreenRolls(TestCase):
         """Packing is locked once an order ships, but the rolls are exactly
         what someone comes back to check — so the card's shell is there
         even though nothing may be scanned into it."""
-        self.order.order_status = "shipped"
-        self.order.save(update_fields=["order_status"])
+        self.order.status = "shipped"
+        self.order.save(update_fields=["status"])
         html = self._html()
         self.assertIn('id="pkScanModal"', html)      # the card can still open
         self.assertIn('id="pkScanResult"', html)

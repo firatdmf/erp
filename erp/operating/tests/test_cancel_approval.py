@@ -60,7 +60,7 @@ class CancelApprovalTest(TestCase):
     def _cancel(self, user, reason="Customer changed their mind"):
         self.client.force_login(user)
         return self.client.post(self.detail, {"action": "update_status",
-                                              "order_status": "cancelled",
+                                              "status": "cancelled",
                                               "cancel_reason": reason})
 
     def _decide(self, user, decision, note=""):
@@ -72,7 +72,7 @@ class CancelApprovalTest(TestCase):
     def _status(self):
         self.order.refresh_from_db()
         self.purchase.refresh_from_db()
-        return self.order.order_status, self.purchase.status
+        return self.order.status, self.purchase.status
 
     # ── Asking ──────────────────────────────────────────────────────
     def test_a_book_admin_cancels_straight_away(self):
@@ -99,13 +99,13 @@ class CancelApprovalTest(TestCase):
         self.client.post(reverse("accounts:purchase_order_confirm", args=[self.purchase.pk]))
         self._cancel(self.clerk)
         self.order.refresh_from_db()
-        self.assertEqual(self.order.order_status, "cancelled")
+        self.assertEqual(self.order.status, "cancelled")
 
     # ── Frozen while it waits ───────────────────────────────────────
     def test_the_order_is_frozen_while_it_waits(self):
         self._cancel(self.clerk)
         self.client.force_login(self.book_admin)
-        r = self.client.post(self.detail, {"action": "update_status", "order_status": "packaging"})
+        r = self.client.post(self.detail, {"action": "update_status", "status": "packaging"})
         self.assertEqual(self._status(), ("pending", "ordered"))
         item = self.order.items.get()
         r = self.client.post(self.detail, {"action": "update_item", "item_id": item.pk,

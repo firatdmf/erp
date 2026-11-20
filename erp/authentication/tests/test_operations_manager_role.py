@@ -23,7 +23,7 @@ class OperationsManagerRoleTests(TestCase):
     def test_every_order_door_is_closed(self):
         from operating.models import Order
 
-        order = Order.objects.create(order_status="pending", created_by=self.user)
+        order = Order.objects.create(status="pending", created_by=self.user)
         for path in ("/operating/orders/",
                      f"/operating/books/{self.book.pk}/orders/",
                      f"/operating/books/{self.book.pk}/orders/create/",

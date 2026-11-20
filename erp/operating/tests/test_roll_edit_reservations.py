@@ -41,7 +41,7 @@ class RollEditTrimsReservations(TestCase):
         product = Product.objects.create(
             title="Bergamo", sku=f"SKU-{number}", price=10,
             category=ProductCategory.objects.get_or_create(name="fabric")[0])
-        order = Order.objects.create(order_number=number, order_status="pending")
+        order = Order.objects.create(order_number=number, status="pending")
         item = OrderItem.objects.create(
             order=order, product=product, quantity=qty, price=10,
             product_variant=ProductVariant.objects.create(

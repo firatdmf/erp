@@ -574,12 +574,12 @@ class OrderDetail(DetailView):
         # Status flow widget on the detail page — 3 ordered primary
         # stages (Açık → Paketleniyor → Gönderildi) with an "active up
         # to" highlight. We compare against ORDER_PRIMARY_STAGES so the
-        # bar still reads correctly even if order_status is a legacy
+        # bar still reads correctly even if the status is a legacy
         # value (e.g. "delivered" — that comes after "shipped", so all
         # stages are highlighted).
         from .models import ORDER_PRIMARY_STAGES, ORDER_STATUS_CHOICES, CARRIER_CHOICES
         primary = list(ORDER_PRIMARY_STAGES)
-        current = self.object.order_status or "pending"
+        current = self.object.status or "pending"
         # Position the bar fills up to. Statuses past "shipped"
         # (in_transit / delivered / …) all count as 'shipped reached'.
         if current in primary:
@@ -763,7 +763,7 @@ class OrderDetail(DetailView):
         # reachable directly. "Geri Aç & Düzelt" (update_status back to an
         # earlier stage) takes the order out of _SHIPPED_CLASS, which
         # re-opens editing automatically — no separate unlock needed.
-        if action in {"update_item", "add_item", "remove_item"} and order.order_status in _SHIPPED_CLASS:
+        if action in {"update_item", "add_item", "remove_item"} and order.status in _SHIPPED_CLASS:
             return JsonResponse({"ok": False, "error": _gettext("Items on a shipped order can't be edited.")}, status=400)
         # Terminal orders: item/customer mutations are dead too — same
         # direct-POST reasoning as above. update_status stays allowed (the
@@ -771,7 +771,7 @@ class OrderDetail(DetailView):
         # deliberately re-opened via the status panel).
         if (action in {"update_item", "add_item", "remove_item",
                        "update_customer", "update_guest"}
-                and order.order_status in {"cancelled", "returned"}):
+                and order.status in {"cancelled", "returned"}):
             return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be edited.")}, status=400)
         from .cancel_approval import frozen_error
         if action in {"update_item", "add_item", "remove_item", "update_customer", "update_guest"}:
@@ -1145,7 +1145,7 @@ class OrderDetail(DetailView):
         if action != "update_status":
             return self.get(request, *args, **kwargs)
 
-        new_status = (request.POST.get("order_status") or "").strip()
+        new_status = (request.POST.get("status") or "").strip()
         carrier = request.POST.get("carrier")
         tracking = request.POST.get("tracking_number")
         # Retail (Perakende) orders can complete without cargo info — a
@@ -1153,17 +1153,17 @@ class OrderDetail(DetailView):
         # checkbox on the detail page. Gated on is_retail_order so this
         # flag can never bypass the cargo gate for a normal order.
         skip_cargo = order.is_retail_order and request.POST.get("skip_cargo") == "1"
-        was_shipped = order.order_status in _SHIPPED_CLASS
+        was_shipped = order.status in _SHIPPED_CLASS
 
         # Cancelling is irreversible, so the page asks why and the reason
         # is required — it lands in the change history below.
         from django.utils.translation import gettext as _g
         # A background save is the cargo card's Save: cargo only, never a
         # status change — those reload the page, which they redraw.
-        if wants_json and new_status != order.order_status:
+        if wants_json and new_status != order.status:
             return JsonResponse({"ok": False, "error": _g("The order's status changed. Reload the page.")}, status=409)
         cancel_reason = (request.POST.get("cancel_reason") or "").strip()
-        cancelling = new_status == "cancelled" and order.order_status != "cancelled"
+        cancelling = new_status == "cancelled" and order.status != "cancelled"
         if cancelling and not cancel_reason:
             messages.error(request, _g("Enter a reason to cancel the order."))
             return redirect("operating:order_detail", pk=order.pk)
@@ -1266,7 +1266,7 @@ class OrderDetail(DetailView):
         if rejected:
             messages.warning(request, rejected_msg)
 
-        now_shipped = order.order_status in _SHIPPED_CLASS
+        now_shipped = order.status in _SHIPPED_CLASS
         if now_shipped and not was_shipped:
             messages.success(
                 request,
@@ -1880,7 +1880,7 @@ def order_pack_scan(request, pk):
     order = get_object_or_404(Order, pk=pk)
     # Cancelled/returned is terminal — never render the packing UI (which
     # would also auto-create Pack #1 as a GET side effect) for a dead order.
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         messages.error(request, _gettext("A cancelled order can't be packed."))
         return redirect("operating:order_detail", pk=order.pk)
     from .cancel_approval import frozen_error
@@ -1942,7 +1942,7 @@ def order_pack_scan(request, pk):
         "reservations": reservations,
         "unassigned_reservations": unassigned_reservations,
         "reservation_count": sum(1 for r in reservations if not r.consumed),
-        "shipped": order.order_status in _SHIPPED_CLASS,
+        "shipped": order.status in _SHIPPED_CLASS,
         "packs": packs,
     })
 
@@ -1958,9 +1958,9 @@ def _packing_follows_packages(order, user):
     packs = order_packs(order)
     packed = (OrderStockReservation.objects.filter(pack__in=packs, consumed=False).exists()
               or OrderItem.objects.filter(pack__in=packs).exists())
-    if packed and order.order_status in ("pending", "confirmed", "preparing"):
+    if packed and order.status in ("pending", "confirmed", "preparing"):
         apply_order_status_change(order, "packaging", user=user)
-    elif not packed and order.order_status == "packaging":
+    elif not packed and order.status == "packaging":
         apply_order_status_change(order, "pending", user=user)
 
 
@@ -1986,9 +1986,9 @@ def order_pack_reserve_add(request, pk):
     the order from the packing bench."""
     from .models import WarehouseProductItem, OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         # Cancelling an order deletes its reservations and is terminal —
         # a stock item scanned onto it afterwards would hold warehouse stock
         # forever with nothing to ever release it.
@@ -2126,9 +2126,9 @@ def order_pack_reserve_update(request, pk):
     """Edit the reserved meters of one reservation (partial cut)."""
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     from .cancel_approval import frozen_error
     if frozen := frozen_error(order):
@@ -2165,9 +2165,9 @@ def order_pack_reserve_remove(request, pk):
     """Release a reservation (remove a scanned roll) before shipping."""
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     from .cancel_approval import frozen_error
     if frozen := frozen_error(order):
@@ -2198,9 +2198,9 @@ def order_pack_reserve_assign_pack(request, pk):
     retail orders only; retail keeps the flat, packless list."""
     from .models import OrderStockReservation
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     from .cancel_approval import frozen_error
     if frozen := frozen_error(order):
@@ -2239,9 +2239,9 @@ def order_pack_assign_item(request, pk):
     OrderItem.pack assignment instead of the roll-reservation machinery
     tracked lines use (order_pack_reserve_assign_pack)."""
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     from .cancel_approval import frozen_error
     if frozen := frozen_error(order):
@@ -2395,7 +2395,7 @@ def _editable_halves(order, user):
     raised_it = can_edit(user, order)
     return [h for h in split_halves(order)
             if h.pk != order.pk and order_book(h) is not None
-            and h.order_status == order.order_status
+            and h.status == order.status
             and (raised_it or member_can_use_book(member, order_book(h)))
             and not frozen_error(h)]
 
@@ -2549,7 +2549,7 @@ def _sibling_order_for_book(order, book, member):
     from .split_orders import CUSTOMER_FIELDS, SHARED_FIELDS
     sibling = Order(
         **{name: getattr(order, name) for name in SHARED_FIELDS + CUSTOMER_FIELDS},
-        order_status=order.order_status,
+        status=order.status,
         split_group=order.split_group,
     )
     # The customer was told where the order stands already; a new half
@@ -3225,10 +3225,10 @@ def order_pack_complete(request, pk):
     invoice bill only what was actually scanned, see
     Order.billable_value), only "nothing scanned at all" is rejected."""
     order = get_object_or_404(Order, pk=pk)
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": _gettext("The order has already shipped.")}, status=400)
-    if order.order_status in {"cancelled", "returned"}:
-        # Also blocks the raw order_status='packaging' save below from
+    if order.status in {"cancelled", "returned"}:
+        # Also blocks the raw status='packaging' save below from
         # reviving a terminal order outside the status funnel.
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be re-opened.")}, status=400)
     from .cancel_approval import frozen_error
@@ -3238,7 +3238,7 @@ def order_pack_complete(request, pk):
     if n < 1:
         return JsonResponse({"ok": False,
                              "error": _gettext("Scan at least one stock item to finish packing.")}, status=400)
-    if order.order_status != "packaging":
+    if order.status != "packaging":
         # Through the status funnel, so a split order's halves are packed
         # together. As the system's own step (no user), as the plain save
         # this replaces was: finishing the scan is what packs the order.
@@ -3283,7 +3283,7 @@ def _decorate_order_changes(changes, order):
     def val_display(c, v):
         if v is None:
             return None
-        if c.field == "order_status":
+        if c.field == "status":
             return status_map.get(v, v)
         if c.field == "carrier":
             return carrier_map.get(v, v)
@@ -4816,7 +4816,7 @@ class OrderEdit(UpdateView):
         # in that status (it can only be revived through the status panel).
         # Editing either would silently mutate items and re-trigger
         # current account/catalog signals on a dead order.
-        if self.object.order_status in {"cancelled", "returned"}:
+        if self.object.status in {"cancelled", "returned"}:
             messages.error(request, _gettext("A cancelled order can't be edited."))
             return redirect("operating:order_detail", pk=self.object.pk)
         from .cancel_approval import frozen_error
@@ -4828,7 +4828,7 @@ class OrderEdit(UpdateView):
         # reservations consumed. Editing items then would desync catalog
         # vs warehouse stock (the item signals adjust catalog while the
         # consumed reservations are never revisited), so block it.
-        if self.object.order_status in {"shipped", "in_transit", "out_for_delivery", "delivered"}:
+        if self.object.status in {"shipped", "in_transit", "out_for_delivery", "delivered"}:
             messages.error(request, _gettext("Shipped orders can't be edited."))
             return redirect("operating:order_detail", pk=self.object.pk)
         return super().dispatch(request, *args, **kwargs)
@@ -5319,7 +5319,7 @@ class OrderEdit(UpdateView):
                 # here, and its counter money settled with it — nothing
                 # left half-edited, nothing left on Retail Sales.
                 if (self.object.is_retail_order
-                        and self.object.order_status not in _SHIPPED_CLASS):
+                        and self.object.status not in _SHIPPED_CLASS):
                     from django.utils.translation import gettext as _g
                     from .views_warehouse import apply_order_status_change
                     done, code = apply_order_status_change(
@@ -5440,8 +5440,8 @@ class OrderList(ListView):
         def _day(order):
             return order.order_date or order.created_at.date()
         for order in all_orders:
-            order.list_group = ("open" if order.order_status in ORDER_LIST_OPEN_STATUSES
-                                else "cancelled" if order.order_status == "cancelled"
+            order.list_group = ("open" if order.status in ORDER_LIST_OPEN_STATUSES
+                                else "cancelled" if order.status == "cancelled"
                                 else "done")
         all_orders = (
             sorted((o for o in all_orders if o.list_group == "open"),
@@ -5496,7 +5496,7 @@ class OrderList(ListView):
             day = order.order_date or timezone.localtime(order.created_at).date()
             # This month also carries what is still open from before it.
             still_open = (month == this_month and day < month
-                          and order.order_status in ORDER_LIST_OPEN_STATUSES)
+                          and order.status in ORDER_LIST_OPEN_STATUSES)
             order.in_period = month <= day < after or still_open
             carried += still_open
         in_period = [order for order in all_orders if order.in_period]
@@ -5584,7 +5584,7 @@ def _attach_list_gross_profit(orders):
     from accounting.services_posting import COST_OF_GOODS_SOLD
     from .models import StockMovement
 
-    shipped = {o.pk: o for o in orders if o.order_status in ORDER_LIST_SHIPPED_STATUSES}
+    shipped = {o.pk: o for o in orders if o.status in ORDER_LIST_SHIPPED_STATUSES}
     movement_order = dict(
         StockMovement.objects.filter(order_id__in=shipped).values_list("pk", "order_id"))
     recorded = defaultdict(Decimal)
@@ -5611,7 +5611,7 @@ def _attach_list_gross_profit(orders):
             cost = (recorded[order.pk] / rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             profit += live - cost
         order.list_gross_profit = profit
-        order.counts_in_profit = order.order_status not in ORDER_LIST_UNSOLD_STATUSES
+        order.counts_in_profit = order.status not in ORDER_LIST_UNSOLD_STATUSES
 
 
 def _currency_codes(orders):
@@ -5704,7 +5704,7 @@ class ProductionOrderList(ListView):
         from django.db.models import Count
         return (Order.objects
                 .filter(current_account__book=self.request.book,
-                        order_status__in=ORDER_LIST_OPEN_STATUSES)
+                        status__in=ORDER_LIST_OPEN_STATUSES)
                 .select_related("contact", "company", "web_client")
                 .annotate(line_count=Count("items"))
                 .order_by("-created_at"))
@@ -5946,7 +5946,7 @@ class OrderPackingList(View):
         # on a terminal (cancelled/returned) order, though: that would
         # write a Pack as a GET side effect on a dead order.
         if (not order_packs(order).exists()
-                and order.order_status not in {"cancelled", "returned"}):
+                and order.status not in {"cancelled", "returned"}):
             Pack.objects.create(order=pack_holder(order), pack_number=1)
         packs = list(order_packs(order))
         # Item numbers run 1..N across the whole order rather than
@@ -5978,7 +5978,7 @@ class OrderPackingList(View):
             "gross_kg": gross_kg,
             "net_kg_estimated": any(p.weights["net_kg_estimated"] for p in packs),
             "unassigned_count": unassigned_count,
-            "shipped": order.order_status in _SHIPPED_CLASS,
+            "shipped": order.status in _SHIPPED_CLASS,
         })
 
     def post(self, request, pk):
@@ -5988,9 +5988,9 @@ class OrderPackingList(View):
         # Same server-side lock as the reserve/assign endpoints — this
         # was previously only enforced by hiding the buttons in the UI,
         # leaving the endpoint itself open on a shipped order.
-        if order.order_status in _SHIPPED_CLASS:
+        if order.status in _SHIPPED_CLASS:
             return JsonResponse({"ok": False, "error": _gettext("The order has shipped — packing is locked.")}, status=400)
-        if order.order_status in {"cancelled", "returned"}:
+        if order.status in {"cancelled", "returned"}:
             return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
         action = (request.POST.get("action") or "").strip()
         from .split_orders import order_packs, pack_holder
@@ -6049,7 +6049,7 @@ def _set_pack_gross_kg(request, order):
     on a shipped order too: the weight is paperwork about the sack, it
     moves no stock, and papers are often finished after it has gone."""
     from decimal import Decimal, InvalidOperation
-    if order.order_status in {"cancelled", "returned"}:
+    if order.status in {"cancelled", "returned"}:
         return JsonResponse({"ok": False, "error": _gettext("A cancelled order can't be packed.")}, status=400)
     try:
         pack_id = int(request.POST.get("pack_id") or 0)
@@ -6336,7 +6336,7 @@ def delete_order(request, pk):
     # WITHOUT restoring stock, orphan the current account sale movement, and (for
     # retail) crash on the defter entry's RESTRICT FK. Force the proper
     # path: re-open first (which reverses everything), then delete.
-    if order.order_status in _SHIPPED_CLASS:
+    if order.status in _SHIPPED_CLASS:
         from django.utils.translation import gettext as _
         messages.error(
             request,
@@ -6435,8 +6435,8 @@ def bulk_delete_orders(request):
         "current_account__book")
     # Same guard as delete_order: shipped orders must be re-opened first
     # (stock + money already posted). Skip them and tell the UI which.
-    deletable = [o for o in qs if o.order_status not in _SHIPPED_CLASS]
-    skipped_ids = [o.pk for o in qs if o.order_status in _SHIPPED_CLASS]
+    deletable = [o for o in qs if o.status not in _SHIPPED_CLASS]
+    skipped_ids = [o.pk for o in qs if o.status in _SHIPPED_CLASS]
     # Iterate so each Order.delete() triggers its cascade signals
     # (OrderItem post_delete restores catalog stock; current account movement is
     # reversed). bulk delete via qs.delete() would still cascade but
@@ -7450,7 +7450,7 @@ def get_order_status(request, order_id):
         return JsonResponse(
             {
                 "id": order.pk,
-                "status": order.get_order_status_display(),
+                "status": order.get_status_display(),
                 "created_at": order.created_at.isoformat(),
                 "updated_at": order.updated_at.isoformat(),
                 "items": [
@@ -7530,12 +7530,10 @@ def get_order_detail_api(request, user_id, order_id):
         order_data = {
             'id': order.pk,
             'order_number': f'ORD-{order.pk}',
-            # `order_status` goes once the storefront reads `status`.
-            'status': order.order_status,
-            'order_status': order.order_status,
-            'order_status_display': dict(
-                order._meta.get_field('order_status').choices
-            ).get(order.order_status) if order.order_status else None,
+            'status': order.status,
+            'status_display': dict(
+                order._meta.get_field('status').choices
+            ).get(order.status) if order.status else None,
             'created_at': order.created_at.isoformat(),
             'updated_at': order.updated_at.isoformat(),
             'ettn': order.ettn,
@@ -7838,9 +7836,8 @@ def track_order(request):
             'order': {
                 'id': order.pk,
                 'order_number': order.order_number or f"DK{str(order.pk).zfill(7)}",
-                'status': order.order_status,
-                'order_status': order.order_status,
-                'order_status_display': dict(order._meta.get_field('order_status').choices).get(order.order_status, order.order_status) if order.order_status else None,
+                'status': order.status,
+                'status_display': dict(order._meta.get_field('status').choices).get(order.status, order.status) if order.status else None,
                 'created_at': order.created_at.isoformat() if order.created_at else None,
                 'updated_at': order.updated_at.isoformat() if order.updated_at else None,
                 
@@ -7892,7 +7889,7 @@ def update_order_status(request, order_id):
     
     Body:
     {
-        "order_status": "shipped",  # pending, confirmed, preparing, shipped, delivered, etc.
+        "status": "shipped",  # pending, confirmed, preparing, shipped, delivered, etc.
         "carrier": "yurtici",       # yurtici, mng, aras, ptt, ups
         "tracking_number": "123456789"
     }
@@ -7910,7 +7907,7 @@ def update_order_status(request, order_id):
         from .views_warehouse import apply_order_status_change
         ok, code = apply_order_status_change(
             order,
-            (data.get('order_status') or order.order_status),
+            (data.get('status') or order.status),
             carrier=data.get('carrier'),
             tracking=data.get('tracking_number'),
             user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
@@ -7944,7 +7941,7 @@ def update_order_status(request, order_id):
             'success': True,
             'message': _gettext("Order status updated"),
             'order_number': order.order_number,
-            'order_status': order.order_status,
+            'status': order.status,
             'carrier': order.carrier,
             'tracking_number': order.tracking_number
         })
@@ -8048,7 +8045,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
         EXCLUDED = ["cancelled", "returned"]
         base_orders = Order.objects.filter(
             created_at__gte=start_date, created_at__lte=end_date
-        ).exclude(order_status__in=EXCLUDED)
+        ).exclude(status__in=EXCLUDED)
         # The page ranks customers by name, so it counts only the orders
         # of customers its reader may see (crm.Directory).
         from crm.models import of_books_in_reach, within_directories
@@ -8246,7 +8243,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
                 c["current_account"] = None
 
         # ── Status distribution (for the mix bar) ──
-        status_rows = list(base_orders.values("order_status").annotate(n=Count("id")).order_by("-n"))
+        status_rows = list(base_orders.values("status").annotate(n=Count("id")).order_by("-n"))
 
         context = {
             "summary": {
@@ -8345,7 +8342,7 @@ class WebOrderStatusEdit(View):
         carrier_choices_en = carrier_choices_for(order)
         
         # Get form data
-        new_status = request.POST.get('order_status')
+        new_status = request.POST.get('status')
         carrier = request.POST.get('carrier')
         tracking_number = request.POST.get('tracking_number')
 
@@ -8353,7 +8350,7 @@ class WebOrderStatusEdit(View):
         # reservation → stock-out conversion can't be bypassed here.
         from .views_warehouse import apply_order_status_change
         ok, code = apply_order_status_change(
-            order, (new_status or order.order_status),
+            order, (new_status or order.status),
             carrier=carrier, tracking=tracking_number, user=request.user,
         )
         if not ok:

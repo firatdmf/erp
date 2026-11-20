@@ -136,7 +136,7 @@ class AHalfAddedLaterIsTheSameOrder(TestCase):
         self.order = Order.objects.create(
             order_number="ORD-L", current_account=account, contact=self.customer,
             order_date=date(2026, 10, 24), internal_notes="Ships with Supertekstil",
-            order_status="packaging")
+            status="packaging")
         parent = Product.objects.create(sku="K24777", title="Tul")
         variant = ProductVariant.objects.create(product=parent, variant_sku="K24777.B02")
         wh = Warehouse.objects.create(name="Ergene depo", accounting_book=self.ergene)
@@ -165,7 +165,7 @@ class AHalfAddedLaterIsTheSameOrder(TestCase):
                 "rolls": [{"barcode": "E-0001", "quantity": 20, "book": self.ergene.pk}]}]),
         })
         added = Order.objects.exclude(pk=self.order.pk).get()
-        self.assertEqual((added.order_date, added.internal_notes, added.order_status),
+        self.assertEqual((added.order_date, added.internal_notes, added.status),
                          (date(2026, 10, 24), "Ships with Supertekstil", "packaging"))
         # The customer already knows the order is being packed.
         notify.assert_not_called()

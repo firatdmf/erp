@@ -12697,7 +12697,7 @@ msgid "the variant sits under featured product '%(current)s', which conflicts wi
 msgstr "varyant featured ürün '%(current)s' altında; sku-eşleşen '%(target)s' ile çelişiyor — taşınmadı"
 
 msgctxt "order change"
-msgid "order status"
+msgid "status"
 msgstr "Sipariş durumu"
 
 msgctxt "order change"

@@ -435,10 +435,10 @@
               </td>
               <td style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ o.created_at|date:"d M Y" }}</td>
               <td>
-                {% if o.order_status == "cancelled" or o.order_status == "returned" %}
-                  <span class="ord-st ord-st-cancelled"><i data-lucide="x-circle"></i>{{ o.get_order_status_display }}</span>
-                {% elif o.order_status == "shipped" or o.order_status == "in_transit" or o.order_status == "out_for_delivery" or o.order_status == "delivered" %}
-                  <span class="ord-st ord-st-done"><i data-lucide="check-circle"></i>{{ o.get_order_status_display }}</span>
+                {% if o.status == "cancelled" or o.status == "returned" %}
+                  <span class="ord-st ord-st-cancelled"><i data-lucide="x-circle"></i>{{ o.get_status_display }}</span>
+                {% elif o.status == "shipped" or o.status == "in_transit" or o.status == "out_for_delivery" or o.status == "delivered" %}
+                  <span class="ord-st ord-st-done"><i data-lucide="check-circle"></i>{{ o.get_status_display }}</span>
                 {% else %}
                   <span class="ord-st {% if o.is_pre_order %}ord-st-preorder{% else %}ord-st-pending{% endif %}" title="{% trans 'Pending order — already reflected on the balance' %}"><i data-lucide="clock"></i>{% trans "Pending" %} · {{ o.status_label }}</span>
                 {% endif %}

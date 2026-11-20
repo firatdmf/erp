@@ -44,7 +44,7 @@ class OrderListPeriodTest(TestCase):
             order_number=number, current_account=self.account,
             is_retail_order=True, order_date=day)
         # Past save(), which may stamp its own date and status.
-        Order.objects.filter(pk=order.pk).update(order_date=day, order_status=status)
+        Order.objects.filter(pk=order.pk).update(order_date=day, status=status)
         return order
 
     def _shown(self, response):

@@ -74,7 +74,7 @@ log_change = _log
 # ────────────────────────────────────────────────────────────────────
 # Simple scalar fields: compared verbatim, logged one row per field.
 _TRACKED_FIELDS = (
-    "order_status", "carrier", "tracking_number", "notes", "internal_notes",
+    "status", "carrier", "tracking_number", "notes", "internal_notes",
     "ettn",
     "guest_first_name", "guest_last_name", "guest_email", "guest_phone",
 )
@@ -126,7 +126,7 @@ def _audit_order_saved(sender, instance, created, **kwargs):
             ov = old.get(f)
             nv = getattr(instance, f, None)
             if (ov or "") != (nv or ""):
-                if f == "order_status":
+                if f == "status":
                     _log(instance, "status", field=f, old=ov, new=nv)
                 else:
                     _log(instance, "field", field=f, old=ov, new=nv)

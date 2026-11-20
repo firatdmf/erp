@@ -3,6 +3,7 @@ from . import views
 from . import views_warehouse
 from . import bought_items
 from . import views_samples
+from . import views_sell_down
 from . import views_partial_shipment
 from . import views_transfer
 from . import order_excel
@@ -46,6 +47,13 @@ urlpatterns = [
     # warehouse itself keep the stricter warehouse_guarded.
     path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),
     path("warehouses/away/", views_warehouse.warehouse_away, name="warehouse_away"),
+    # Sell-down goals. Under warehouses/ because they are about stock, and
+    # so readable by every role that reads the stock pages; each goal is
+    # read over the reader's own books (views_sell_down).
+    path("warehouses/sell-down/", views_sell_down.SellDownList.as_view(), name="sell_down_list"),
+    path("warehouses/sell-down/new/", views_sell_down.SellDownEdit.as_view(), name="sell_down_create"),
+    path("warehouses/sell-down/<int:pk>/", views_sell_down.SellDownDetail.as_view(), name="sell_down_detail"),
+    path("warehouses/sell-down/<int:pk>/edit/", views_sell_down.SellDownEdit.as_view(), name="sell_down_edit"),
     # Global activity feed ("Son Hareketler") — all warehouses. Must sit
     # above warehouses/<int:pk>/ patterns (won't collide: int ≠ "movements").
     path("warehouses/movements/", views_warehouse.WarehouseMovementsAll.as_view(), name="warehouse_movements_all"),

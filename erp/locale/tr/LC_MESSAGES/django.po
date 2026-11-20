@@ -16945,3 +16945,196 @@ msgstr "%(purchase)s artık %(number)s siparişinde değil."
 
 msgid "Roll(s) %(codes)s are back on the shelf."
 msgstr "%(codes)s topları rafa geri döndü."
+
+# Sell-down goals (operating.sell_down).
+msgid "Sell-down goal"
+msgstr "Stok eritme hedefi"
+
+msgid "Sell-down goals"
+msgstr "Stok eritme hedefleri"
+
+msgid "New sell-down goal"
+msgstr "Yeni stok eritme hedefi"
+
+msgid "New goal"
+msgstr "Yeni hedef"
+
+msgid "Edit goal"
+msgstr "Hedefi düzenle"
+
+msgid "Create goal"
+msgstr "Hedefi oluştur"
+
+msgid "Goal reached"
+msgstr "Hedefe ulaşıldı"
+
+msgid "On pace"
+msgstr "Planda"
+
+msgid "Behind pace"
+msgstr "Plandan geride"
+
+msgid "Ahead of pace by"
+msgstr "Plandan önde"
+
+msgid "Behind pace by"
+msgstr "Plandan geride"
+
+#, python-format
+msgid "Ahead of pace by %(amount)s"
+msgstr "Plandan %(amount)s önde"
+
+#, python-format
+msgid "Behind pace by %(amount)s"
+msgstr "Plandan %(amount)s geride"
+
+#, python-format
+msgid "Sell %(amount)s a month to make it"
+msgstr "Yetişmek için ayda %(amount)s satın"
+
+#, python-format
+msgid "%(start)s → %(end)s"
+msgstr "%(start)s → %(end)s"
+
+msgid "Not on the dashboard"
+msgstr "Ana sayfada gösterilmiyor"
+
+msgid "Show on the dashboard"
+msgstr "Ana sayfada göster"
+
+msgid "Value at start"
+msgstr "Başlangıçtaki değer"
+
+msgid "Value left"
+msgstr "Kalan değer"
+
+msgid "Target"
+msgstr "Hedef"
+
+msgid "Left on the shelves"
+msgstr "Rafta kalan"
+
+msgid "Designs in stock"
+msgstr "Stoktaki desenler"
+
+msgid "Design"
+msgstr "Desen"
+
+msgid "The rest"
+msgstr "Diğerleri"
+
+msgid "Nothing left on the shelves."
+msgstr "Rafta bir şey kalmadı."
+
+#, python-format
+msgid "by %(day)s"
+msgstr "son tarih %(day)s"
+
+msgid "Product tag"
+msgstr "Ürün etiketi"
+
+msgid "Product group"
+msgstr "Ürün grubu"
+
+msgid "Deadline"
+msgstr "Son tarih"
+
+#, python-format
+msgid "left of %(start)s · target %(target)s"
+msgstr "kaldı, başlangıç %(start)s · hedef %(target)s"
+
+#, python-format
+msgid "%(done)s%% sold"
+msgstr "%%%(done)s satıldı"
+
+#, python-format
+msgid "%(done)s%% sold, %(due)s%% due by today"
+msgstr "%%%(done)s satıldı, bugüne kadar %%%(due)s olmalıydı"
+
+#, python-format
+msgid "%(done)s%% of the goal sold · %(due)s%% due by today"
+msgstr "Hedefin %%%(done)s kadarı satıldı · bugüne kadar %%%(due)s olmalıydı"
+
+#, python-format
+msgid "%(due)s%% due by today"
+msgstr "Bugüne kadar %%%(due)s olmalıydı"
+
+msgid "To sell each month"
+msgstr "Ayda satılması gereken"
+
+msgid "Designs, most value first"
+msgstr "Desenler, en değerliden başlayarak"
+
+msgid "Share · running"
+msgstr "Pay · toplam"
+
+msgid "Changing the product group or tag starts the goal again from today's stock."
+msgstr "Ürün grubunu veya etiketi değiştirmek hedefi bugünkü stoktan yeniden başlatır."
+
+msgid "The goal starts from what this stock is worth today."
+msgstr "Hedef, bu stokun bugünkü değerinden başlar."
+
+msgid "Stock to sell by a date. Each goal shows the designs that hold most of what is left, so you know what to push."
+msgstr "Bir tarihe kadar satılacak stok. Her hedef, kalanın çoğunu tutan desenleri gösterir; böylece neyi öne çıkaracağınızı bilirsiniz."
+
+#, python-format
+msgid "%(now)s left · target %(target)s"
+msgstr "%(now)s kaldı · hedef %(target)s"
+
+msgid "No sell-down goals in your books yet."
+msgstr "Defterlerinizde henüz stok eritme hedefi yok."
+
+msgid "Its stock in these books is added together. Each person sees the books they work in."
+msgstr "Bu defterlerdeki stok toplanır. Herkes çalıştığı defterleri görür."
+
+msgid "Sell (%)"
+msgstr "Satılacak (%)"
+
+msgid "How much of today's value to sell by the deadline."
+msgstr "Bugünkü değerin ne kadarının son tarihe kadar satılacağı."
+
+msgid "Only products carrying this tag. Leave blank for any."
+msgstr "Yalnızca bu etiketi taşıyan ürünler. Hepsi için boş bırakın."
+
+msgid "Focus on designs holding (%)"
+msgstr "Odaklanılacak desenlerin payı (%)"
+
+msgid "Only products in this group. Leave blank for every group."
+msgstr "Yalnızca bu gruptaki ürünler. Tüm gruplar için boş bırakın."
+
+msgid "The fewest designs, biggest first, that hold this share of what is left are the ones to push."
+msgstr "Kalanın bu payını tutan en az sayıda desen, en büyükten başlayarak, öne çıkarılacak olanlardır."
+
+msgid "At most 100%."
+msgstr "En fazla %100."
+
+msgid "These books use different currencies, so their stock can't be added up."
+msgstr "Bu defterler farklı para birimleri kullanıyor, bu yüzden stokları toplanamaz."
+
+#, python-format
+msgid "The deadline has to be after the start (%(day)s)."
+msgstr "Son tarih, başlangıçtan (%(day)s) sonra olmalı."
+
+#, python-format
+msgid "%(n)s day left"
+msgid_plural "%(n)s days left"
+msgstr[0] "%(n)s gün kaldı"
+msgstr[1] "%(n)s gün kaldı"
+
+#, python-format
+msgid "By %(day)s · %(n)s day left"
+msgid_plural "By %(day)s · %(n)s days left"
+msgstr[0] "Son tarih %(day)s · %(n)s gün kaldı"
+msgstr[1] "Son tarih %(day)s · %(n)s gün kaldı"
+
+#, python-format
+msgid "Push %(n)s design, it holds %(pct)s%%:"
+msgid_plural "Push these %(n)s designs, they hold %(pct)s%%:"
+msgstr[0] "Öne çıkarın: %(n)s desen, kalanın %%%(pct)s kadarı:"
+msgstr[1] "Öne çıkarın: %(n)s desen, kalanın %%%(pct)s kadarı:"
+
+#, python-format
+msgid "The first %(n)s holds %(pct)s%% of what is left"
+msgid_plural "The first %(n)s hold %(pct)s%% of what is left"
+msgstr[0] "İlk %(n)s desen kalanın %%%(pct)s kadarını tutuyor"
+msgstr[1] "İlk %(n)s desen kalanın %%%(pct)s kadarını tutuyor"

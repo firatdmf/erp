@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load i18n static %}
+
+{% block title %}{% if goal.pk %}{% trans "Edit goal" %}{% else %}{% trans "New sell-down goal" %}{% endif %} | Nejum ERP{% endblock %}
+{% block css %}<link rel="stylesheet" href="{% static 'operating/css/sell_down.css' %}">{% endblock %}
+
+{% block content %}
+{% comment %}Create or change a sell-down goal (operating.views_sell_down.
+SellDownEdit), admins only. Each book records what its stock is worth on
+the day it joins; changing the group or tag starts the goal again from
+today, because the old starting values described other products.{% endcomment %}
+<div class="sd-page">
+  <a class="sd-back" href="{% if goal.pk %}{% url 'operating:sell_down_detail' goal.pk %}{% else %}{% url 'operating:sell_down_list' %}{% endif %}"><i class="fa fa-arrow-left"></i> {% if goal.pk %}{{ goal.title }}{% else %}{% trans "Sell-down goals" %}{% endif %}</a>
+  <h1 class="sd-h1">{% if goal.pk %}{% trans "Edit goal" %}{% else %}{% trans "New sell-down goal" %}{% endif %}</h1>
+  <p class="sd-lead" style="margin-bottom:18px">{% if goal.pk %}{% trans "Changing the product group or tag starts the goal again from today's stock." %}{% else %}{% trans "The goal starts from what this stock is worth today." %}{% endif %}</p>
+
+  <form method="post" class="sd-form" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="sd-error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+    {% include "operating/partials/_sell_down_field.html" with field=form.title %}
+    <div class="sd-two">
+      {% include "operating/partials/_sell_down_field.html" with field=form.category %}
+      {% include "operating/partials/_sell_down_field.html" with field=form.tag %}
+    </div>
+    <datalist id="sellDownTags">{% for t in tags %}<option value="{{ t }}">{% endfor %}</datalist>
+    {% include "operating/partials/_sell_down_field.html" with field=form.books %}
+    <div class="sd-two">
+      {% include "operating/partials/_sell_down_field.html" with field=form.sell_percent %}
+      {% include "operating/partials/_sell_down_field.html" with field=form.deadline %}
+    </div>
+    {% include "operating/partials/_sell_down_field.html" with field=form.focus_percent %}
+    <div class="sd-field">
+      <label style="display:inline-flex;gap:8px;align-items:center;font-weight:600">{{ form.is_active }} {{ form.is_active.label }}</label>
+    </div>
+
+    <button type="submit" class="sd-btn primary">{% if goal.pk %}{% trans "Save" %}{% else %}{% trans "Create goal" %}{% endif %}</button>
+  </form>
+</div>
+{% endblock %}

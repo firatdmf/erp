@@ -1,0 +1,54 @@
+{% load i18n static sell_down_tags %}
+{% comment %}The dashboard's sell-down card: one per active goal in the
+reader's books (operating.templatetags.sell_down_tags.sell_down_card).
+The bar fills with how much of the goal is sold; the tick is where the
+straight line from start to deadline says it should be today.{% endcomment %}
+{% if goals %}
+<link rel="stylesheet" href="{% static 'operating/css/sell_down.css' %}">
+{% for p, currency, chips in goals %}
+<section class="sd-card" aria-label="{% trans 'Sell-down goal' %}">
+  <div class="sd-head">
+    <div>
+      <div class="sd-eyebrow">{% trans "Sell-down goal" %}</div>
+      <a class="sd-title" href="{% url 'operating:sell_down_detail' p.goal.pk %}">{{ p.goal.title }}</a>
+    </div>
+    <div class="sd-dates">
+      {% blocktrans with day=p.goal.deadline|date:"j M Y" count n=p.days_left %}By {{ day }} · {{ n }} day left{% plural %}By {{ day }} · {{ n }} days left{% endblocktrans %}
+    </div>
+  </div>
+
+  <div class="sd-figures">
+    {% if show_money %}
+      <span class="sd-big">{{ p.value_now|sd_money:currency }}</span>
+      <span class="sd-of">{% blocktrans with start=p.start_value|sd_money:currency target=p.target_value|sd_money:currency %}left of {{ start }} · target {{ target }}{% endblocktrans %}</span>
+    {% else %}
+      <span class="sd-big">{% blocktrans with done=p.done_percent|floatformat:0 %}{{ done }}% sold{% endblocktrans %}</span>
+    {% endif %}
+    {% if p.reached %}
+      <span class="sd-pill done">{% trans "Goal reached" %}</span>
+    {% elif p.on_pace %}
+      <span class="sd-pill ahead">{% if show_money %}{% blocktrans with amount=p.behind_by|sd_money:currency|cut:"-" %}Ahead of pace by {{ amount }}{% endblocktrans %}{% else %}{% trans "On pace" %}{% endif %}</span>
+    {% else %}
+      <span class="sd-pill behind">{% if show_money %}{% blocktrans with amount=p.behind_by|sd_money:currency %}Behind pace by {{ amount }}{% endblocktrans %}{% else %}{% trans "Behind pace" %}{% endif %}</span>
+    {% endif %}
+  </div>
+
+  <div class="sd-bar" role="img" aria-label="{% blocktrans with done=p.done_percent|floatformat:0 due=p.time_percent|floatformat:0 %}{{ done }}% sold, {{ due }}% due by today{% endblocktrans %}">
+    <div class="sd-bar-fill" style="width: {{ p.done_percent|floatformat:'1u' }}%"></div>
+    <div class="sd-bar-pace" style="left: {{ p.time_percent|floatformat:'1u' }}%"></div>
+  </div>
+  <div class="sd-bar-legend">
+    <span>{% blocktrans with done=p.done_percent|floatformat:0 due=p.time_percent|floatformat:0 %}{{ done }}% of the goal sold · {{ due }}% due by today{% endblocktrans %}</span>
+    {% if show_money and not p.reached %}<span>{% blocktrans with amount=p.needed_per_month|sd_money:currency %}Sell {{ amount }} a month to make it{% endblocktrans %}</span>{% endif %}
+  </div>
+
+  {% if chips %}
+  <div class="sd-push">
+    <span class="sd-push-label">{% blocktrans with pct=p.goal.focus_percent|floatformat:"-2" count n=p.focus|length %}Push {{ n }} design, it holds {{ pct }}%:{% plural %}Push these {{ n }} designs, they hold {{ pct }}%:{% endblocktrans %}</span>
+    {% for d in chips %}<a class="sd-chip" href="{% url 'marketing:product_detail' d.product_id %}"><b>{{ d.sku|default:d.title }}</b> <span>{% if show_money %}{{ d.value|sd_money:currency }}{% else %}{{ d.quantity|sd_qty:d.unit }}{% endif %}</span></a>{% endfor %}
+    <a class="sd-more" href="{% url 'operating:sell_down_detail' p.goal.pk %}">{% trans "See all" %} →</a>
+  </div>
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}

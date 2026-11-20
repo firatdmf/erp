@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load sell_down_tags %}
 {% comment %}
   Nejum-exact dashboard partial. Mirrors Nejum design kit's
   ScreenHome.jsx structure 1:1: top tab bar (Calendar / My Tasks /
@@ -13,6 +14,9 @@
 {% endcomment %}
 
 <div class="content home-content njdash" id="njDashRoot" data-tab="calendar">
+
+  {# Sell-down goals in the reader's books, always in view. #}
+  {% sell_down_card member %}
 
   <div class="home-tabs">
     <button class="home-tab active" data-tab="calendar">

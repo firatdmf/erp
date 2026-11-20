@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load i18n static sell_down_tags %}
+
+{% block title %}{{ goal.title }} | Nejum ERP{% endblock %}
+{% block css %}<link rel="stylesheet" href="{% static 'operating/css/sell_down.css' %}">{% endblock %}
+
+{% block content %}
+{% comment %}One sell-down goal over the reader's books
+(operating.views_sell_down.SellDownDetail): where it stands, and every
+design still on the shelves, most value first. The designs above the
+focus line are the ones that hold the goal's focus share.{% endcomment %}
+<div class="sd-page">
+  <a class="sd-back" href="{% url 'operating:sell_down_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Sell-down goals" %}</a>
+  <div class="sd-page-head">
+    <div>
+      <h1 class="sd-h1">{{ goal.title }}</h1>
+      <p class="sd-lead">
+        {% if goal.category %}{{ goal.category.name }}{% endif %}{% if goal.category and goal.tag %} · {% endif %}{% if goal.tag %}#{{ goal.tag }}{% endif %}
+        · {% for b in p.books %}{{ b.name }}{% if not forloop.last %} + {% endif %}{% endfor %}
+        · {% blocktrans with start=goal.start_date|date:"j M Y" end=goal.deadline|date:"j M Y" %}{{ start }} → {{ end }}{% endblocktrans %}
+        {% if not goal.is_active %}· {% trans "Not on the dashboard" %}{% endif %}
+      </p>
+    </div>
+    {% if may_edit %}<a class="sd-btn" href="{% url 'operating:sell_down_edit' goal.pk %}"><i class="fa fa-pen"></i> {% trans "Edit goal" %}</a>{% endif %}
+  </div>
+
+  <div class="sd-card">
+    <div class="sd-figures" style="margin-top:0">
+      <span class="sd-big">{% blocktrans with done=p.done_percent|floatformat:0 %}{{ done }}% sold{% endblocktrans %}</span>
+      {% if p.reached %}<span class="sd-pill done">{% trans "Goal reached" %}</span>
+      {% elif p.on_pace %}<span class="sd-pill ahead">{% trans "On pace" %}</span>
+      {% else %}<span class="sd-pill behind">{% trans "Behind pace" %}</span>{% endif %}
+    </div>
+    <div class="sd-bar"><div class="sd-bar-fill" style="width: {{ p.done_percent|floatformat:'1u' }}%"></div><div class="sd-bar-pace" style="left: {{ p.time_percent|floatformat:'1u' }}%"></div></div>
+    <div class="sd-bar-legend"><span>{% blocktrans with due=p.time_percent|floatformat:0 %}{{ due }}% due by today{% endblocktrans %}</span><span>{% blocktrans count n=p.days_left %}{{ n }} day left{% plural %}{{ n }} days left{% endblocktrans %}</span></div>
+
+    <div class="sd-stats">
+      {% if show_money %}
+      <div class="sd-stat"><div class="sd-stat-label">{% trans "Value at start" %}</div><div class="sd-stat-value">{{ p.start_value|sd_money:currency }}</div></div>
+      <div class="sd-stat"><div class="sd-stat-label">{% trans "Value left" %}</div><div class="sd-stat-value">{{ p.value_now|sd_money:currency }}</div></div>
+      <div class="sd-stat"><div class="sd-stat-label">{% trans "Target" %}</div><div class="sd-stat-value">{{ p.target_value|sd_money:currency }}</div></div>
+      <div class="sd-stat"><div class="sd-stat-label">{% if p.on_pace %}{% trans "Ahead of pace by" %}{% else %}{% trans "Behind pace by" %}{% endif %}</div><div class="sd-stat-value">{{ p.behind_by|sd_money:currency|cut:"-" }}</div></div>
+      {% if not p.reached %}<div class="sd-stat"><div class="sd-stat-label">{% trans "To sell each month" %}</div><div class="sd-stat-value">{{ p.needed_per_month|sd_money:currency }}</div></div>{% endif %}
+      {% endif %}
+      <div class="sd-stat"><div class="sd-stat-label">{% trans "Left on the shelves" %}</div><div class="sd-stat-value">{% for unit, qty in p.quantities %}{{ qty|sd_qty:unit }}{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</div></div>
+      <div class="sd-stat"><div class="sd-stat-label">{% trans "Designs in stock" %}</div><div class="sd-stat-value">{{ p.designs|length }}</div></div>
+    </div>
+  </div>
+
+  <div class="sd-list">
+    <div class="sd-list-head">
+      <span class="sd-list-title">{% trans "Designs, most value first" %}</span>
+      <span class="sd-list-sum">{% blocktrans with pct=goal.focus_percent|floatformat:"-2" count n=p.focus|length %}The first {{ n }} holds {{ pct }}% of what is left{% plural %}The first {{ n }} hold {{ pct }}% of what is left{% endblocktrans %}</span>
+    </div>
+    <div class="sd-row head{% if not show_money %} no-money{% endif %}">
+      <span>#</span><span>{% trans "Design" %}</span>
+      {% if show_money %}<span class="sd-num">{% trans "Value" %}</span>{% endif %}
+      <span class="sd-num">{% trans "Quantity" %}</span>
+      {% if show_money %}<span class="sd-num">{% trans "Share · running" %}</span>{% endif %}
+    </div>
+    {% for d in p.designs %}
+    {% if forloop.counter0 == p.focus|length %}
+    <div class="sd-list-head" style="border-top:1px solid var(--border-default,#E6ECEE)"><span class="sd-list-sum">{% trans "The rest" %}</span></div>
+    {% endif %}
+    <div class="sd-row{% if not show_money %} no-money{% endif %}">
+      <span class="sd-rank">{{ forloop.counter }}</span>
+      <span class="sd-design"><a href="{% url 'marketing:product_detail' d.product_id %}">{{ d.sku|default:d.title }}</a>{% if d.title and d.title != d.sku %}<small>{{ d.title }}</small>{% endif %}</span>
+      {% if show_money %}<span class="sd-num">{{ d.value|sd_money:currency }}</span>{% endif %}
+      <span class="sd-num">{{ d.quantity|sd_qty:d.unit }}</span>
+      {% if show_money %}<span class="sd-share"><span class="sd-share-bar"><i style="width: {{ d.share|floatformat:'1u' }}%"></i></span>{{ d.share|floatformat:1 }}% · {{ d.running_share|floatformat:0 }}%</span>{% endif %}
+    </div>
+    {% empty %}
+    <div class="sd-empty" style="border:none">{% trans "Nothing left on the shelves." %}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

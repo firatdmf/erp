@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load i18n static sell_down_tags %}
+
+{% block title %}{% trans "Sell-down goals" %} | Nejum ERP{% endblock %}
+{% block css %}<link rel="stylesheet" href="{% static 'operating/css/sell_down.css' %}">{% endblock %}
+
+{% block content %}
+{% comment %}Every sell-down goal in the reader's books, the ones on the
+dashboard first (operating.views_sell_down.SellDownList).{% endcomment %}
+<div class="sd-page">
+  <a class="sd-back" href="{% url 'operating:warehouse_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Warehouses" %}</a>
+  <div class="sd-page-head">
+    <div>
+      <h1 class="sd-h1">{% trans "Sell-down goals" %}</h1>
+      <p class="sd-lead">{% trans "Stock to sell by a date. Each goal shows the designs that hold most of what is left, so you know what to push." %}</p>
+    </div>
+    {% if may_edit %}<a class="sd-btn primary" href="{% url 'operating:sell_down_create' %}"><i class="fa fa-plus"></i> {% trans "New goal" %}</a>{% endif %}
+  </div>
+
+  {% for p, currency in rows %}
+  <section class="sd-card{% if not p.goal.is_active %} sd-closed{% endif %}">
+    <div class="sd-head">
+      <a class="sd-title" href="{% url 'operating:sell_down_detail' p.goal.pk %}">{{ p.goal.title }}</a>
+      <span class="sd-dates">{% for b in p.books %}{{ b.name }}{% if not forloop.last %} + {% endif %}{% endfor %} · {% blocktrans with day=p.goal.deadline|date:"j M Y" %}by {{ day }}{% endblocktrans %}{% if not p.goal.is_active %} · {% trans "Not on the dashboard" %}{% endif %}</span>
+    </div>
+    <div class="sd-figures">
+      <span class="sd-big">{% blocktrans with done=p.done_percent|floatformat:0 %}{{ done }}% sold{% endblocktrans %}</span>
+      {% if show_money %}<span class="sd-of">{% blocktrans with now=p.value_now|sd_money:currency target=p.target_value|sd_money:currency %}{{ now }} left · target {{ target }}{% endblocktrans %}</span>{% endif %}
+      {% if p.reached %}<span class="sd-pill done">{% trans "Goal reached" %}</span>
+      {% elif p.on_pace %}<span class="sd-pill ahead">{% trans "On pace" %}</span>
+      {% else %}<span class="sd-pill behind">{% trans "Behind pace" %}</span>{% endif %}
+    </div>
+    <div class="sd-bar"><div class="sd-bar-fill" style="width: {{ p.done_percent|floatformat:'1u' }}%"></div><div class="sd-bar-pace" style="left: {{ p.time_percent|floatformat:'1u' }}%"></div></div>
+  </section>
+  {% empty %}
+  <div class="sd-empty">{% trans "No sell-down goals in your books yet." %}</div>
+  {% endfor %}
+</div>
+{% endblock %}

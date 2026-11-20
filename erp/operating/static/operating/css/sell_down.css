@@ -1,0 +1,104 @@
+/* Sell-down goals: the dashboard card and the goal pages.
+   Colours come from the design tokens (erp/css/nejum/tokens.css), which
+   flip under [data-theme="dark"], so there is no separate dark block. */
+
+.sd-card {
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #E6ECEE);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  color: var(--fg-default, #1F2937);
+  box-shadow: 0 1px 2px rgba(15, 23, 31, 0.04), 0 12px 30px rgba(15, 23, 31, 0.05);
+}
+.sd-card + .sd-card { margin-top: -6px; }
+.sd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.sd-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-brand, #005354); }
+.sd-title { font-size: 16px; font-weight: 700; color: var(--fg-default, #1F2937); text-decoration: none; }
+.sd-title:hover { text-decoration: underline; }
+.sd-dates { font-size: 12px; color: var(--fg-muted, #6B7280); }
+
+.sd-figures { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin: 10px 0 8px; }
+.sd-big { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sd-of { font-size: 13px; color: var(--fg-muted, #6B7280); }
+.sd-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.sd-pill.ahead { background: var(--success-50, #E8F7EE); color: var(--success-700, #166534); }
+.sd-pill.behind { background: var(--danger-50, #FEEAEA); color: var(--danger-700, #991B1B); }
+.sd-pill.done { background: var(--success-100, #C9EDD6); color: var(--success-700, #166534); }
+
+/* Progress bar: how much is sold, with a tick where the pace says it
+   should be today. */
+.sd-bar { position: relative; height: 10px; border-radius: 999px; background: var(--bg-muted, #EEF2F5); overflow: visible; }
+.sd-bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--fg-brand, #005354); max-width: 100%; }
+.sd-bar-pace { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--fg-default, #1F2937); border-radius: 1px; }
+.sd-bar-legend { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--fg-muted, #6B7280); margin-top: 6px; }
+
+.sd-push { margin-top: 12px; font-size: 13px; line-height: 1.6; }
+.sd-push-label { font-weight: 700; margin-right: 4px; }
+.sd-chip { display: inline-block; margin: 2px 4px 2px 0; padding: 1px 8px; border: 1px solid var(--border-default, #E6ECEE); border-radius: 999px; font-size: 12px; color: var(--fg-default, #1F2937); text-decoration: none; white-space: nowrap; }
+.sd-chip b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+.sd-chip span { color: var(--fg-muted, #6B7280); }
+.sd-chip:hover { border-color: var(--border-brand, #005354); }
+.sd-more { font-size: 12px; font-weight: 700; color: var(--fg-brand, #005354); text-decoration: none; white-space: nowrap; }
+
+/* Pages */
+.sd-page { padding: 22px 28px 100px; max-width: 1100px; color: var(--fg-default, #1F2937); }
+@media (max-width: 720px) {
+  .sd-page { padding: 16px 16px 100px; }
+  .sd-card { padding: 14px 16px; }
+  .sd-big { font-size: 19px; }
+}
+.sd-back { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--fg-brand, #005354); text-decoration: none; margin-bottom: 10px; }
+.sd-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sd-h1 { font-size: 24px; font-weight: 800; margin: 2px 0 4px; }
+.sd-lead { color: var(--fg-muted, #6B7280); margin: 0; max-width: 680px; font-size: 13.5px; }
+.sd-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border-default, #DDE3EA); background: var(--bg-surface, #fff); color: var(--fg-default, #1F2937); font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.sd-btn.primary { background: var(--fg-brand, #005354); border-color: var(--fg-brand, #005354); color: #fff; }
+.sd-empty { padding: 40px 16px; text-align: center; color: var(--fg-muted, #6B7280); border: 1px dashed var(--border-default, #E6ECEE); border-radius: 12px; }
+.sd-closed { opacity: .7; }
+
+.sd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0 4px; }
+.sd-stat { border: 1px solid var(--border-default, #E6ECEE); border-radius: 10px; padding: 10px 12px; background: var(--bg-surface, #fff); min-width: 0; }
+.sd-stat-label { font-size: 11.5px; color: var(--fg-muted, #6B7280); }
+.sd-stat-value { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Design list: a grid of rows that wraps on a phone rather than
+   scrolling sideways. */
+.sd-list { border: 1px solid var(--border-default, #E6ECEE); border-radius: 12px; background: var(--bg-surface, #fff); margin-top: 16px; overflow: hidden; }
+.sd-list-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border-default, #E6ECEE); }
+.sd-list-title { font-size: 15px; font-weight: 700; }
+.sd-list-sum { font-size: 12.5px; color: var(--fg-muted, #6B7280); }
+.sd-row { display: grid; grid-template-columns: 44px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--border-subtle, #F1F5F9); font-size: 13px; }
+.sd-row.no-money { grid-template-columns: 44px minmax(0, 1.4fr) minmax(0, 1fr); }
+.sd-row.head { border-top: none; font-size: 11.5px; font-weight: 700; color: var(--fg-muted, #6B7280); text-transform: uppercase; letter-spacing: .04em; }
+.sd-rank { color: var(--fg-muted, #6B7280); font-variant-numeric: tabular-nums; }
+.sd-design { min-width: 0; }
+.sd-design a { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: var(--fg-default, #1F2937); text-decoration: none; overflow-wrap: anywhere; }
+.sd-design a:hover { text-decoration: underline; }
+.sd-design small { display: block; color: var(--fg-muted, #6B7280); overflow-wrap: anywhere; }
+.sd-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sd-share { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.sd-share-bar { flex: 0 0 90px; height: 6px; border-radius: 999px; background: var(--bg-muted, #EEF2F5); overflow: hidden; }
+.sd-share-bar i { display: block; height: 100%; background: var(--fg-brand, #005354); }
+@media (max-width: 720px) {
+  .sd-row, .sd-row.no-money { grid-template-columns: 34px minmax(0, 1fr) auto; row-gap: 2px; }
+  .sd-row.head { display: none; }
+  .sd-row .sd-design { grid-column: 2; grid-row: 1 / span 2; }
+  .sd-row .sd-num, .sd-row .sd-share { grid-column: 3; justify-content: flex-end; }
+  .sd-share-bar { display: none; }
+}
+
+/* Form */
+.sd-form { max-width: 640px; }
+.sd-field { margin-bottom: 16px; }
+.sd-field > label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.sd-field input[type=text], .sd-field input[type=number], .sd-field input[type=date], .sd-field select {
+  width: 100%; max-width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--border-default, #DDE3EA);
+  border-radius: 8px; background: var(--bg-surface, #fff); color: var(--fg-default, #1F2937); font-size: 13.5px; box-sizing: border-box;
+}
+.sd-field ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.sd-field ul label { font-size: 13.5px; font-weight: 500; display: inline-flex; gap: 6px; align-items: center; }
+.sd-help { font-size: 12px; color: var(--fg-muted, #6B7280); margin-top: 4px; }
+.sd-error { font-size: 12.5px; color: var(--danger-600, #B91C1C); margin-top: 4px; }
+.sd-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 560px) { .sd-two { grid-template-columns: 1fr; } }

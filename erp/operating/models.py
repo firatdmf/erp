@@ -3085,3 +3085,69 @@ class PackedOrderItem(models.Model):
 #     raw_material = models.ForeignKey(
 #         AssetInventoryRawMaterial, on_delete=models.RESTRICT, related_name="units")
 
+
+class SellDownGoal(models.Model):
+    """A decision to sell stock down: which products, how far, by when.
+
+    The products are described, not listed — a product group, a product
+    tag, or both — so the goal follows the shelves: a design that arrives
+    later is in it, one that sells out drops off. Which of them to push is
+    worked out on every read (operating.sell_down): the fewest designs that
+    hold `focus_percent` of what is left.
+
+    A goal belongs to books (SellDownGoalBook), each remembering what its
+    stock was worth the day it joined. Readers see the books they work in
+    added together, so someone in two of the goal's books sees both and a
+    book outside the goal never sees it at all.
+    """
+
+    title = models.CharField(max_length=120)
+    category = models.ForeignKey(
+        "marketing.ProductCategory", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="+",
+        help_text="Only products in this group (blank: every group)",
+    )
+    tag = models.CharField(
+        max_length=100, blank=True, default="",
+        help_text="Only products carrying this tag (blank: any tag)",
+    )
+    # How much of the starting value may still be on the shelves at the
+    # deadline: 20 means "sell 80% of it".
+    target_left_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("20"),
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    # The designs to push are the fewest that hold this share of what is
+    # left — the Pareto cut.
+    focus_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("80"),
+        validators=[MinValueValidator(Decimal("1"))],
+    )
+    start_date = models.DateField(default=timezone.localdate)
+    deadline = models.DateField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["deadline", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class SellDownGoalBook(models.Model):
+    """One book's part in a goal, and what its stock was worth then —
+    in the book's base currency, as the balance sheet counts it."""
+
+    goal = models.ForeignKey(SellDownGoal, on_delete=models.CASCADE, related_name="book_parts")
+    book = models.ForeignKey("accounting.Book", on_delete=models.CASCADE, related_name="+")
+    start_value = models.DecimalField(max_digits=16, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["goal", "book"], name="sell_down_goal_book_once"),
+        ]
+

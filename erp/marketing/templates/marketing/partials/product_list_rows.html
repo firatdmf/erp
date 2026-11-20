@@ -11,14 +11,16 @@
     </label>
 
     <div class="pr-img">
-      {% if product.primary_image.file_url %}
+      {% with photo=product.card_photo %}
+      {% if photo %}
         <img class="pl-thumb"
-             src="{{ product.primary_image.thumbnail_url }}"
+             src="{{ photo.thumbnail_url }}"
              alt="{{ product|product_name }}"
              onerror="this.outerHTML='<div class=&quot;pl-thumb-fallback&quot;><i data-lucide=&quot;image&quot;></i></div>';">
       {% else %}
         <div class="pl-thumb-fallback"><i data-lucide="image"></i></div>
       {% endif %}
+      {% endwith %}
     </div>
 
     <div class="pr-text">

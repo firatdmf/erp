@@ -447,3 +447,24 @@ def storefront_gallery(files, variant_id=None):
         videos = [f for f in videos if not f.product_variant_id]
     photos, videos = once(photos), once(videos)
     return photos[:1] + videos + photos[1:]
+
+
+def card_photo(picked, files):
+    """The photo a product's card shows: the one picked for it (`picked`,
+    its primary_image) or, with none picked, the first photo of its
+    storefront gallery — so a product with any photo has a card photo,
+    however its files were added. None when it has no photo.
+
+    `files` are ProductFile objects or the plain rows the storefront API
+    reads (dicts with id, file_url, file_type, sequence,
+    product_variant_id)."""
+    if picked is not None and picked.file_url:
+        return picked
+    rows = [SimpleNamespace(pk=f["id"], **f) if isinstance(f, dict) else f
+            for f in files]
+    return next((f for f in storefront_gallery(rows) if not is_video(f)), None)
+
+
+def card_photo_url(picked, files):
+    photo = card_photo(picked, files)
+    return photo.file_url if photo else None

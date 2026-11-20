@@ -65,13 +65,9 @@ def _money(amount, currency: str = BASE_CURRENCY) -> str:
 
 
 def _photo_for(product) -> str | None:
-    """Primary image, falling back to the first image file on the product."""
-    if product.primary_image_id and product.primary_image.file_url:
-        return product.primary_image.file_url
-    for file in product.files.all():
-        if file.file_type == "image" and file.file_url:
-            return file.file_url
-    return None
+    """The product's card photo (Product.card_photo)."""
+    photo = product.card_photo
+    return photo.file_url if photo else None
 
 
 def _spec_part(name: str, value: str) -> str:

@@ -522,7 +522,7 @@ class GlobalSearch(View):
                 )
                 for p in recent_products:
                     url = self._product_url(p, restricted)
-                    pi = getattr(p, 'primary_image', None)
+                    pi = p.card_photo
                     image = (
                         getattr(pi, 'thumbnail_url', None)
                         or getattr(pi, 'file_url', None)
@@ -623,7 +623,7 @@ class GlobalSearch(View):
             for p in products:
                 url = self._product_url(p, restricted)
                 # Prefer the small thumbnail; fall back to full file_url.
-                pi = getattr(p, 'primary_image', None)
+                pi = p.card_photo
                 image = (
                     getattr(pi, 'thumbnail_url', None)
                     or getattr(pi, 'file_url', None)

@@ -781,6 +781,14 @@ class Product(models.Model):
         except (ValueError, AttributeError):
             return None
 
+    @property
+    def card_photo(self):
+        """The ProductFile the product's card shows: the picked
+        primary_image, else the first photo of its gallery
+        (product_images.card_photo)."""
+        from .product_images import card_photo
+        return card_photo(self.primary_image, self.files.all())
+
     def get_care_instructions(self, lang="en"):
         """The product's OWN care text (from its description translations)
         wins; otherwise the product group's default for that language."""

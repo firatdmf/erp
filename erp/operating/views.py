@@ -7575,7 +7575,7 @@ def get_order_detail_api(request, user_id, order_id):
                     'id': item.pk,
                     'product_sku': item.product.sku,
                     'product_title': item.product.title,
-                    'product_image': item.product.primary_image.file_url if item.product.primary_image else None,
+                    'product_image': getattr(item.product.card_photo, 'file_url', None),
                     'product_variant_sku': item.product_variant.variant_sku if item.product_variant else None,
                     'quantity': str(item.quantity),
                     'price': str(item.price),
@@ -7811,7 +7811,7 @@ def track_order(request):
             item_data = {
                 'product_sku': item.product.sku if item.product else None,
                 'product_title': item.product.title if item.product else 'Unknown',
-                'product_image': item.product.primary_image.file_url if item.product and item.product.primary_image else None,
+                'product_image': getattr(item.product.card_photo, 'file_url', None) if item.product else None,
                 'variant_sku': item.product_variant.variant_sku if item.product_variant else None,
                 'quantity': str(item.quantity),
                 'price': str(item.price),

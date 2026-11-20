@@ -41,6 +41,7 @@ from .signals import cdn_url_in_use
 
 from erp.image_optimizer import WEB, OptimizedImage, optimize_image
 import os
+from types import SimpleNamespace
 from . import product_images
 from .product_images import new_file_name
 from django.utils.translation import gettext as _gettext
@@ -2962,6 +2963,11 @@ def get_products(request):
         if price is not None and (from_prices.get(pid) is None or price < from_prices[pid]):
             from_prices[pid] = price
 
+    # Each card shows the picked photo or the first of its gallery.
+    file_rows_by_product = {}
+    for f in file_rows:
+        file_rows_by_product.setdefault(f["product_id"], []).append(f)
+
     # Build products data
     products_data = [
         {
@@ -2973,7 +2979,8 @@ def get_products(request):
             "prices": _convert_price(from_prices.get(p.id), rates),
             "minimum_order_quantity": float(p.effective_minimum_order_quantity) if p.effective_minimum_order_quantity is not None else None,
             "care_instructions": {"en": p.get_care_instructions("en"), "tr": p.get_care_instructions("tr")},
-            "primary_image": p.primary_image.file_url if p.primary_image else None,
+            "primary_image": product_images.card_photo_url(
+                p.primary_image, file_rows_by_product.get(p.id, [])),
             "is_packaged": bool(p.is_packaged),
             "pack_count": int(p.pack_count) if p.pack_count else None,
             "product_attributes": prod_attrs_map.get(p.id, []),
@@ -3283,7 +3290,8 @@ def get_product(request):
         "minimum_inventory_level": float(p_min_inv) if p_min_inv is not None else None,
         "minimum_order_quantity": float(p_min_order_qty) if p_min_order_qty is not None else None,
         "care_instructions": p_care_texts,
-        "primary_image": p_primary_image_url,
+        "primary_image": product_images.card_photo_url(
+            SimpleNamespace(file_url=p_primary_image_url), file_rows_json),
     }
 
     # Attribute value images (color swatches per attribute value)

@@ -395,6 +395,50 @@ class AltTextInTheStorefrontApi(TestCase):
         self.assertEqual(typed, {self.g28.pk: "Every colourway"})
 
 
+class CardPhoto(TestCase):
+    """A card shows the picked photo or, with none picked, the first photo
+    of the gallery — photos added in bulk (no save signal) included."""
+
+    def setUp(self):
+        cache.clear()
+        self.product = Product.objects.create(title="Grek", sku="GREK", featured=True)
+        self.beige = ProductVariant.objects.create(product=self.product, variant_sku="GREK.BEIGE")
+        self.photos = ProductFile.objects.bulk_create([
+            ProductFile(product=self.product, product_variant=self.beige, sequence=n,
+                        file_url=url(f"media/product_images/GREK/grek-{n}.avif"))
+            for n in (1, 0, 2)
+        ])
+
+    def _card(self):
+        return Product.objects.get(pk=self.product.pk).card_photo
+
+    def test_with_none_picked_the_first_photo_by_sequence(self):
+        self.assertIsNone(Product.objects.get(pk=self.product.pk).primary_image)
+        self.assertEqual(self._card().file_url, url("media/product_images/GREK/grek-0.avif"))
+
+    def test_the_product_s_own_photos_come_before_its_variants(self):
+        own = ProductFile.objects.create(product=self.product, sequence=5,
+                                         file_url=url("media/product_images/GREK/grek-range.avif"))
+        Product.objects.filter(pk=self.product.pk).update(primary_image=None)
+        self.assertEqual(self._card(), own)
+
+    def test_a_video_is_never_the_card(self):
+        ProductFile.objects.filter(product=self.product).update(file_type="video")
+        self.assertIsNone(self._card())
+
+    def test_a_picked_photo_wins(self):
+        picked = self.photos[2]
+        Product.objects.filter(pk=self.product.pk).update(primary_image=picked)
+        self.assertEqual(self._card(), picked)
+
+    def test_the_storefront_api_sends_it(self):
+        first = url("media/product_images/GREK/grek-0.avif")
+        product = self.client.get("/marketing/api/get_product", {"product_sku": "GREK"}).json()["product"]
+        self.assertEqual(product["primary_image"], first)
+        products = self.client.get("/marketing/api/get_products").json()["products"]
+        self.assertEqual(products[0]["primary_image"], first)
+
+
 @override_settings(BUNNY_CDN_URL=CDN)
 class HourlyHousekeeping(TestCase):
     def setUp(self):

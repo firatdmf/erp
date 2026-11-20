@@ -497,6 +497,10 @@ class GoodsOutTest(TestCase):
     def test_the_shelf_figures_say_what_is_away(self, _up):
         """The stock still counts an item away for work, so every figure
         that says what is in stock says how much of it is away too."""
+        # With nothing away the warehouses list still leads to the page.
+        before = self.client.get(reverse("operating:warehouse_list"), follow=True)
+        self.assertContains(before, reverse("operating:warehouse_away"))
+        self.assertNotContains(before, "1 away for work")
         self._save(["KZL-A"])
         roll = self._roll("KZL-A")
         page = self.client.get(reverse("operating:warehouse_detail", args=[self.wh.pk]))

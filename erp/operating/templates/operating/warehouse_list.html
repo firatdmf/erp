@@ -487,11 +487,9 @@
       <a href="{% url 'operating:warehouse_movements_all' %}" class="ord-btn ghost">
         <i class="fa fa-clock-rotate-left"></i>{% trans "Recent activity" %}
       </a>
-      {% if away_count %}
       <a href="{% url 'operating:warehouse_away' %}" class="ord-btn ghost" style="color:#5B21B6;">
-        <i class="fa fa-truck-arrow-right"></i>{% blocktrans count n=away_count %}{{ n }} away for work{% plural %}{{ n }} away for work{% endblocktrans %}
+        <i class="fa fa-truck-arrow-right"></i>{% if away_count %}{% blocktrans count n=away_count %}{{ n }} away for work{% plural %}{{ n }} away for work{% endblocktrans %}{% else %}{% trans "Away for work" %}{% endif %}
       </a>
-      {% endif %}
       {% if is_brand_admin %}
       <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
         <i class="fa fa-plus"></i>{% trans "Add warehouse" %}

@@ -14,10 +14,10 @@ from erp.attachments import record_file_views
 from .models import EquityExpense
 from .models_accounts import Invoice, Payment
 
-# Purchasing is operations work, the mirror of an order, so a purchase's
-# files sit beside Operating/orders/ in the storage zone.
+# A purchase is accounting's record (decided 2026-11-21), so its files sit
+# with the payments' and expenses' under Accounting/ in the storage zone.
 purchase_files, purchase_file, purchase_file_delete = record_file_views(
-    "Operating/purchases",
+    "Accounting/purchases",
     lambda pk: get_object_or_404(Invoice, pk=pk, type="purchase"),
     "accounts:purchase_documents")
 

@@ -63,7 +63,7 @@ class PurchaseDocumentsTest(TestCase):
         doc = docs.get(name="hakan-invoice.pdf")
         self.assertEqual(doc.record, self.purchase)
         self.assertEqual(doc.uploaded_by, self.user)
-        self.assertTrue(doc.path.startswith(f"Operating/purchases/{self.purchase.pk}/"), doc.path)
+        self.assertTrue(doc.path.startswith(f"Accounting/purchases/{self.purchase.pk}/"), doc.path)
 
     def test_a_heavy_scanned_pdf_is_stored_lighter_under_its_name(self, upload, _delete):
         from erp.tests.test_pdf_optimizer import _scan
@@ -132,7 +132,7 @@ class PurchaseDocumentsTest(TestCase):
                 default_currency=self.purchase.currency),
             currency=self.purchase.currency, type="purchase", number="PUR-L-1",
             date=date(2026, 11, 20), due_date=date(2026, 12, 20))
-        doc = Attachment.objects.create(record=theirs, name="theirs.pdf", path="Operating/purchases/x.pdf",
+        doc = Attachment.objects.create(record=theirs, name="theirs.pdf", path="Accounting/purchases/x.pdf",
                                            content_type="application/pdf")
         self.assertEqual(self._upload(self._pdf(), purchase=theirs).status_code, 404)
         self.assertEqual(self.client.get(self._url("purchase_documents_file", doc.pk, purchase=theirs)).status_code, 404)

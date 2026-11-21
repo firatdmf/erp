@@ -3,6 +3,7 @@
 {% load catalog_wording %}
 {% load humanize %}
 {% load accounts_tags %}
+{% load accounting_tags %}
 {% block title %}{% trans "Purchase order" %} · {{ invoice.number }} | Nejum ERP{% endblock %}
 
 {% block css %}
@@ -57,6 +58,23 @@
   .po-card-v.total { font-size: 20px; font-variant-numeric: tabular-nums; }
   .po-card-sub { font: 600 12px var(--font-sans); color: var(--nejum-teal-700); margin-top: 4px; font-variant-numeric: tabular-nums; }
   .po-card-sub .dot { color: #CBD5E1; margin: 0 4px; }
+
+  /* The cost card takes the whole row: a line per account owed, amounts
+     right-aligned so they read down as a sum, the total under a rule. */
+  .po-cost { grid-column: 1 / -1; }
+  .po-cost-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; border-top: 1px solid #EEF2F6; }
+  .po-card-l + .po-cost-row { border-top: 0; padding-top: 2px; }
+  .po-cost-who { min-width: 0; font: 700 14.5px var(--font-sans); }
+  .po-cost-who a { color: var(--nejum-teal-700); text-decoration: none; }
+  .po-cost-who a:hover { text-decoration: underline; }
+  .po-cost-role { display: block; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 2px; }
+  .po-cost-note { font: 500 12px var(--font-sans); color: #64748B; margin-top: 3px; }
+  .po-cost-note .dot { color: #CBD5E1; margin: 0 4px; }
+  .po-cost-amt { font: 700 15px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .po-cost-fx { display: block; font: 500 12px var(--font-sans); color: #64748B; margin-top: 2px; }
+  .po-cost-fx .r { opacity: .8; }
+  .po-cost-total { border-top: 1.5px solid #CBD5E1; margin-top: 2px; }
+  .po-cost-total .po-cost-amt { font-size: 20px; color: var(--ink); }
 
   .po-items-h { font: 700 15px var(--font-sans); margin: 0 0 10px; }
   /* Looks like a product card, but is not one: tests and readers count
@@ -175,9 +193,57 @@
   </div>
 
   <div class="po-info">
-    <div class="po-card">
-      <div class="po-card-l">{% trans "Supplier" %}</div>
-      <div class="po-card-v"><a href="{% url 'accounts:detail' invoice.current_account.pk %}">{{ invoice.current_account.name }}</a></div>
+    {% comment %}What the purchase costs and who it is owed to, in one place:
+       the supplier for the goods, each carrier for its delivery
+       (accounting.purchase_charges), and the two added up.{% endcomment %}
+    <div class="po-card po-cost">
+      <div class="po-card-l">{% trans "Cost" %}</div>
+      {% for r in cost.rows %}
+      <div class="po-cost-row">
+        <div class="po-cost-who">
+          <span class="po-cost-role">{% if r.role == "supplier" %}{% trans "Supplier" %}{% else %}{% trans "Carrier" %}{% endif %}</span>
+          <a href="{% url 'accounts:detail' r.account.pk %}">{{ r.account.name }}</a>
+          {% if r.role == "supplier" %}
+          {# The goods behind the money: how much arrived, and on how many packs. #}
+          <div class="po-card-sub">
+            {{ total_quantity|floatformat:"2g" }}{% if total_unit %} {{ total_unit }}{% endif %}
+            <span class="dot">·</span>
+            {{ total_packs }} {{ total_pack_noun }}
+          </div>
+          {% else %}
+          <div class="po-cost-note">
+            {{ r.charge.description }}{% if r.charge.reference %} ({{ r.charge.reference }}){% endif %}
+            <span class="dot">·</span>
+            {% if invoice.status == 'received' %}{% trans "Owed to them, and part of the goods' cost." %}
+            {% elif invoice.status == 'ordered' %}{% trans "Owed once the purchase is received." %}
+            {% else %}{% trans "Not owed: the purchase is cancelled." %}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="po-cost-amt">
+          {{ r.symbol }}{{ r.amount|money }}
+          {# In another currency than the book's: what it came to in base, and at what rate. #}
+          {% if r.converted and r.base is not None %}
+          <span class="po-cost-fx">{{ base_symbol }}{{ r.base|money }} <span class="r">@ {{ r.rate|format_rate }}</span></span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if cost.has_charges %}
+      <div class="po-cost-row po-cost-total">
+        <div class="po-cost-who"><span class="po-cost-role">{% trans "Total" %}</span>
+          {# The sum in base: every row at its base value. #}
+          <div class="po-cost-note">
+            {% if cost.total is not None %}{% for b in cost.base_parts %}{% if not forloop.first %} + {% endif %}{{ base_symbol }}{{ b|money }}{% endfor %} = {{ base_symbol }}{{ cost.total|money }}
+            {% else %}{% for s, a in cost.per_currency %}{% if not forloop.first %} + {% endif %}{{ s }}{{ a|money }}{% endfor %}{% endif %}
+          </div>
+        </div>
+        <div class="po-cost-amt">
+          {% if cost.total is not None %}{{ base_symbol }}{{ cost.total|money }}
+          {% else %}{% for s, a in cost.per_currency %}{% if not forloop.first %} + {% endif %}{{ s }}{{ a|money }}{% endfor %}{% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
     <div class="po-card">
       <div class="po-card-l">{% trans "Date" %}</div>
@@ -195,43 +261,6 @@
       <div class="po-card-v">{{ invoice.received_on|date:"d.m.Y" }}</div>
     </div>
     {% endif %}
-    <div class="po-card">
-      <div class="po-card-l">{% trans "Total" %}</div>
-      <div class="po-card-v total">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|money }}</div>
-      {# The goods behind the money: how much arrived, and on how many packs. #}
-      <div class="po-card-sub">
-        {{ total_quantity|floatformat:"2g" }}{% if total_unit %} {{ total_unit }}{% endif %}
-        <span class="dot">·</span>
-        {{ total_packs }} {{ total_pack_noun }}
-      </div>
-    </div>
-    {% comment %}What bringing it cost (accounting.purchase_charges): owed to each
-       account once received, and inside the goods' cost.{% endcomment %}
-    {% with charges=invoice.charges.all %}{% if charges %}
-    <div class="po-card">
-      <div class="po-card-l">{% trans "Delivery cost" %}</div>
-      {% for c in charges %}
-      <div class="po-card-v" style="font-size:14px;">
-        {{ c.amount|money }} {{ c.currency_code }}
-        <span style="font-weight:600; color:#64748B;">· {{ c.description }} ·</span>
-        <a href="{% url 'accounts:detail' c.current_account_id %}">{{ c.current_account.name }}</a>
-        {% if c.reference %}<span style="font-weight:500; color:#64748B; font-size:12px;">({{ c.reference }})</span>{% endif %}
-      </div>
-      {% endfor %}
-      <div class="po-card-sub">
-        {% if invoice.status == 'received' %}{% trans "Owed to them, and part of the goods' cost." %}
-        {% elif invoice.status == 'ordered' %}{% trans "Owed once the purchase is received." %}
-        {% else %}{% trans "Not owed: the purchase is cancelled." %}{% endif %}
-      </div>
-      {% comment %}What the goods are now worth in stock with the delivery in
-         them — the figure the delivery changed.{% endcomment %}
-      {% if landed_total and charged_total %}
-      <div class="po-card-sub">
-        {% blocktrans with total=landed_total|money extra=charged_total|money symbol=base_symbol %}Goods with delivery: {{ symbol }}{{ total }} ({{ symbol }}{{ extra }} on the rolls){% endblocktrans %}
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}{% endwith %}
     {% if invoice.for_order %}
     <div class="po-card">
       <div class="po-card-l">{% trans "For customer order" %}</div>

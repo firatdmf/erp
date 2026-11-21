@@ -224,17 +224,7 @@ class PurchaseOrderDetail(View):
             landed = {r.unit_cost_base for r in own if r.unit_cost_base is not None}
             it.charge_per_unit = max(per_unit) if per_unit and max(per_unit) > 0 else None
             it.landed_unit_cost = landed.pop() if len(landed) == 1 else None
-        # The goods as they stand in stock with the delivery inside them:
-        # what arrived, at its landed cost.
-        landed_total = charged_total = None
-        if invoice.charges.exists():
-            from .purchase_charges import charged_value
-            landed_total = sum(
-                (Decimal(r.quantity or 0) * Decimal(r.unit_cost_base or 0)
-                 for it in items for r in it.warehouse_stock_items.all()),
-                Decimal("0"),
-            ).quantize(Decimal("0.01"))
-            charged_total = charged_value(invoice).quantize(Decimal("0.01"))
+        cost = purchase_cost_rows(invoice)
         # What the whole delivery comes to in goods, beside what it costs:
         # so many meters on so many rolls. Only a unit every line shares
         # is printed — meters and pieces added together are a bare number
@@ -261,8 +251,7 @@ class PurchaseOrderDetail(View):
             "total_unit": total_unit,
             "total_packs": total_packs,
             "total_pack_noun": total_pack_noun,
-            "landed_total": landed_total,
-            "charged_total": charged_total,
+            "cost": cost,
             "base_symbol": invoice.book.effective_base_currency.symbol,
             "warehouse_id": warehouse_id,
             "is_order": invoice.status == "ordered",
@@ -279,6 +268,59 @@ class PurchaseOrderDetail(View):
             # customer's order, which turns on whether packing has started.
             "cancel_order_warning": purchase_cancel_warning(invoice),
         })
+
+
+def purchase_cost_rows(invoice):
+    """Everything the purchase costs, one row per account it is owed to:
+    the supplier for the goods, then each delivery cost's carrier. And the
+    total, added up.
+
+    The rows may be in different currencies (dollar goods, a lira
+    carrier), so the total is in the book's base currency: each row at
+    the value it posted at. A row not posted yet and not in base (an order
+    with a lira delivery) has no such value until it is received; then
+    there is no single total, only the amounts per currency.
+    """
+    from .models import CurrencyCategory
+
+    base = invoice.book.effective_base_currency
+    symbols = dict(CurrencyCategory.objects.values_list("code", "symbol"))
+
+    def row(role, account, amount, code, movement, **extra):
+        converted = code != base.code
+        return {
+            "role": role, "account": account, "amount": amount, "code": code,
+            "symbol": symbols.get(code) or code,
+            "converted": converted,
+            # Its value in base, and the rate that made it: what it posted
+            # at. In base already, it is itself; not posted yet, unknown.
+            "base": (amount if not converted
+                     else abs(movement.amount_base) if movement is not None else None),
+            "rate": movement.exchange_rate if converted and movement is not None else None,
+            **extra,
+        }
+
+    goods_code = invoice.currency.code if invoice.currency_id else base.code
+    rows = [row("supplier", invoice.current_account, invoice.total, goods_code,
+                invoice.posted_movement)]
+    for c in invoice.charges.select_related("current_account__default_currency", "posted_movement"):
+        rows.append(row("carrier", c.current_account, c.amount, c.currency_code,
+                        c.posted_movement, charge=c))
+
+    by_code = {}
+    for r in rows:
+        by_code.setdefault(r["code"], [r["symbol"], Decimal("0")])[1] += r["amount"] or 0
+    known = [r["base"] for r in rows]
+    return {
+        "rows": rows,
+        "has_charges": len(rows) > 1,
+        # The total and the sum behind it, both in base: every row at its
+        # base value. None while a row has none yet.
+        "total": (sum(known, Decimal("0")) if None not in known else None),
+        "base_parts": known if None not in known else [],
+        # Only for a sum that can't be made in base yet: each currency's own.
+        "per_currency": [(s, a) for s, a in by_code.values()],
+    }
 
 
 def purchase_warehouse_id(invoice_pk):

@@ -140,12 +140,23 @@ class PurchaseChargeTest(TestCase):
         # In cents on the page, exact on hover.
         self.assertContains(page, "With delivery: $4.10 / m (+$0.60)")
         self.assertContains(page, 'data-exact="With delivery: $4.1000 / m (+$0.6000)"')
-        self.assertContains(page, "Goods with delivery: $205.00 ($30.00 on the rolls)")
+        # One card: Karven for the goods, Öz Turanlar for the delivery, added up.
+        cost = page.context["cost"]
+        self.assertEqual([(r["role"], r["account"], r["amount"]) for r in cost["rows"]],
+                         [("supplier", self.karven, Decimal("175.00")),
+                          ("carrier", self.carrier, Decimal("30.00"))])
+        self.assertEqual(cost["total"], Decimal("205.00"))
+        self.assertEqual(cost["base_parts"], [Decimal("175.00"), Decimal("30.00")])
+        self.assertFalse(any(r["converted"] for r in cost["rows"]))
+        self.assertContains(page, "$175.00 + $30.00 = $205.00")
 
     def test_without_a_delivery_cost_the_page_says_nothing_of_it(self, _upload):
         invoice = self._receive(self._payload())
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[invoice.pk]))
         self.assertNotContains(page, "With delivery")
+        # Just the supplier's row, with no total under it.
+        self.assertEqual(len(page.context["cost"]["rows"]), 1)
+        self.assertNotContains(page, 'class="po-cost-row po-cost-total"')
 
     def test_it_is_spread_by_each_lines_value(self, _upload):
         """175.00 of G07 and 70.00 of G08: of a 49.00 delivery, 35.00 and 14.00."""
@@ -198,6 +209,15 @@ class PurchaseChargeTest(TestCase):
         # The form says what it is billed in.
         page = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.invoice_id]))
         self.assertContains(page, '"currency": "TRY"')
+        # The purchase page adds it up in dollars: the lira row says what
+        # it came to and at what rate, and the sum is all in dollars.
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[self.invoice_id]))
+        cost = page.context["cost"]
+        carrier = cost["rows"][1]
+        self.assertEqual((carrier["converted"], carrier["base"], carrier["rate"]),
+                         (True, Decimal("30.00"), Decimal("0.025")))
+        self.assertContains(page, "$30.00 <span class=\"r\">@ 0.025</span>", html=False)
+        self.assertContains(page, "$175.00 + $30.00 = $205.00")
 
     def test_two_carriers_each_owed_their_own(self, _upload):
         porter = CurrentAccount.objects.create(

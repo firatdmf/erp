@@ -203,13 +203,22 @@ site's menus and the page's own way back are left out.{% endcomment %}
     gap: 10px; align-items: end; padding: 12px; margin-bottom: 10px;
     border: 1px solid #E2E8EE; border-radius: 10px; background: #FBFCFD;
   }
-  .np-cost-row .np-field { min-width: 0; }
+  /* The row's gap spaces the fields; their own bottom margin would lift
+     them above the bin, which lines up with the row's end. */
+  .np-cost-row .np-field { min-width: 0; margin-bottom: 0; }
   .np-cost-amt { display: flex; align-items: center; gap: 6px; }
   .np-cost-amt .np-input { flex: 1; min-width: 0; }
   .np-cost-cur { font: 700 12px var(--font-mono); color: var(--gray-600); min-width: 30px; }
+  /* base.css makes every <button> a padded inline-flex box: centre the
+     icon, and stand exactly as tall as the fields beside it. */
   button.np-cost-del {
-    width: 40px; height: 40px; padding: 0; border: 1px solid #E2E8EE; border-radius: 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; padding: 0; box-sizing: border-box;
+    border: 1px solid #E2E8EE; border-radius: 9px;
     background: #fff; color: var(--gray-500); cursor: pointer;
+  }
+  @media (max-width: 1024px) {
+    .gr button.np-cost-del { width: 44px; height: 44px; }
   }
   button.np-cost-del:hover { color: #C0392B; border-color: #F1C9C4; }
   button.np-cost-add {

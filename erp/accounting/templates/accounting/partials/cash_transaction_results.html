@@ -14,7 +14,7 @@
 
 {% if cash_accounts %}
 <div class="tx-filter">
-  <a href="?" class="{% if not selected_account %}on{% endif %}"
+  <a href="?" class="{% if not selected_account and not paid_selected %}on{% endif %}"
      hx-get="?" hx-target="#tx-results" hx-swap="innerHTML" hx-push-url="true">
     All <span class="n">{{ total_count }}</span>
   </a>
@@ -27,6 +27,17 @@
     <span class="n">{{ row.count }}</span>
   </a>
   {% endfor %}
+  {% comment %}
+    Expenses somebody paid for the book out of their own pocket: no cash
+    account moved, so they get a tab of their own.
+  {% endcomment %}
+  {% if paid_count %}
+  <a href="?account={{ paid_tab }}" class="{% if paid_selected %}on{% endif %}"
+     hx-get="?account={{ paid_tab }}" hx-target="#tx-results"
+     hx-swap="innerHTML" hx-push-url="true">
+    Paid from an account <span class="n">{{ paid_count }}</span>
+  </a>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -66,7 +77,11 @@
         {% if t.source_description %}{{ t.source_description }}
         {% elif not t.source_heading %}<span class="none">—</span>{% endif %}
       </td>
+      {% if t.paid_by %}
+      <td><span class="tx-muted">Paid by</span> {{ t.paid_by.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>
+      {% else %}
       <td>{{ t.cash_account.label }} <span class="tx-muted">{{ t.currency.code }}</span></td>
+      {% endif %}
       <td class="num {% if t.is_amount_positive %}tx-in{% else %}tx-out{% endif %}">
         {% if t.is_amount_positive %}+{% else %}&minus;{% endif %}{{ t.currency.symbol }}{{ t.amount|format_money }}
         {% comment %}
@@ -82,8 +97,14 @@
         </span>
         {% endif %}
       </td>
+      {% if t.paid_by %}
+      {# No cash moved, so no cash balance changed. #}
+      <td class="num tx-muted">—</td>
+      <td class="num tx-muted">—</td>
+      {% else %}
       <td class="num">{{ t.currency.symbol }}{{ t.account_running|format_money }}</td>
       <td class="num tx-muted">{{ base_currency_symbol }}{{ t.book_running|format_money }}</td>
+      {% endif %}
     </tr>
     {% endfor %}
   </tbody>
@@ -96,16 +117,16 @@
 {% endcomment %}
 <div class="tx-pager">
   {% if page_obj.has_previous %}
-  <a href="?page={{ page_obj.previous_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}"
-     hx-get="?page={{ page_obj.previous_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}"
+  <a href="?page={{ page_obj.previous_page_number }}{% if account_param %}&account={{ account_param }}{% endif %}"
+     hx-get="?page={{ page_obj.previous_page_number }}{% if account_param %}&account={{ account_param }}{% endif %}"
      hx-target="#tx-results" hx-swap="innerHTML" hx-push-url="true">&larr; Newer</a>
   {% endif %}
   <span class="spacer"></span>
   <span>Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
   <span class="spacer"></span>
   {% if page_obj.has_next %}
-  <a href="?page={{ page_obj.next_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}"
-     hx-get="?page={{ page_obj.next_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}"
+  <a href="?page={{ page_obj.next_page_number }}{% if account_param %}&account={{ account_param }}{% endif %}"
+     hx-get="?page={{ page_obj.next_page_number }}{% if account_param %}&account={{ account_param }}{% endif %}"
      hx-target="#tx-results" hx-swap="innerHTML" hx-push-url="true">Older &rarr;</a>
   {% endif %}
 </div>

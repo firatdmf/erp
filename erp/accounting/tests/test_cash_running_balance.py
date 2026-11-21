@@ -407,6 +407,73 @@ class CashEntryListPageTests(CashEntryTestBase):
         self.assertEqual(len(response.context["object_list"]), 1)
         self.assertIsNone(response.context["selected_account"])
 
+    def _paid_from_account(self, amount, date, description):
+        """An expense somebody paid for the book: a movement, no cash entry."""
+        from accounting.models_accounts import CurrentAccount, CurrentAccountMovement
+
+        account = CurrentAccount.objects.filter(book=self.book, code="ACC-001").first() \
+            or CurrentAccount.objects.create(
+                book=self.book, code="ACC-001", name="Owner", default_currency=self.usd)
+        expense = EquityExpense.objects.create(
+            book=self.book, currency=self.usd, amount=Decimal(amount), date=date,
+            description=description, paid_by_current_account=account,
+            category=ExpenseCategory.objects.get_or_create(name="Shipping and Cargo")[0])
+        CurrentAccountMovement.objects.create(
+            current_account=account, book=self.book, date=date,
+            amount=-Decimal(amount), currency=self.usd, movement_type="adjustment",
+            source_type=ContentType.objects.get_for_model(EquityExpense),
+            source_id=expense.pk)
+        return expense
+
+    def test_an_expense_paid_from_an_account_is_listed_under_all(self):
+        self._entry("600.00", True)  # 2026-08-19
+        expense = self._paid_from_account("150.00", "2026-01-05", "markiss kargo")
+
+        response = self.client.get(self.url())
+        rows = response.context["object_list"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(response.context["total_count"], 2)
+        # Older, so it comes after today's cash entry.
+        paid = rows[1]
+        self.assertEqual(paid.paid_by.name, "Owner")
+        self.assertIsNone(paid.account_running)
+        self.assertContains(response, "markiss kargo")
+        self.assertContains(response, "Paid by")
+        href = reverse("accounting:equity_expense_detail", args=[self.book.pk, expense.pk])
+        self.assertContains(response, f'data-href="{href}"')
+
+    def test_its_tab_lists_only_those_expenses(self):
+        self._entry("600.00", True)
+        self._paid_from_account("150.00", "2026-01-05", "markiss kargo")
+
+        response = self.client.get(self.url(account="paid"))
+        rows = response.context["object_list"]
+        self.assertEqual([r.source_description for r in rows], ["markiss kargo"])
+        self.assertEqual(response.context["paid_count"], 1)
+        self.assertTrue(response.context["paid_selected"])
+        self.assertEqual(response.context["account_param"], "paid")
+
+    def test_a_cash_account_tab_does_not_list_them(self):
+        self._entry("600.00", True)
+        self._paid_from_account("150.00", "2026-01-05", "markiss kargo")
+
+        response = self.client.get(self.url(account=self.kasa.pk))
+        self.assertEqual(len(response.context["object_list"]), 1)
+        self.assertNotContains(response, "markiss kargo")
+
+    def test_all_pages_both_kinds_in_one_date_order(self):
+        for day in range(1, 31):
+            self._paid_from_account("1.00", f"2026-01-{day:02d}", f"p{day}")
+        for _ in range(30):
+            self._entry("1.00", True)  # 2026-08-19, newer than every expense
+        first = self.client.get(self.url()).context["object_list"]
+        second = self.client.get(self.url(page=2)).context["object_list"]
+        self.assertEqual(len(first), 50)
+        self.assertEqual(len(second), 10)
+        self.assertTrue(all(isinstance(r, CashTransactionEntry) for r in first[:30]))
+        dates = [str(r.date) for r in first[30:] + second]
+        self.assertEqual(dates, sorted(dates, reverse=True))
+
     def test_the_page_does_not_query_once_per_row(self):
         """Descriptions come from a GenericForeignKey — the trap is N+1.
 

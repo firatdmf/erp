@@ -34,6 +34,7 @@ import json
 
 # import yfinance as yf
 from decimal import Decimal, ROUND_HALF_UP
+from types import SimpleNamespace
 import math
 import time
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -2617,6 +2618,12 @@ class CashTransactionEntryList(generic.ListView):
 
     paginate_by = 50
 
+    # The tab for expenses somebody paid on the book's behalf. They moved
+    # no cash, so no cash account's tab holds them, but they are still
+    # transactions of the book: "All" interleaves them and this tab lists
+    # only them.
+    PAID_FROM_ACCOUNT = "paid"
+
     def get_selected_account(self, accounts):
         """The cash account being filtered to, or None for all of them."""
         raw = self.request.GET.get("account") or ""
@@ -2624,9 +2631,21 @@ class CashTransactionEntryList(generic.ListView):
             return accounts.get(int(raw))
         return None
 
+    def paid_from_account_expenses(self):
+        """Expenses funded by a current account rather than a cash account."""
+        return (
+            EquityExpense.objects
+            .filter(book=self.kwargs.get("pk"), paid_by_current_account__isnull=False)
+            .select_related("category", "currency", "paid_by_current_account")
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         book = Book.objects.get(pk=self.kwargs.get("pk"))
+        context["paid_tab"] = self.PAID_FROM_ACCOUNT
+        context["paid_selected"] = self.request.GET.get("account") == self.PAID_FROM_ACCOUNT
+        context["paid_count"] = self.paid_from_account_expenses().count()
+        context["object_list"] = self.resolve_rows(context["object_list"], book)
         context["base_currency"] = book.effective_base_currency
         context["base_currency_symbol"] = str(book.effective_base_currency.symbol)
         context["book"] = book
@@ -2645,13 +2664,18 @@ class CashTransactionEntryList(generic.ListView):
             {"account": a, "count": counts.get(a.pk, 0)}
             for a in sorted(accounts.values(), key=lambda a: (a.name, a.currency.code))
         ]
-        context["total_count"] = sum(counts.values())
+        context["total_count"] = sum(counts.values()) + context["paid_count"]
         context["selected_account"] = self.get_selected_account(accounts)
+        # What the pager carries so paging stays on the same tab.
+        if context["selected_account"]:
+            context["account_param"] = context["selected_account"].pk
+        elif context["paid_selected"]:
+            context["account_param"] = self.PAID_FROM_ACCOUNT
 
         # entry.content is a GenericForeignKey, so reading it in the template
         # loop would cost a query per row. Group the page's rows by content
         # type and fetch each source table once instead.
-        entries = list(context["object_list"])
+        entries = [e for e in context["object_list"] if isinstance(e, CashTransactionEntry)]
         by_type = {}
         for entry in entries:
             by_type.setdefault(entry.content_type_id, set()).add(entry.content_pk)
@@ -2674,8 +2698,73 @@ class CashTransactionEntryList(generic.ListView):
             entry.account_running, entry.book_running = balances.get(
                 entry.pk, (None, None)
             )
-        context["object_list"] = entries
         return context
+
+    def resolve_rows(self, page_rows, book):
+        """The page's rows as objects the template can show.
+
+        On "All" the paginator works over (date, created_at, pk, kind) keys,
+        so the page is cut from both sources in one order before anything
+        is loaded; here those keys become rows. Cash entries stay cash
+        entries. An expense paid from a current account becomes a row with
+        the same attributes, minus a cash account and the running balances,
+        which it never touched.
+        """
+        page_rows = list(page_rows)
+        keys = [r for r in page_rows if isinstance(r, tuple)]
+        if not keys:
+            expenses = [r for r in page_rows if isinstance(r, EquityExpense)]
+            if not expenses:
+                return page_rows
+            by_kind = {"e": {e.pk: e for e in expenses}}
+            keys = [(None, None, e.pk, "e") for e in expenses]
+        else:
+            cash_ids = [k[2] for k in keys if k[3] == "c"]
+            expense_ids = [k[2] for k in keys if k[3] == "e"]
+            by_kind = {
+                "c": CashTransactionEntry.objects.select_related(
+                    "cash_account", "currency", "content_type").in_bulk(cash_ids),
+                "e": self.paid_from_account_expenses().in_bulk(expense_ids),
+            }
+
+        expense_type = ContentType.objects.get_for_model(EquityExpense)
+        expense_ids = [k[2] for k in keys if k[3] == "e"]
+        # The base value is the one the current account movement posted, so
+        # the row says exactly what the account and the ledger say.
+        base_by_expense = dict(
+            CurrentAccountMovement.objects
+            .filter(source_type=expense_type, source_id__in=expense_ids)
+            .values_list("source_id", "amount_base")
+        )
+        rows = []
+        for _date, _created, pk, kind in keys:
+            obj = by_kind[kind].get(pk)
+            if obj is None:
+                continue
+            if kind == "c":
+                rows.append(obj)
+                continue
+            base = base_by_expense.get(pk)
+            converted = obj.currency_id != book.effective_base_currency.pk
+            rows.append(SimpleNamespace(
+                pk=obj.pk,
+                date=obj.date,
+                created_at=obj.created_at,
+                content_type=expense_type,
+                source_heading=cash_entry_heading(obj),
+                source_description=describe_cash_entry_source(obj),
+                source_url=cash_entry_url(obj, book),
+                paid_by=obj.paid_by_current_account,
+                cash_account=None,
+                currency=obj.currency,
+                amount=obj.amount,
+                is_amount_positive=False,
+                exchange_rate=obj.exchange_rate if converted else None,
+                amount_in_base_currency=abs(base) if base is not None else None,
+                account_running=None,
+                book_running=None,
+            ))
+        return rows
 
     def get_template_names(self):
         # An htmx request is a filter or page click from a page already on
@@ -2709,8 +2798,16 @@ class CashTransactionEntryList(generic.ListView):
         # the right answer for a hand-edited URL.
         account = self.request.GET.get("account") or ""
         if account.isdigit():
-            queryset = queryset.filter(cash_account_id=int(account))
-        return queryset
+            return queryset.filter(cash_account_id=int(account))
+        expenses = self.paid_from_account_expenses().order_by("-date", "-created_at", "-pk")
+        if account == self.PAID_FROM_ACCOUNT:
+            return expenses
+        # "All": both sources in one order. Only the sort keys are read
+        # here; resolve_rows loads the one page that is shown.
+        keys = [(*k, "c") for k in queryset.values_list("date", "created_at", "pk")]
+        keys += [(*k, "e") for k in expenses.values_list("date", "created_at", "pk")]
+        keys.sort(key=lambda k: (k[0] or datetime.min.date(), k[1], k[2]), reverse=True)
+        return keys
 
 
 # @method_decorator(login_required, name='dispatch')

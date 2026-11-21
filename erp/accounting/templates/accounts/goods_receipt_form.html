@@ -206,6 +206,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   /* The row's gap spaces the fields; their own bottom margin would lift
      them above the bin, which lines up with the row's end. */
   .np-cost-row .np-field { min-width: 0; margin-bottom: 0; }
+  /* The new-account panel takes the whole row, under the fields. */
+  .np-cost-new { grid-column: 1 / -1; margin-top: 0; }
+  .np-cost-new[hidden] { display: none; }
   .np-cost-amt { display: flex; align-items: center; gap: 6px; }
   .np-cost-amt .np-input { flex: 1; min-width: 0; }
   .np-cost-cur { font: 700 12px var(--font-mono); color: var(--gray-600); min-width: 30px; }
@@ -2109,12 +2112,32 @@ site's menus and the page's own way back are left out.{% endcomment %}
         '<input type="text" class="np-input np-cost-ref" maxlength="60" ' +
           'placeholder="{% filter escapejs %}{% trans "Optional" %}{% endfilter %}"></div>' +
       '<button type="button" class="np-cost-del" title="{% filter escapejs %}{% trans "Remove" %}{% endfilter %}">' +
-        '<i class="fa fa-trash"></i></button>';
+        '<i class="fa fa-trash"></i></button>' +
+      // A carrier not in the list yet, created on the spot — the same
+      // account create the supplier picker uses, in this book.
+      '<div class="np-sup-new np-cost-new" hidden>' +
+        '<div class="np-sup-new-t">{% filter escapejs %}{% trans "New account" %}{% endfilter %}</div>' +
+        '<div class="np-row">' +
+          '<div class="np-col"><label>{% filter escapejs %}{% trans "Account name" %}{% endfilter %}</label>' +
+            '<input type="text" class="np-input np-cost-new-name"></div>' +
+          '<div class="np-col"><label>{% filter escapejs %}{% trans "Currency" %}{% endfilter %} <span style="color:#C0392B;">*</span></label>' +
+            '<select class="np-select np-cost-new-cur"></select></div>' +
+        '</div>' +
+        '<div class="np-sup-new-foot">' +
+          '<button type="button" class="gr-btn np-cost-new-cancel">{% filter escapejs %}{% trans "Cancel" %}{% endfilter %}</button>' +
+          '<button type="button" class="gr-btn primary np-cost-new-save"><i class="fa fa-plus"></i> ' +
+            '{% filter escapejs %}{% trans "Create account" %}{% endfilter %}</button>' +
+        '</div>' +
+      '</div>';
     document.getElementById('npCostRows').appendChild(row);
 
     const search = row.querySelector('.np-cost-search');
     const results = row.querySelector('.np-sup-results');
     const chip = row.querySelector('.np-sup-chip');
+    const panel = row.querySelector('.np-cost-new');
+    // The currencies the supplier's own create offers.
+    row.querySelector('.np-cost-new-cur').innerHTML =
+      document.getElementById('npSupNewCurrency').innerHTML;
     function pick(id, name, currency) {
       row.dataset.accountId = id || '';
       row.querySelector('.np-cost-cur').textContent = currency || '';
@@ -2122,22 +2145,79 @@ site's menus and the page's own way back are left out.{% endcomment %}
       chip.hidden = !id;
       search.parentNode.hidden = !!id;
       results.hidden = true;
+      panel.hidden = true;
     }
+    function openNew(prefill) {
+      results.hidden = true;
+      panel.hidden = false;
+      const nameEl = panel.querySelector('.np-cost-new-name');
+      nameEl.value = (prefill || '').trim();
+      nameEl.focus();
+    }
+    panel.querySelector('.np-cost-new-cancel').onclick = function () { panel.hidden = true; };
+    panel.querySelector('.np-cost-new-save').onclick = function () {
+      const btn = this;
+      const nameEl = panel.querySelector('.np-cost-new-name');
+      const curEl = panel.querySelector('.np-cost-new-cur');
+      const name = nameEl.value.trim();
+      if (!name) { nameEl.focus(); return; }
+      // What they bill in, so it is asked.
+      if (!curEl.value) { curEl.focus(); return; }
+      const orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% filter escapejs %}{% trans "Saving…" %}{% endfilter %}';
+      fetch(NP_SUPPLIER_CREATE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': NP_CSRF, 'Content-Type': 'application/json',
+                   'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ name: name, book_id: {{ current_book.pk }}, currency: curEl.value }),
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.success) {
+            alert((d && d.error) || '{% filter escapejs %}{% trans "Account could not be created." %}{% endfilter %}');
+            return;
+          }
+          // Listed from now on, for the other rows — without becoming the
+          // purchase's own account.
+          const sel = document.getElementById('npSupplier');
+          if (sel && !sel.querySelector('option[value="' + d.id + '"]')) {
+            const opt = document.createElement('option');
+            opt.value = String(d.id);
+            opt.textContent = d.name || name;
+            opt.setAttribute('data-prefix', d.prefix || 'GEN');
+            opt.setAttribute('data-currency', d.currency || curEl.value);
+            sel.appendChild(opt);
+          }
+          pick(String(d.id), d.name || name, d.currency || curEl.value);
+          window.npDirty = true;
+        })
+        .catch(function () {
+          alert('{% filter escapejs %}{% trans "Account could not be created." %}{% endfilter %}');
+        })
+        .finally(function () { btn.disabled = false; btn.innerHTML = orig; });
+    };
     function find(q) {
       const needle = npSupFold(q);
       const matches = npSupOptions().filter(function (o) {
         return !needle || npSupFold(o.textContent).indexOf(needle) !== -1;
       });
-      results.innerHTML = matches.length
+      const exact = matches.some(function (o) { return npSupFold(o.textContent) === needle; });
+      let html = matches.length
         ? matches.map(function (o) {
             return '<div class="np-sup-opt" data-id="' + o.value + '"><span>' + npEsc(o.textContent) +
                    '</span><span class="pfx">' + npEsc(o.getAttribute('data-currency') || '') + '</span></div>';
           }).join('')
         : '<div class="np-sup-empty">{% filter escapejs %}{% trans "No account matches" %}{% endfilter %}</div>';
+      if (needle && !exact) {
+        html += '<div class="np-sup-opt create" data-create="1"><span><i class="fa fa-plus"></i> ' +
+                '{% filter escapejs %}{% trans "Create" %}{% endfilter %} “' + npEsc((q || '').trim()) + '”</span></div>';
+      }
+      results.innerHTML = html;
       results.hidden = false;
       Array.prototype.forEach.call(results.querySelectorAll('.np-sup-opt'), function (el) {
         el.addEventListener('mousedown', function (e) {
           e.preventDefault();
+          if (el.dataset.create) { openNew(search.value); return; }
           const o = npSupOptions().filter(function (x) { return x.value === el.dataset.id; })[0];
           pick(el.dataset.id, o ? o.textContent : '', o ? o.getAttribute('data-currency') : '');
           window.npDirty = true;

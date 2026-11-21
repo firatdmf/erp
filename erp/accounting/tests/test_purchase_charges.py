@@ -162,6 +162,29 @@ class PurchaseChargeTest(TestCase):
                          Decimal("52") * Decimal("3.50") + Decimal("52") * Decimal("0.1923"))
         self._assert_shelves_match_the_ledger()
 
+    def test_a_carrier_billing_in_lira_is_owed_lira_and_the_goods_take_dollars(self, _upload):
+        """Öz Turanlar bills 1,200 TL; at 40 TL to the dollar that is 30.00,
+        the same 0.60 a meter as a 30.00 bill in dollars."""
+        tl = CurrencyCategory.objects.create(code="TRY", name="Turkish Lira", symbol="₺")
+        self.carrier.default_currency = tl
+        self.carrier.save()
+
+        def rate(src, dst, on_date=None):
+            return Decimal("0.025") if (src, dst) == ("TRY", "USD") else Decimal("1")
+
+        with patch("accounting.services.get_exchange_rate", side_effect=rate):
+            invoice = self._receive(self._payload([self._charge(1200)]))
+        mv = PurchaseCharge.objects.get().posted_movement
+        self.assertEqual((mv.amount, mv.currency.code, mv.amount_base),
+                         (Decimal("-1200.00"), "TRY", Decimal("-30.00")))
+        self.assertEqual(mv.date, invoice.posting_date)       # the day the goods came in
+        self.assertEqual(self._roll("KRV-A").charges_per_unit, Decimal("0.6000"))
+        self.assertEqual(self._balances()["1300"], Decimal("205.00"))
+        self._assert_shelves_match_the_ledger()
+        # The form says what it is billed in.
+        page = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.invoice_id]))
+        self.assertContains(page, '"currency": "TRY"')
+
     def test_two_carriers_each_owed_their_own(self, _upload):
         porter = CurrentAccount.objects.create(
             book=self.book, code="C-HML", name="Hamal", type="supplier", default_currency=self.usd)

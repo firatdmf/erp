@@ -1247,6 +1247,10 @@ class BaseProductView(ModelFormMixin):
                                         file_path=source_file.file_path,
                                         file_type=source_file.file_type,
                                         sequence=img_sequence,
+                                        # The same file: its still frame, and
+                                        # already made light if the source was.
+                                        video_thumbnail=source_file.video_thumbnail,
+                                        video_optimized_at=source_file.video_optimized_at,
                                     )
                                     files_to_clone.append(cloned_file)
                                     print(f"👯 Cloning file {img_id} (URL: {source_file.file_url[-15:]}) for variant {variant_sku}")

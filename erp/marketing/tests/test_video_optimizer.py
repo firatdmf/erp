@@ -113,6 +113,19 @@ class Optimizing(TestCase):
         self.assertFalse(RetiredCdnFile.objects.exists())
 
     @patch("marketing.video_optimizer.encode")
+    def test_a_copy_of_a_done_video_takes_its_still_frame_without_a_new_encode(
+            self, encode, dl, upload, delete):
+        ProductFile.objects.filter(pk=self.rows[0].pk).update(
+            video_optimized_at="2026-11-21T00:00Z", video_thumbnail=url(f"{FOLDER}/done.jpg"))
+        self.assertEqual(video_optimizer.optimize(self.old), self.old)
+        copy = self._fresh()[1]
+        self.assertEqual(copy.video_thumbnail, url(f"{FOLDER}/done.jpg"))
+        self.assertIsNotNone(copy.video_optimized_at)
+        encode.assert_not_called()
+        dl.assert_not_called()
+        upload.assert_not_called()
+
+    @patch("marketing.video_optimizer.encode")
     def test_a_video_another_run_is_on_is_left_to_it(self, encode, dl, upload, delete):
         cache.add(f"marketing.video_optimizer:{self.old}", True, 60)
         self.assertIsNone(video_optimizer.optimize(self.old))

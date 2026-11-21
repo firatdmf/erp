@@ -72,6 +72,13 @@ def optimize(url):
         path = product_images.storage_path(url)
         if row is None or not path:
             return None
+        # A copy of a row already done (the same file picked for another
+        # colour) takes the done row's still frame: the file is already light.
+        done = (ProductFile.everywhere.filter(file_url=url, video_optimized_at__isnull=False)
+                .values("video_optimized_at", "video_thumbnail").first())
+        if done:
+            ProductFile.everywhere.filter(file_url=url, video_optimized_at__isnull=True).update(**done)
+            return url
         folder, name = path.rsplit("/", 1)
 
         source = os.path.join(work, "source" + (os.path.splitext(name)[1] or ".mp4"))

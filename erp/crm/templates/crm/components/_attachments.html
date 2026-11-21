@@ -1,12 +1,12 @@
 {% load i18n %}
 {% comment %}The file rows only — the upload box and the group header live
 in the detail page, so an upload can swap just this list back in.{% endcomment %}
-{% for f in attachments %}
+{% for f in attachments %}{% url 'crm:download_attachment' f.pk as href %}
   <div class="od-file" id="attachment-{{ f.id }}">
     {% if f.is_image %}
-    <a class="od-file-ico thumb" href="{{ f.href }}" target="_blank" rel="noopener"
+    <a class="od-file-ico thumb" href="{{ href }}" target="_blank" rel="noopener"
        aria-hidden="true" tabindex="-1">
-      <img src="{{ f.href }}" alt="" loading="lazy">
+      <img src="{{ href }}" alt="" loading="lazy">
     </a>
     {% else %}
     <span class="od-file-ico">
@@ -17,7 +17,7 @@ in the detail page, so an upload can swap just this list back in.{% endcomment %
     </span>
     {% endif %}
     <div class="od-file-body">
-      <a class="od-file-name" href="{{ f.href }}" target="_blank" rel="noopener">{{ f.name }}</a>
+      <a class="od-file-name" href="{{ href }}" target="_blank" rel="noopener">{{ f.name }}</a>
       <div class="od-file-meta">
         <span>{{ f.pretty_size }}</span>
         <span class="od-dot"></span>
@@ -29,7 +29,7 @@ in the detail page, so an upload can swap just this list back in.{% endcomment %
       </div>
     </div>
     <div class="od-file-actions">
-      <a class="od-icon-btn" href="{{ f.href }}" target="_blank" rel="noopener"
+      <a class="od-icon-btn" href="{{ href }}" target="_blank" rel="noopener"
          title="{% trans 'Download' %}"><i class="fa fa-download"></i></a>
       <button type="button" class="od-icon-btn del" title="{% trans 'Delete' %}"
               onclick="deleteAttachment({{ f.id }})">

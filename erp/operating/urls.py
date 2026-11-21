@@ -5,6 +5,7 @@ from . import bought_items
 from . import views_samples
 from . import views_sell_down
 from . import views_partial_shipment
+from . import views_files
 from . import views_transfer
 from . import order_excel
 from . import picking_list
@@ -149,6 +150,11 @@ urlpatterns = [
     # The rolls to pull for an order, for the warehouse floor: no prices,
     # no customer name. Guarded the way the pack screen is — it is the
     # same people's sheet.
+    # Its files — the customer's PO, a proforma, sketches (views_files):
+    # walled with the order's book and customer.
+    path("orders/<int:pk>/files/", of_a_customer_in_reach(book_guarded(views_files.order_files, Order, "current_account.book")), name="order_files"),
+    path("orders/<int:pk>/files/<int:doc_pk>/", of_a_customer_in_reach(book_guarded(views_files.order_file, Order, "current_account.book")), name="order_files_file"),
+    path("orders/<int:pk>/files/<int:doc_pk>/delete/", of_a_customer_in_reach(book_guarded(views_files.order_file_delete, Order, "current_account.book")), name="order_files_delete"),
     path("orders/<int:pk>/picking_list/", of_a_customer_in_reach(book_guarded_for_sales_rep(picking_list.order_picking_list, Order, "current_account.book")), name="order_picking_list"),
     # Packing-scan flow (reserve warehouse rolls before shipping).
     #

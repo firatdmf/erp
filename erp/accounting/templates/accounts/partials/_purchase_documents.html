@@ -1,150 +1,23 @@
-{% load i18n accounts_tags %}
+{% load i18n %}
 {% comment %}A purchase's documents box: the supplier's invoice, delivery notes,
-photos. On the purchase page and on the purchase form.
+photos — the shared files box (components/attachments_box.html). On the
+purchase page and on the purchase form.
 
 With `invoice` the files go up as they are picked. Without one (a purchase
 not saved yet) they wait in the box, and the form's save hands them over
 with pdDocs.uploadTo(id) once the purchase exists.{% endcomment %}
-<style>
-  .pd-docs { font: 400 13px var(--font-sans, sans-serif); }
-  .pd-docs-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-    padding: 12px; border: 1.5px dashed #CBD5E1; border-radius: 10px; background: #F8FAFC; transition: border-color 140ms, background 140ms; }
-  .pd-docs-add.over { border-color: #147F74; background: #F0FBF9; }
-  .pd-docs-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; background: #fff;
-    border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans, sans-serif); color: #005354; cursor: pointer; }
-  .pd-docs-btn:hover { border-color: #147F74; }
-  .pd-docs-hint { font: 500 12px var(--font-sans, sans-serif); color: #6B7280; flex: 1 1 200px; min-width: 0; }
-  .pd-docs-status { font: 600 12px var(--font-sans, sans-serif); color: #005354; margin-top: 8px; }
-  .pd-docs-status:empty { display: none; }
-  .pd-docs-status.err { color: #B91C1C; white-space: pre-line; }
-  .pd-docs-list { margin-top: 8px; }
-  .pd-doc { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #F1F5F9; }
-  .pd-doc:last-child { border-bottom: none; }
-  .pd-doc-ico { flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; background: #E5F1F0; color: #005354;
-    display: inline-flex; align-items: center; justify-content: center; }
-  .pd-doc-ico.thumb { width: 44px; height: 44px; overflow: hidden; background: #F1F5F9; }
-  .pd-doc-ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .pd-doc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .pd-doc-name { font: 600 13px var(--font-sans, sans-serif); color: #0F1419; text-decoration: none; overflow-wrap: anywhere; }
-  .pd-doc-name:hover { color: #005354; text-decoration: underline; }
-  .pd-doc-meta { font: 500 11.5px var(--font-sans, sans-serif); color: #6B7280; }
-  .pd-doc-del { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 8px;
-    background: transparent; color: #94A3B8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-  .pd-doc-del:hover { color: #B91C1C; border-color: #FCA5A5; background: #FEF2F2; }
-  .pd-doc.waiting .pd-doc-ico { background: #F1F5F9; color: #94A3B8; }
-  .pd-empty { padding: 6px 2px; font: 500 12.5px var(--font-sans, sans-serif); color: #94A3B8; }
-</style>
-<div class="pd-docs" id="pdDocs"
-     data-url="{% if invoice %}{% url 'accounts:purchase_documents' invoice.pk %}{% endif %}"
-     data-url-tpl="{% url 'accounts:purchase_documents' 0 %}">
-  <div class="pd-docs-add" id="pdDocsAdd">
-    <button type="button" class="pd-docs-btn" onclick="document.getElementById('pdDocsFile').click()">
-      <i class="fa fa-paperclip"></i> {% trans "Add files" %}
-    </button>
-    <button type="button" class="pd-docs-btn" onclick="document.getElementById('pdDocsPhoto').click()">
-      <i class="fa fa-camera"></i> {% trans "Take photo" %}
-    </button>
-    <span class="pd-docs-hint">
-      {% if invoice %}{% trans "The supplier's invoice, delivery notes, photos of the goods. Or drop files here." %}{% else %}{% trans "The supplier's invoice, delivery notes, photos of the goods. They are uploaded when the purchase is saved." %}{% endif %}
-    </span>
-    <input type="file" id="pdDocsFile" multiple hidden onchange="pdDocs.add(this.files); this.value='';">
-    <input type="file" id="pdDocsPhoto" accept="image/*" capture="environment" hidden onchange="pdDocs.add(this.files); this.value='';">
-  </div>
-  <div class="pd-docs-status" id="pdDocsStatus" role="status"></div>
-  <div class="pd-docs-list" id="pdDocsList">
-    {% if invoice %}{% purchase_documents_of invoice as documents %}{% include "accounts/partials/_purchase_documents_list.html" with documents=documents invoice=invoice %}{% endif %}
-  </div>
-</div>
+{% if invoice %}{% trans "The supplier's invoice, delivery notes, photos of the goods. Or drop files here." as hint %}{% else %}{% trans "The supplier's invoice, delivery notes, photos of the goods. They are uploaded when the purchase is saved." as hint %}{% endif %}
+{% include "components/attachments_box.html" with record=invoice url_name="accounts:purchase_documents" box_id="pdDocsBox" hint=hint %}
 <script>
-window.pdDocs = (function () {
-  const box = document.getElementById('pdDocs');
-  const list = document.getElementById('pdDocsList');
-  const status = document.getElementById('pdDocsStatus');
-  const zone = document.getElementById('pdDocsAdd');
-  const CSRF = '{{ csrf_token }}';
-  const T = {
-    uploading: '{% filter escapejs %}{% trans "Uploading…" %}{% endfilter %}',
-    failed: '{% filter escapejs %}{% trans "The upload failed. Please try again." %}{% endfilter %}',
-    savedNoDocs: '{% filter escapejs %}{% trans "The purchase was saved, but its documents were not uploaded. Add them on the purchase page." %}{% endfilter %}',
-    sure: '{% filter escapejs %}{% trans "Delete {name}?" %}{% endfilter %}',
-    waiting: '{% filter escapejs %}{% trans "uploaded when saved" %}{% endfilter %}',
-    remove: '{% filter escapejs %}{% trans "Remove" %}{% endfilter %}',
-  };
-  let url = box.dataset.url;
-  const pending = [];
-
-  function say(text, isErr) {
-    status.textContent = text || '';
-    status.classList.toggle('err', !!isErr);
-  }
-  function esc(s) {
-    const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
-  }
-  function showPending() {
-    list.innerHTML = pending.map(function (f, i) {
-      return '<div class="pd-doc waiting"><span class="pd-doc-ico"><i class="fa fa-file"></i></span>' +
-        '<span class="pd-doc-body"><span class="pd-doc-name">' + esc(f.name) + '</span>' +
-        '<span class="pd-doc-meta">' + T.waiting + '</span></span>' +
-        '<button type="button" class="pd-doc-del" title="' + T.remove + '" onclick="pdDocs.unqueue(' + i + ')">' +
-        '<i class="fa fa-times"></i></button></div>';
-    }).join('');
-  }
-  function answer(r) {
-    return r.json().then(function (d) {
-      if (d && d.html !== undefined) list.innerHTML = d.html;
-      const errors = (d && d.errors) || [];
-      say(errors.join('\n'), errors.length > 0);
-      return d;
+window.pdDocs = {
+  add: function (files) { pdDocsBox.add(files); },
+  // Always resolves: the purchase is saved either way, so a failed upload
+  // says so and lets the save go on to its page.
+  uploadTo: function (invoiceId) {
+    const savedNoDocs = '{% filter escapejs %}{% trans "The purchase was saved, but its documents were not uploaded. Add them on the purchase page." %}{% endfilter %}';
+    return pdDocsBox.uploadTo(invoiceId).then(function (r) {
+      if (r.errors.length) alert(savedNoDocs + '\n\n' + r.errors.join('\n'));
     });
-  }
-  function send(files) {
-    const body = new FormData();
-    files.forEach(function (f) { body.append('files', f); });
-    say(T.uploading);
-    return fetch(url, { method: 'POST', body: body,
-      headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' } }).then(answer);
-  }
-
-  zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('over'); });
-  zone.addEventListener('dragleave', function () { zone.classList.remove('over'); });
-  zone.addEventListener('drop', function (e) {
-    e.preventDefault(); zone.classList.remove('over');
-    if (e.dataTransfer && e.dataTransfer.files.length) add(e.dataTransfer.files);
-  });
-
-  function add(fileList) {
-    const files = Array.prototype.slice.call(fileList || []);
-    if (!files.length) return;
-    if (url) {
-      send(files).catch(function () { say(T.failed, true); });
-      return;
-    }
-    pending.push.apply(pending, files);
-    window.npDirty = true;
-    showPending();
-  }
-
-  return {
-    add: add,
-    unqueue: function (i) { pending.splice(i, 1); showPending(); },
-    remove: function (btn) {
-      if (!confirm(T.sure.replace('{name}', btn.dataset.name))) return;
-      btn.disabled = true;
-      fetch(btn.dataset.url, { method: 'POST',
-        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(answer).catch(function () { btn.disabled = false; say(T.failed, true); });
-    },
-    // The files picked before the purchase existed, sent to it now. Always
-    // resolves: the purchase is saved either way, so a failed upload says
-    // so and lets the save go on to its page.
-    uploadTo: function (invoiceId) {
-      if (!pending.length) return Promise.resolve();
-      if (!invoiceId) { alert(T.savedNoDocs); return Promise.resolve(); }
-      url = box.dataset.urlTpl.replace('/0/', '/' + invoiceId + '/');
-      return send(pending.splice(0)).then(function (d) {
-        if (d && d.errors && d.errors.length) alert(T.savedNoDocs + '\n\n' + d.errors.join('\n'));
-      }).catch(function () { alert(T.savedNoDocs); });
-    },
-  };
-})();
+  },
+};
 </script>

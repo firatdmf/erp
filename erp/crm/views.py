@@ -5,13 +5,14 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
 from .models import (
-    Attachment, Contact, Company, DuplicateName, Note, CompanyFollowUp,
-    content_type_for, of_books_in_reach, validate_attachment_size, validate_attachment_type,
+    Contact, Company, DuplicateName, Note, CompanyFollowUp,
+    of_books_in_reach,
 )
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _gettext
 from todo.models import Task
 from erp.search_utils import unaccent_icontains
+from erp.attachments import attachment_response, files_of, save_uploads
 from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from itertools import chain
@@ -1718,7 +1719,7 @@ def _render_attachment_list(request, kind, owner, errors=()):
     from django.template.loader import render_to_string
     import json as _json
 
-    files = Attachment.objects.filter(**{kind: owner}).select_related("uploaded_by")
+    files = files_of(owner)
     response = HttpResponse(render_to_string(
         "crm/components/_attachments.html",
         {"attachments": files, "owner_kind": kind, "owner": owner},
@@ -1735,63 +1736,6 @@ def _render_attachment_list(request, kind, owner, errors=()):
 CRM_ATTACHMENT_CDN_FOLDER = "Marketing/crm"
 
 
-# Types the download view will render in the browser. Everything else —
-# SVG included — is handed over as a download instead.
-INLINE_CONTENT_TYPES = frozenset({
-    "application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp",
-})
-
-
-class AttachmentStorageError(Exception):
-    """The file could not be put somewhere it will survive."""
-
-
-def _store_attachment(upload, folder, owner):
-    """Put an uploaded file where it will survive, and say where: under
-    `folder`/<owner's id>/ in the storage zone.
-
-    Returns `(storage_path, local_file)`, exactly one of which is set.
-
-    Bunny, or nothing: MEDIA_ROOT is a container path with no volume
-    mounted, so a file written there looks saved and is gone on the next
-    deploy. A failed upload raises instead — an error the user sees and
-    retries in seconds beats a file that quietly disappears in a week.
-
-    The local disk is used only where it is the intent: a dev box with
-    USE_BUNNY_CDN off. In production that same setting means the storage
-    is misconfigured, so the upload is refused rather than written to a
-    doomed path.
-    """
-    from django.conf import settings as _dj_settings
-
-    if not getattr(_dj_settings, "USE_BUNNY_CDN", False):
-        if not _dj_settings.DEBUG:
-            raise AttachmentStorageError(
-                "File storage is not configured on this server, so the "
-                "upload was refused rather than saved somewhere it would "
-                "be lost. Ask an administrator to check USE_BUNNY_CDN.")
-        return "", upload   # dev box: the local disk is the intent
-
-    from marketing.utils.bunny_storage import upload_to_bunny
-    from django.utils.crypto import get_random_string
-    import re as _re
-
-    # A random prefix, so two uploads of "contract.pdf" onto the same
-    # record do not overwrite one another.
-    safe = _re.sub(r"[^A-Za-z0-9._-]", "-", upload.name)[-80:].strip("-._")
-    path = f"{folder}/{owner.pk}/{get_random_string(8)}_{safe}"
-    try:
-        upload_to_bunny(
-            upload, path, content_type=getattr(upload, "content_type", None))
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).exception(
-            "Bunny upload failed for a CRM attachment")
-        raise AttachmentStorageError(
-            "Upload failed — the file was not saved. Please try again.") from exc
-    return path, None
-
-
 @login_required
 def upload_attachments(request, kind, pk):
     """Attach one or more files to a CRM record.
@@ -1804,123 +1748,35 @@ def upload_attachments(request, kind, pk):
     if request.method != "POST":
         return _render_attachment_list(request, kind, owner)
 
-    skipped = save_uploads(request, kind, owner)
+    skipped = save_uploads(request, owner, f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}")
     return _render_attachment_list(request, kind, owner, errors=skipped)
-
-
-def save_uploads(request, kind, owner, folder=None):
-    """Store each file in `request.FILES` as an Attachment on `owner`,
-    whose field on Attachment is `kind` ("contact", "company",
-    "invoice"); returns a complaint per file that was not kept.
-
-    The ones that made it are kept whatever happened to the others,
-    because their bytes are already safe. `folder` is where in the storage
-    zone they go, each owner in a folder of its own under it; a CRM
-    record's by default (Marketing/crm/contact/, Marketing/crm/company/).
-    """
-    uploads = request.FILES.getlist("files") or request.FILES.getlist("file")
-    skipped = []
-    for upload in uploads:
-        try:
-            validate_attachment_size(upload)
-            validate_attachment_type(upload)
-        except ValidationError as exc:
-            skipped.append(f"{upload.name}: {exc.messages[0]}")
-            continue
-        # A phone photo goes in as a DOCUMENT JPEG: a fraction of the
-        # size, upright, and HEIC turned into something every browser
-        # opens. A heavy PDF has the photos inside it treated the same way
-        # (erp.pdf_optimizer). Anything neither can read is stored as it came.
-        uploaded_type = content_type_for(upload.name)
-        if uploaded_type.startswith("image/") or uploaded_type == "application/pdf":
-            from django.core.files.uploadedfile import SimpleUploadedFile
-            from erp.image_optimizer import DOCUMENT, OptimizedImage, optimize_image
-            from erp.pdf_optimizer import OptimizedPdf, optimize_pdf
-            optimize = optimize_pdf if uploaded_type == "application/pdf" else optimize_image
-            smaller = optimize(upload, DOCUMENT)
-            if isinstance(smaller, (OptimizedImage, OptimizedPdf)):
-                upload = SimpleUploadedFile(
-                    smaller.name, smaller.getvalue(), smaller.content_type)
-        try:
-            path, local = _store_attachment(
-                upload, folder or f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}", owner)
-        except AttachmentStorageError as exc:
-            skipped.append(f"{upload.name}: {exc}")
-            continue
-        Attachment.objects.create(
-            **{kind: owner},
-            name=upload.name[:255],
-            path=path,
-            file=local,
-            size=upload.size or 0,
-            content_type=content_type_for(
-                upload.name, getattr(upload, "content_type", "")),
-            uploaded_by=request.user if request.user.is_authenticated else None,
-        )
-    return skipped
 
 
 @login_required
 def download_attachment(request, pk):
-    """Serve an attachment to a signed-in user.
-
-    The bytes come back out of the Storage API with the account key, so
-    the file is never fetched through the public pull zone and its CDN
-    address never appears in a page. Anyone without a session gets the
-    login screen instead of the document.
-    """
-    return attachment_response(get_object_or_404(Attachment, pk=pk))
+    """Serve a contact's or company's file to a signed-in user who may
+    open that record (erp.attachments.attachment_response)."""
+    return attachment_response(_crm_attachment(pk))
 
 
-def attachment_response(attachment):
-    """The file behind `attachment`, for a reader already let in."""
-    from django.http import FileResponse, StreamingHttpResponse
-
-    # A short allowlist, not "any image": an SVG is a document that can
-    # carry script, and rendering one here would run it on our own origin
-    # as the signed-in user. Everything outside this list downloads.
-    inline = attachment.content_type in INLINE_CONTENT_TYPES
-    disposition = "inline" if inline else "attachment"
-    filename = attachment.name.replace('"', "")
-
-    if attachment.path:
-        from marketing.utils.bunny_storage import download_from_bunny
-        try:
-            upstream = download_from_bunny(attachment.path)
-        except Exception:
-            import logging
-            logging.getLogger(__name__).exception(
-                "Could not read attachment %s back from Bunny", attachment.pk)
-            raise Http404("This file could not be read from storage")
-        response = StreamingHttpResponse(
-            upstream.iter_content(chunk_size=64 * 1024),
-            content_type=attachment.content_type or "application/octet-stream",
-        )
-        if attachment.size:
-            response["Content-Length"] = attachment.size
-    elif attachment.file:
-        response = FileResponse(
-            attachment.file.open("rb"),
-            content_type=attachment.content_type or "application/octet-stream",
-        )
-    else:
-        raise Http404("This attachment has no file behind it")
-
-    response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
-    # Never let a shared cache hold a document behind a login.
-    response["Cache-Control"] = "private, max-age=0, no-store"
-    # And never let the browser decide a text file is really HTML.
-    response["X-Content-Type-Options"] = "nosniff"
-    return response
+def _crm_attachment(pk):
+    """The file `pk`, if it hangs off a contact or company the reader may
+    open; 404 otherwise — another record's files have their own routes."""
+    from erp.models import Attachment
+    attachment = get_object_or_404(Attachment.objects.select_related("record_type"), pk=pk)
+    kind = attachment.record_type.model
+    if attachment.record_type.app_label != "crm" or kind not in ATTACHMENT_OWNERS:
+        raise Http404("No such file.")
+    _attachment_owner(kind, attachment.record_id)
+    return attachment
 
 
 @login_required
 def delete_attachment(request, pk):
     """Drop an attachment. The bytes go with it, via the delete signal."""
-    attachment = get_object_or_404(Attachment, pk=pk)
     if request.method != "POST":
         return HttpResponse(status=405)
-    attachment.delete()
+    _crm_attachment(pk).delete()
     return HttpResponse(status=200)
 
 

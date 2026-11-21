@@ -25,7 +25,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from crm.models import Attachment, Company, Contact
+from crm.models import Company, Contact
+from erp.models import Attachment
 from crm.tests import works_in_a_book
 
 User = get_user_model()
@@ -54,7 +55,7 @@ class AttachmentUpload(TestCase):
 
         self.assertEqual(res.status_code, 200)
         row = Attachment.objects.get()
-        self.assertEqual(row.contact, self.contact)
+        self.assertEqual(row.record, self.contact)
         self.assertEqual(row.name, "contract.pdf")
         self.assertTrue(
             row.path.startswith(f"Marketing/crm/contact/{self.contact.pk}/"))
@@ -150,8 +151,7 @@ class AttachmentUpload(TestCase):
         )
 
         row = Attachment.objects.get()
-        self.assertEqual(row.company, company)
-        self.assertIsNone(row.contact)
+        self.assertEqual(row.record, company)
         self.assertTrue(row.path.startswith(f"Marketing/crm/company/{company.pk}/"))
 
     @override_settings(USE_BUNNY_CDN=True)
@@ -210,7 +210,7 @@ class AttachmentDelete(TestCase):
     @patch("marketing.utils.bunny_storage.delete_from_bunny")
     def test_delete_removes_the_row_and_the_stored_file(self, mock_delete):
         row = Attachment.objects.create(
-            contact=self.contact, name="contract.pdf",
+            record=self.contact, name="contract.pdf",
             path="Marketing/crm/contact/1/abc_contract.pdf",
         )
 
@@ -224,9 +224,9 @@ class AttachmentDelete(TestCase):
     def test_deleting_the_contact_takes_its_files_off_the_cdn(self, mock_delete):
         """The route most attachments actually die by."""
         Attachment.objects.create(
-            contact=self.contact, name="a.pdf", path="Marketing/crm/contact/1/a.pdf")
+            record=self.contact, name="a.pdf", path="Marketing/crm/contact/1/a.pdf")
         Attachment.objects.create(
-            contact=self.contact, name="b.pdf", path="Marketing/crm/contact/1/b.pdf")
+            record=self.contact, name="b.pdf", path="Marketing/crm/contact/1/b.pdf")
 
         self.contact.delete()
 
@@ -239,7 +239,7 @@ class AttachmentDelete(TestCase):
     def test_a_cdn_that_will_not_delete_still_drops_the_row(self, mock_delete):
         mock_delete.side_effect = RuntimeError("bunny is down")
         row = Attachment.objects.create(
-            contact=self.contact, name="x.pdf", path="Marketing/crm/contact/1/x.pdf")
+            record=self.contact, name="x.pdf", path="Marketing/crm/contact/1/x.pdf")
 
         self.client.post(reverse("crm:delete_attachment", args=[row.pk]))
 
@@ -257,7 +257,7 @@ class AttachmentsOnThePage(TestCase):
 
     def test_the_files_group_lists_them_without_leaking_the_cdn_address(self):
         row = Attachment.objects.create(
-            contact=self.contact, name="contract.pdf",
+            record=self.contact, name="contract.pdf",
             path="Marketing/crm/contact/1/abc_contract.pdf", size=2048,
             content_type="application/pdf",
         )
@@ -272,7 +272,7 @@ class AttachmentsOnThePage(TestCase):
 
     def test_the_partial_is_just_the_rows(self):
         Attachment.objects.create(
-            contact=self.contact, name="spec.xlsx",
+            record=self.contact, name="spec.xlsx",
             path="Marketing/crm/contact/1/spec.xlsx")
 
         html = self.client.get(
@@ -284,14 +284,14 @@ class AttachmentsOnThePage(TestCase):
 
     def test_a_photo_shows_a_thumbnail(self):
         """A photo shows itself in the list; a PDF keeps its icon."""
-        photo = Attachment.objects.create(contact=self.contact, name="shop.jpg",
+        photo = Attachment.objects.create(record=self.contact, name="shop.jpg",
                                           path="p/shop.jpg", content_type="image/jpeg")
-        pdf = Attachment.objects.create(contact=self.contact, name="contract.pdf",
+        pdf = Attachment.objects.create(record=self.contact, name="contract.pdf",
                                         path="p/contract.pdf", content_type="application/pdf")
         html = self.client.get(
             reverse("crm:contact_detail", args=[self.contact.pk])).content.decode()
-        self.assertIn(f'<img src="{photo.href}"', html)
-        self.assertNotIn(f'<img src="{pdf.href}"', html)
+        self.assertIn(f'<img src="{reverse("crm:download_attachment", args=[photo.pk])}"', html)
+        self.assertNotIn(f'<img src="{reverse("crm:download_attachment", args=[pdf.pk])}"', html)
 
 
 class AttachmentDownload(TestCase):
@@ -302,7 +302,7 @@ class AttachmentDownload(TestCase):
         works_in_a_book(self.user)
         self.contact = Contact.objects.create(name="Abbie Braker")
         self.row = Attachment.objects.create(
-            contact=self.contact, name="contract.pdf",
+            record=self.contact, name="contract.pdf",
             path="Marketing/crm/contact/1/abc_contract.pdf",
             size=11, content_type="application/pdf",
         )

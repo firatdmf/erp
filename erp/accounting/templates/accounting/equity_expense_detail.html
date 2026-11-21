@@ -212,6 +212,16 @@
       {% endif %}
     </div>
   </div>
+
+  <div class="xd-card">
+    <div class="xd-sect">
+      <div class="xd-sect-h">
+        <span class="ico"><i data-lucide="paperclip"></i></span>
+        <h3>{% trans "Documents" %}</h3>
+      </div>
+      {% include "components/attachments_box.html" with record=expense url_name="accounts:expense_files" box_id="expenseFiles" %}
+    </div>
+  </div>
 </div>
 
 <script>if (window.lucide) lucide.createIcons();</script>

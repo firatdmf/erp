@@ -8,6 +8,8 @@ from django.db.models.functions import Lower
 from django.forms import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from erp.models import attachments_relation
+
 
 class DuplicateName(ValueError):
     """A second company or contact under a name CRM already has."""
@@ -418,6 +420,9 @@ class ClientGroup(models.Model):
 class Company(UniqueNameMixin, models.Model):
     duplicate_name_message = _("A company with this name already exists.")
 
+    # Its files (erp.Attachment): contracts, spec sheets, photos.
+    attachments = attachments_relation()
+
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
     # rows that predate this column (and on anything created outside a
@@ -501,6 +506,9 @@ class Company(UniqueNameMixin, models.Model):
 
 class Contact(UniqueNameMixin, models.Model):
     duplicate_name_message = _("A contact with this name already exists.")
+
+    # Its files (erp.Attachment): contracts, spec sheets, photos.
+    attachments = attachments_relation()
 
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
@@ -699,106 +707,31 @@ class CompanyFollowUp(models.Model):
         self.save()
 
 
-# Extensions that execute rather than describe. A CRM should carry
-# whatever paperwork a customer sends, so the rule is open-minus-the-
-# dangerous-ones rather than a whitelist: these are the endings that turn
-# the file list into a way to hand a colleague a program, and nothing a
-# salesperson legitimately attaches ends in one. A zipped executable
-# still gets through — that is the accepted cost of accepting archives.
-BLOCKED_ATTACHMENT_EXTENSIONS = frozenset({
-    # Windows executables and installers
-    "exe", "msi", "com", "scr", "pif", "cpl", "msc", "lnk", "reg",
-    # Shell and script interpreters
-    "bat", "cmd", "sh", "bash", "ps1", "psm1", "vbs", "vbe",
-    "js", "jse", "wsf", "wsh", "hta",
-    # Packaged applications
-    "jar", "apk", "app", "deb", "rpm",
-    # Macro-enabled Office documents — the classic mail-borne payload
-    "docm", "dotm", "xlsm", "xltm", "xlam", "pptm", "potm", "ppam",
-})
-
-
-def validate_attachment_type(file):
-    """Refuse the file endings that run instead of open.
-
-    Only the LAST extension is examined, which is the point:
-    "invoice.pdf.exe" is an executable wearing a document's name, and
-    that is exactly the shape this is here to stop.
-    """
-    name = getattr(file, "name", "") or ""
-    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-    if ext in BLOCKED_ATTACHMENT_EXTENSIONS:
-        raise ValidationError(
-            f".{ext} files cannot be attached — programs and scripts are "
-            f"not accepted. Put it in a zip if it really has to travel.")
-    return file
-
-
-def content_type_for(filename, declared=""):
-    """Work out a file's type from its name, not from what the client said.
-
-    The browser supplies `content_type` on an upload and a crafted client
-    can supply anything, so trusting it lets a caller choose how their
-    file is later served — declare a payload "image/svg+xml" and it comes
-    back inline, on our own origin. The extension is not proof of content
-    either, but it is at least ours to reason about, and the download view
-    only ever renders a short list of types inline.
-    """
-    import mimetypes
-
-    guess, _ = mimetypes.guess_type(filename or "")
-    return (guess or declared or "application/octet-stream")[:120]
-
-
-def validate_attachment_size(file):
-    """Cap an attachment at 25 MB.
-
-    Larger than the 10 MB product-image limit because these are the
-    documents a salesperson hangs off a client — a signed contract scan
-    or a spec sheet routinely runs past ten.
-    """
-    size_threshold = 26214400  # 25 MB
-    if file.size > size_threshold:
-        raise ValidationError("The maximum file size that can be uploaded is 25MB")
-    return file
+# The rules and the type check are the shared attachments' (erp.attachments);
+# kept importable here for crm.views and the crm migrations that name them.
+from erp.attachments import (  # noqa: E402
+    BLOCKED_EXTENSIONS as BLOCKED_ATTACHMENT_EXTENSIONS, content_type_for,
+    validate_attachment_size, validate_attachment_type,
+)
 
 
 class Attachment(models.Model):
-    """A file hung off a record — a contact, a company, or a purchase
-    (the supplier's invoice, a delivery note, photos of the goods).
-
-    A purchase's files are reached through the purchase's own pages
-    (accounting.views_purchase_documents), which its book walls: they
-    are purchasing papers, open to whoever may open the purchase, and
-    not part of the CRM. The CRM routes find only contacts' and
-    companies' files (OwnedRecordManager).
-
-    The bytes live in the Bunny Storage Zone and the row keeps only the
-    storage `path` — never a CDN URL. Readers go through the
-    login-required download view, which fetches from the Storage API
-    with the account key, so an attachment has no public address to
-    leak or guess.
-
-    There is no local fallback for a failed upload. MEDIA_ROOT is a
-    container path with no volume mounted: a file written there looks
-    saved and is gone on the next deploy, which is how 3,611 warehouse
-    rolls ended up pointing at photos that no longer exist. A refused
-    upload the user can retry beats a file that quietly disappears.
-    `file` is only for a dev box running without Bunny configured, where
-    the local disk is the intent rather than a consolation prize.
+    """Retired: the files moved to the shared erp.Attachment (erp 0009),
+    which any record can carry. Nothing reads or writes this table any
+    more; it stays until its own migration drops it.
     """
 
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True,
-        related_name="attachments",
+        related_name="+",
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True,
-        related_name="attachments",
+        related_name="+",
     )
     invoice = models.ForeignKey(
         "accounting.Invoice", on_delete=models.CASCADE, blank=True, null=True,
-        related_name="attachments",
+        related_name="+",
     )
     name = models.CharField(max_length=255)
     path = models.CharField(
@@ -817,32 +750,8 @@ class Attachment(models.Model):
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
-    objects = OwnedRecordManager()
-    everywhere = models.Manager()
-
     class Meta:
         ordering = ["-uploaded_at"]
 
     def __str__(self):
         return self.name
-
-    @property
-    def href(self):
-        """Every reader goes through the login-required download view."""
-        from django.urls import reverse
-        return reverse("crm:download_attachment", args=[self.pk])
-
-    @property
-    def extension(self):
-        return (self.name.rsplit(".", 1)[-1].upper() if "." in self.name else "")
-
-    @property
-    def is_image(self):
-        return self.content_type.startswith("image/")
-
-    def pretty_size(self):
-        n = self.size or 0
-        for unit in ("B", "KB", "MB", "GB"):
-            if n < 1024 or unit == "GB":
-                return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
-            n /= 1024.0

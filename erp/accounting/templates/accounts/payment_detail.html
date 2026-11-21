@@ -234,6 +234,17 @@
         </div>
       </div>
       {% endif %}
+
+      <!-- Documents: the bank slip, the card slip (erp.attachments) -->
+      <div class="pd-card">
+        <div class="pd-sect">
+          <div class="pd-sect-h">
+            <span class="ico"><i data-lucide="paperclip"></i></span>
+            <h3>{% trans "Documents" %}</h3>
+          </div>
+          {% include "components/attachments_box.html" with record=payment url_name="accounts:payment_files" box_id="paymentFiles" %}
+        </div>
+      </div>
     </div>
 
     <!-- SIDE -->

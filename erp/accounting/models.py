@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from crm.models import Company, Contact
+from erp.models import attachments_relation
 from authentication.models import Member
 
 # from operating.models import Product
@@ -886,6 +887,9 @@ class EquityExpense(models.Model):
     makes "exactly one" a fact about the table rather than a convention
     the views happen to keep.
     """
+
+    # Its receipt (erp.Attachment).
+    attachments = attachments_relation()
 
     class Meta:
         verbose_name_plural = "Equity Expenses"

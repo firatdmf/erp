@@ -1945,6 +1945,15 @@
                   placeholder="{% trans 'Only your team sees these — they are not printed or sent.' %}">{{ order.internal_notes|default:'' }}</textarea>
       </section>
 
+      <!-- DOCUMENTS — the customer's PO, a proforma, sketches and photos
+           they sent (erp.attachments). Cargo receipts stay with the status. -->
+      <section class="od-card no-print" id="od-files-card">
+        <div class="od-card-h">
+          <h3><i class="fa fa-paperclip" style="color:#6B7280;"></i> {% trans "Documents" %}</h3>
+        </div>
+        {% include "components/attachments_box.html" with record=order url_name="operating:order_files" box_id="odFiles" %}
+      </section>
+
       <!-- ORDER CHANGES — audit trail preview (full page at order_changes).
            It records price changes, so it is the sale's (sees_order_money). -->
       {% if sees_order_money %}

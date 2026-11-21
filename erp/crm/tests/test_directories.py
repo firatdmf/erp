@@ -16,7 +16,8 @@ from django.urls import reverse
 from accounting.forms import BookForm
 from accounting.models import Book
 from crm import urls as crm_urls
-from crm.models import Attachment, Company, Contact, Directory, DuplicateName, Note
+from crm.models import Company, Contact, Directory, DuplicateName, Note
+from erp.models import Attachment
 from operating import audit
 
 
@@ -61,7 +62,7 @@ class TwoBusinesses(TestCase):
         cls.woodline = Company.objects.create(name="Woodline", directory=cls.main)
         cls.ayse = Contact.objects.create(name="Ayse Kaya", company=cls.woodline)
         cls.note = Note.objects.create(contact=cls.ayse, content="Pays late")
-        cls.file = Attachment.objects.create(company=cls.woodline, name="contract.pdf")
+        cls.file = Attachment.objects.create(record=cls.woodline, name="contract.pdf")
 
         cls.steppe = Company.objects.create(
             name="Steppe Home", directory=cls.almaty.directory)
@@ -131,7 +132,6 @@ class WhoSeesWhat(TwoBusinesses):
             self.assertEqual(self._names(Company), {"Steppe Home"})
             self.assertEqual(self._names(Contact), {"Dana Akhmet"})
             self.assertFalse(Note.objects.exists())
-            self.assertFalse(Attachment.objects.exists())
             self.assertFalse(self.woodline.contacts.exists())
 
     def test_two_books_of_one_business_share_the_list(self):
@@ -140,7 +140,6 @@ class WhoSeesWhat(TwoBusinesses):
                 self.assertEqual(self._names(Company), {"Woodline"})
                 self.assertEqual(self._names(Contact), {"Ayse Kaya"})
                 self.assertTrue(Note.objects.filter(pk=self.note.pk).exists())
-                self.assertTrue(Attachment.objects.filter(pk=self.file.pk).exists())
 
     def test_what_one_shop_adds_the_factory_sees(self):
         with acting_as(self.cuma):
@@ -308,7 +307,7 @@ class ThePagesKeepTheWall(TwoBusinesses):
             "contacts": list(Contact.everywhere.order_by("pk")
                              .values_list("pk", "name", "company_id")),
             "notes": list(Note.everywhere.order_by("pk").values_list("pk", "content")),
-            "files": list(Attachment.everywhere.order_by("pk").values_list("pk", "name")),
+            "files": list(Attachment.objects.order_by("pk").values_list("pk", "name")),
         }
 
     def test_the_same_routes_open_for_the_business_they_belong_to(self):

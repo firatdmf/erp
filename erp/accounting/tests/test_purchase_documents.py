@@ -1,6 +1,6 @@
 """A purchase's documents: the supplier's invoice, delivery notes, photos.
 
-They are files on the purchase (crm.Attachment.invoice), kept in the
+They are files on the purchase (the shared erp.Attachment), kept in the
 storage zone like a contact's, and reached only through the purchase's
 own pages, so they open for exactly the people the purchase opens for.
 
@@ -19,7 +19,8 @@ from django.urls import reverse
 from accounting.models import Book, CurrencyCategory
 from accounting.models_accounts import CurrentAccount, Invoice
 from authentication.models import Permission
-from crm.models import Attachment, Company
+from crm.models import Company
+from erp.models import Attachment
 from operating.models import Warehouse
 
 
@@ -57,11 +58,10 @@ class PurchaseDocumentsTest(TestCase):
         r = self._upload(self._pdf(), SimpleUploadedFile("delivery.txt", b"20 rolls", "text/plain"))
         self.assertTrue(r.json()["success"], r.json())
         self.assertIn("hakan-invoice.pdf", r.json()["html"])
-        docs = Attachment.everywhere.filter(invoice=self.purchase)
+        docs = self.purchase.attachments
         self.assertEqual(docs.count(), 2)
         doc = docs.get(name="hakan-invoice.pdf")
-        self.assertIsNone(doc.contact_id)
-        self.assertIsNone(doc.company_id)
+        self.assertEqual(doc.record, self.purchase)
         self.assertEqual(doc.uploaded_by, self.user)
         self.assertTrue(doc.path.startswith(f"Operating/purchases/{self.purchase.pk}/"), doc.path)
 
@@ -69,7 +69,7 @@ class PurchaseDocumentsTest(TestCase):
         from erp.tests.test_pdf_optimizer import _scan
         scan = _scan(size=(1500, 2000), pages=1)
         self.assertTrue(self._upload(scan).json()["success"])
-        doc = Attachment.everywhere.get(invoice=self.purchase)
+        doc = self.purchase.attachments.get()
         self.assertEqual((doc.name, doc.content_type), ("hakan-invoice.pdf", "application/pdf"))
         self.assertLess(doc.size, scan.size // 2)
 
@@ -77,18 +77,18 @@ class PurchaseDocumentsTest(TestCase):
         r = self._upload(self._pdf(), SimpleUploadedFile("setup.exe", b"MZ", "application/octet-stream"))
         self.assertFalse(r.json()["success"])
         self.assertIn("setup.exe", " ".join(r.json()["errors"]))
-        self.assertEqual(list(Attachment.everywhere.filter(invoice=self.purchase)
+        self.assertEqual(list(self.purchase.attachments
                               .values_list("name", flat=True)), ["hakan-invoice.pdf"])
 
     def test_the_purchase_page_lists_them_and_opens_each(self, upload, _delete):
         self._upload(self._pdf())
-        doc = Attachment.everywhere.get(invoice=self.purchase)
+        doc = self.purchase.attachments.get()
         page = self.client.get(self._url("purchase_order_detail"))
         self.assertContains(page, "hakan-invoice.pdf")
-        self.assertContains(page, self._url("purchase_document_file", doc.pk))
+        self.assertContains(page, self._url("purchase_documents_file", doc.pk))
         with patch("marketing.utils.bunny_storage.download_from_bunny",
                    return_value=SimpleNamespace(iter_content=lambda chunk_size: [b"%PDF-1.4 ..."])):
-            r = self.client.get(self._url("purchase_document_file", doc.pk))
+            r = self.client.get(self._url("purchase_documents_file", doc.pk))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(b"".join(r.streaming_content), b"%PDF-1.4 ...")
         self.assertIn("inline", r["Content-Disposition"])
@@ -98,10 +98,10 @@ class PurchaseDocumentsTest(TestCase):
         from erp.tests.test_image_optimizer import _image_file
         self._upload(self._pdf(), _image_file("goods.jpg", "JPEG", size=(400, 300),
                                               content_type="image/jpeg"))
-        docs = {d.name: d for d in Attachment.everywhere.filter(invoice=self.purchase)}
+        docs = {d.name: d for d in self.purchase.attachments.all()}
         page = self.client.get(self._url("purchase_order_detail")).content.decode()
-        photo_url = self._url("purchase_document_file", docs["goods.jpg"].pk)
-        pdf_url = self._url("purchase_document_file", docs["hakan-invoice.pdf"].pk)
+        photo_url = self._url("purchase_documents_file", docs["goods.jpg"].pk)
+        pdf_url = self._url("purchase_documents_file", docs["hakan-invoice.pdf"].pk)
         self.assertIn(f'<img src="{photo_url}"', page)
         self.assertNotIn(f'<img src="{pdf_url}"', page)
 
@@ -118,11 +118,11 @@ class PurchaseDocumentsTest(TestCase):
 
     def test_deleting_one_takes_its_file_too(self, upload, delete):
         self._upload(self._pdf())
-        doc = Attachment.everywhere.get(invoice=self.purchase)
-        self.assertEqual(self.client.get(self._url("purchase_document_delete", doc.pk)).status_code, 405)
-        r = self.client.post(self._url("purchase_document_delete", doc.pk))
+        doc = self.purchase.attachments.get()
+        self.assertEqual(self.client.get(self._url("purchase_documents_delete", doc.pk)).status_code, 405)
+        r = self.client.post(self._url("purchase_documents_delete", doc.pk))
         self.assertTrue(r.json()["success"])
-        self.assertFalse(Attachment.everywhere.filter(pk=doc.pk).exists())
+        self.assertFalse(Attachment.objects.filter(pk=doc.pk).exists())
         delete.assert_called_once_with(doc.path)
 
     def test_another_books_purchase_keeps_its_papers_to_itself(self, upload, _delete):
@@ -132,22 +132,22 @@ class PurchaseDocumentsTest(TestCase):
                 default_currency=self.purchase.currency),
             currency=self.purchase.currency, type="purchase", number="PUR-L-1",
             date=date(2026, 11, 20), due_date=date(2026, 12, 20))
-        doc = Attachment.everywhere.create(invoice=theirs, name="theirs.pdf", path="Operating/purchases/x.pdf",
+        doc = Attachment.objects.create(record=theirs, name="theirs.pdf", path="Operating/purchases/x.pdf",
                                            content_type="application/pdf")
         self.assertEqual(self._upload(self._pdf(), purchase=theirs).status_code, 404)
-        self.assertEqual(self.client.get(self._url("purchase_document_file", doc.pk, purchase=theirs)).status_code, 404)
-        self.assertEqual(self.client.post(self._url("purchase_document_delete", doc.pk, purchase=theirs)).status_code, 404)
+        self.assertEqual(self.client.get(self._url("purchase_documents_file", doc.pk, purchase=theirs)).status_code, 404)
+        self.assertEqual(self.client.post(self._url("purchase_documents_delete", doc.pk, purchase=theirs)).status_code, 404)
         # Nor through a purchase of one's own book naming it.
-        self.assertEqual(self.client.get(self._url("purchase_document_file", doc.pk)).status_code, 404)
-        self.assertTrue(Attachment.everywhere.filter(pk=doc.pk).exists())
+        self.assertEqual(self.client.get(self._url("purchase_documents_file", doc.pk)).status_code, 404)
+        self.assertTrue(Attachment.objects.filter(pk=doc.pk).exists())
 
     def test_a_role_without_the_ledger_still_handles_them(self, upload, _delete):
         """Purchasing is warehouse work: Operations opens purchases without
         the ledger or the CRM, and their documents with them."""
         self.user.member.permissions.add(Permission.objects.get_or_create(name="no_accounts")[0])
         self.assertTrue(self._upload(self._pdf()).json()["success"])
-        doc = Attachment.everywhere.get(invoice=self.purchase)
-        self.assertEqual(self.client.post(self._url("purchase_document_delete", doc.pk)).status_code, 200)
+        doc = self.purchase.attachments.get()
+        self.assertEqual(self.client.post(self._url("purchase_documents_delete", doc.pk)).status_code, 200)
         # The CRM's own file routes stay theirs: closed to this role.
         self.assertNotEqual(self.client.get(reverse("crm:download_attachment", args=[doc.pk])).status_code, 200)
 

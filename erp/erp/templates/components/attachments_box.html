@@ -1,0 +1,63 @@
+{% load i18n static attachment_tags %}
+{% comment %}A record's files box (erp.attachments): add files, take a photo, drop
+them in; the list under it, each row opening its file in a new tab.
+
+  record    the record, or None for one not saved yet: its files then wait
+            in the box until the page's save calls
+            window[box_id].uploadTo(id) once the record exists
+  url_name  the record's files route ("accounts:payment_files"); its _file
+            and _delete routes are named after it
+  box_id    the element id, and the window name of its script object
+  hint      optional: what goes here, beside the buttons{% endcomment %}
+<style>
+  .nf-files { font: 400 13px var(--font-sans, sans-serif); }
+  .nf-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 12px; border: 1.5px dashed #CBD5E1; border-radius: 10px; background: #F8FAFC; transition: border-color 140ms, background 140ms; }
+  .nf-add.over { border-color: #147F74; background: #F0FBF9; }
+  .nf-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; background: #fff;
+    border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans, sans-serif); color: #005354; cursor: pointer; }
+  .nf-btn:hover { border-color: #147F74; }
+  .nf-hint { font: 500 12px var(--font-sans, sans-serif); color: #6B7280; flex: 1 1 200px; min-width: 0; }
+  .nf-status { font: 600 12px var(--font-sans, sans-serif); color: #005354; margin-top: 8px; }
+  .nf-status:empty { display: none; }
+  .nf-status.err { color: #B91C1C; white-space: pre-line; }
+  .nf-list { margin-top: 8px; }
+  .nf-doc { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #F1F5F9; }
+  .nf-doc:last-child { border-bottom: none; }
+  .nf-doc-ico { flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; background: #E5F1F0; color: #005354;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .nf-doc-ico.thumb { width: 44px; height: 44px; overflow: hidden; background: #F1F5F9; }
+  .nf-doc-ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .nf-doc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .nf-doc-name { font: 600 13px var(--font-sans, sans-serif); color: #0F1419; text-decoration: none; overflow-wrap: anywhere; }
+  .nf-doc-name:hover { color: #005354; text-decoration: underline; }
+  .nf-doc-meta { font: 500 11.5px var(--font-sans, sans-serif); color: #6B7280; }
+  .nf-doc-del { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 8px;
+    background: transparent; color: #94A3B8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .nf-doc-del:hover { color: #B91C1C; border-color: #FCA5A5; background: #FEF2F2; }
+  .nf-doc.waiting .nf-doc-ico { background: #F1F5F9; color: #94A3B8; }
+  .nf-empty { padding: 6px 2px; font: 500 12.5px var(--font-sans, sans-serif); color: #94A3B8; }
+</style>
+<div class="nf-files" id="{{ box_id }}"
+     data-url="{% if record %}{% url url_name record.pk %}{% endif %}"
+     data-url-tpl="{% url url_name 0 %}"
+     data-csrf="{{ csrf_token }}"
+     data-t-uploading="{% trans 'Uploading…' %}"
+     data-t-failed="{% trans 'The upload failed. Please try again.' %}"
+     data-t-sure="{% trans 'Delete {name}?' %}"
+     data-t-waiting="{% trans 'uploaded when saved' %}"
+     data-t-remove="{% trans 'Remove' %}">
+  <div class="nf-add">
+    <button type="button" class="nf-btn" data-pick="files"><i class="fa fa-paperclip"></i> {% trans "Add files" %}</button>
+    <button type="button" class="nf-btn" data-pick="photo"><i class="fa fa-camera"></i> {% trans "Take photo" %}</button>
+    {% if hint %}<span class="nf-hint">{{ hint }}</span>{% endif %}
+    <input type="file" data-input="files" multiple hidden>
+    <input type="file" data-input="photo" accept="image/*" capture="environment" hidden>
+  </div>
+  <div class="nf-status" role="status"></div>
+  <div class="nf-list">
+    {% if record %}{% files_of record as documents %}{% include "components/attachments_list.html" with documents=documents record=record url_name=url_name %}{% endif %}
+  </div>
+</div>
+<script src="{% static 'erp/js/attachments_box.js' %}"></script>
+<script>window["{{ box_id|escapejs }}"] = NejumFiles.box(document.getElementById("{{ box_id|escapejs }}"));</script>

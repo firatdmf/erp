@@ -69,6 +69,7 @@ from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext as _gettext, gettext_lazy as _
+from erp.models import attachments_relation
 
 from authentication.models import Member
 from crm.models import Company, Contact
@@ -1044,6 +1045,10 @@ class CurrentAccountSettings(models.Model):
 # 4. Invoice
 # ---------------------------------------------------------------------------
 class Invoice(models.Model):
+    # A purchase's documents (erp.Attachment): the supplier's invoice,
+    # delivery notes, photos of the goods.
+    attachments = attachments_relation()
+
     class Meta:
         verbose_name = _("Invoice")
         verbose_name_plural = _("Invoices")
@@ -1633,6 +1638,9 @@ def _invoice_item_deleted(sender, instance, **kwargs):
 # 6. Payment — collection / payment
 # ---------------------------------------------------------------------------
 class Payment(models.Model):
+    # Its papers (erp.Attachment): the bank slip, the card slip.
+    attachments = attachments_relation()
+
     class Meta:
         verbose_name = _("Collection / Payment")
         verbose_name_plural = _("Collections / Payments")

@@ -7,6 +7,7 @@ from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
+from erp.models import attachments_relation
 
 # from accounting.models import (
 #     AssetInventoryRawMaterial,
@@ -499,6 +500,10 @@ def _dollar_labels():
 
 
 class Order(models.Model):
+    # Its files (erp.Attachment): the customer's PO, a proforma,
+    # sketches and photos they sent.
+    attachments = attachments_relation()
+
     # Who raised this record. Stamped automatically on first save by
     # erp.ownership.stamp_creator, from the request-scoped user. NULL on
     # rows that predate this column (and on anything created outside a

@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}A record's files, one row each (erp.attachments). The box around it
+(components/attachments_box.html) swaps this list in after an upload or a
+delete. `url_name` is the record's files route; its _file and _delete
+routes take the record's pk and the file's.{% endcomment %}
+{% for d in documents %}{% url url_name|add:"_file" record.pk d.pk as file_url %}
+<div class="nf-doc">
+  {% if d.is_image %}
+  <a class="nf-doc-ico thumb" href="{{ file_url }}" target="_blank" rel="noopener" aria-hidden="true" tabindex="-1">
+    <img src="{{ file_url }}" alt="" loading="lazy">
+  </a>
+  {% else %}
+  <span class="nf-doc-ico">
+    {% if d.is_pdf %}<i class="fa fa-file-pdf"></i>
+    {% elif d.extension in 'XLSX,XLS,CSV' %}<i class="fa fa-file-excel"></i>
+    {% elif d.extension in 'DOC,DOCX' %}<i class="fa fa-file-word"></i>
+    {% else %}<i class="fa fa-file"></i>{% endif %}
+  </span>
+  {% endif %}
+  <span class="nf-doc-body">
+    <a class="nf-doc-name" href="{{ file_url }}" target="_blank" rel="noopener">{{ d.name }}</a>
+    <span class="nf-doc-meta">{{ d.pretty_size }} · {{ d.uploaded_at|date:"d.m.Y" }}{% if d.uploaded_by %} · {{ d.uploaded_by.get_full_name|default:d.uploaded_by.username }}{% endif %}</span>
+  </span>
+  <button type="button" class="nf-doc-del" title="{% trans 'Delete' %}" aria-label="{% trans 'Delete' %} {{ d.name }}"
+          data-delete-url="{% url url_name|add:'_delete' record.pk d.pk %}" data-name="{{ d.name }}"><i class="fa fa-trash"></i></button>
+</div>
+{% empty %}
+<div class="nf-empty">{% trans "No documents yet." %}</div>
+{% endfor %}

@@ -74,7 +74,7 @@
         <div class="thumbnail {% if forloop.first %}active{% endif %}"
           onclick="changeImage('{{ file.file_url }}', '{{ file.file_type }}', this)">
           {% if file.file_type == 'video' %}
-          <div style="position:relative;">
+          <div class="thumbnail-video">
             {% if file.video_thumbnail %}
             <img src="{{ file.video_thumbnail }}" alt="Video thumbnail">
             {% else %}

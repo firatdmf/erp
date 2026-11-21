@@ -200,6 +200,24 @@
   object-fit: cover;
 }
 
+/* A video tile fills the square like an image tile, so its still frame is
+   cropped evenly and the play icon sits in the middle. */
+.thumbnail-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.thumbnail-video img {
+  display: block;
+}
+
+.video-thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--border-color);
+}
+
 /* Product Info */
 .product-info {
   display: flex;

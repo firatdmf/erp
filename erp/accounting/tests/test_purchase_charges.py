@@ -152,14 +152,14 @@ class PurchaseChargeTest(TestCase):
         self.assertEqual(b["1300"], Decimal("51") * Decimal("3.50") + Decimal("51") * Decimal("0.1961"))
         self._assert_shelves_match_the_ledger()
 
-    def test_the_share_per_meter_is_always_rounded_up(self, _upload):
-        """10.00 over 52 m is 0.19230…: carried as 0.1924, never below what
-        was paid — the rolls hold 10.0048 against 10.00 owed."""
+    def test_the_share_per_meter_is_rounded_half_up(self, _upload):
+        """10.00 over 52 m is 0.19230…: carried as 0.1923, as an invoice line
+        rounds — the rolls hold 9.9996 against 10.00 owed."""
         self._receive(self._payload([self._charge(10)], lengths=(30, 22)))
-        self.assertEqual(self._roll("KRV-A").charges_per_unit, Decimal("0.1924"))
+        self.assertEqual(self._roll("KRV-A").charges_per_unit, Decimal("0.1923"))
         self.assertEqual(self._owed_to(self.carrier), Decimal("10.00"))
         self.assertEqual(self._balances()["1300"],
-                         Decimal("52") * Decimal("3.50") + Decimal("52") * Decimal("0.1924"))
+                         Decimal("52") * Decimal("3.50") + Decimal("52") * Decimal("0.1923"))
         self._assert_shelves_match_the_ledger()
 
     def test_two_carriers_each_owed_their_own(self, _upload):

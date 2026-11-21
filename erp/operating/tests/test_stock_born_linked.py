@@ -1,7 +1,6 @@
 """Stock is always a catalog variant, so a warehouse row is born linked.
 
-Every path that creates a row — a goods receipt, a roll scan, the Excel
-import — used to write the row first and link it to the catalog after,
+Every path that creates a row — a goods receipt, a roll scan — used to write the row first and link it to the catalog after,
 with a warning when the catalog could not take it. The row then sat on the
 shelf as stock no catalog entry stood behind. Now the variant is found or
 made first, and stock the catalog can't take is refused, not shelved.
@@ -9,7 +8,6 @@ made first, and stock the catalog can't take is refused, not shelved.
 Run with:
     python manage.py test operating.tests.test_stock_born_linked
 """
-import io
 import json
 
 from django.contrib.auth import get_user_model
@@ -123,31 +121,3 @@ class ARollScan(SignedIn):
         self.assertFalse(WarehouseProductItem.objects.exists())
 
 
-class TheExcelImport(SignedIn):
-    def _import(self, *rows):
-        from openpyxl import Workbook
-
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["Name", "Code", "Quantity", "Purchase Price", "Currency"])
-        for row in rows:
-            ws.append(row)
-        upload = io.BytesIO()
-        wb.save(upload)
-        upload.seek(0)
-        upload.name = "stock.xlsx"
-        response = self.client.post(
-            reverse("operating:warehouse_product_import", args=[self.warehouse.pk]),
-            {"file": upload})
-        return b"".join(response.streaming_content).decode()
-
-    def test_a_new_row_is_born_linked(self):
-        self._import(["GREK BEYAZ", "LZK000054", 10, 0.70, "USD"])
-        row = WarehouseProduct.objects.get(sku="LZK000054")
-        self.assertEqual(row.catalog_variant.variant_sku, "LZK000054")
-
-    def test_one_sku_twice_in_a_sheet_is_one_row_and_says_so(self):
-        body = self._import(["GREK BEYAZ", "LZK000054", 10, 0.70, "USD"],
-                            ["GREK BEYAZ", "lzk000054", 5, 0.70, "USD"])
-        self.assertEqual(WarehouseProduct.objects.count(), 1)
-        self.assertIn("already on this shelf", body)

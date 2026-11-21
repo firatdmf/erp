@@ -92,7 +92,6 @@ urlpatterns = [
     # Convenience: a mistyped/stale "label/info" path still lands on the info screen.
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/info/", RedirectView.as_view(pattern_name="operating:warehouse_product_info", permanent=False)),
     path("warehouses/<int:pk>/edit/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseEdit.as_view()), name="warehouse_edit"),
-    path("warehouses/<int:pk>/import/", in_reach(views_warehouse.WarehouseProductImport.as_view()), name="warehouse_product_import"),
     path("warehouses/<int:pk>/delete/", views_warehouse.warehouse_guarded(views_warehouse.WarehouseDelete.as_view()), name="warehouse_delete"),
     path("warehouses/<int:pk>/scan/", in_reach(views_warehouse.WarehouseRollScan.as_view()), name="warehouse_roll_scan"),
     path("warehouses/<int:pk>/manual-add/", in_reach(views_warehouse.WarehouseManualAdd.as_view()), name="warehouse_manual_add"),

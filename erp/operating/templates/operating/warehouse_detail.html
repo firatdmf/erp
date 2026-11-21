@@ -516,44 +516,6 @@
     box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
   }
 
-  /* IMPORT MODAL */
-  .wh-modal {
-    display: none; position: fixed; inset: 0;
-    background: rgba(15,23,31,0.45);
-    backdrop-filter: blur(3px);
-    z-index: 10000; align-items: center; justify-content: center;
-    font-family: var(--font-sans);
-  }
-  .wh-modal.show { display: flex; }
-  .wh-modal-card {
-    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
-    padding: 24px; max-width: 480px; width: 90%;
-    box-shadow: 0 20px 60px rgba(15,23,31,0.20);
-  }
-  .wh-modal-card h3 {
-    margin: 0 0 6px; font: 700 16px var(--font-sans); color: #0F1419;
-  }
-  .wh-modal-card p {
-    font: 500 12.5px var(--font-sans); color: var(--gray-500); margin: 0 0 16px;
-  }
-  .wh-drop {
-    border: 2px dashed #E0E6EE; border-radius: 12px;
-    padding: 28px 18px; text-align: center; background: #F8FAFC;
-    cursor: pointer; transition: all 140ms; margin-bottom: 14px;
-  }
-  .wh-drop:hover, .wh-drop.dragging {
-    border-color: var(--nejum-teal-500); background: var(--nejum-teal-50);
-  }
-  .wh-drop-icon {
-    width: 44px; height: 44px; background: #E5EAF0; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 10px; color: var(--gray-600); font-size: 18px;
-    transition: all 140ms;
-  }
-  .wh-drop:hover .wh-drop-icon {
-    background: var(--nejum-teal-600); color: white;
-  }
-
   /* DELETE CONFIRM MODAL */
   .od-confirm-overlay {
     display: none; position: fixed; inset: 0;
@@ -861,7 +823,7 @@
     .wh-roll-act a { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
 
     /* Dialogs: nearly full width, and actions the thumb can reach. */
-    .wh-modal-card, .od-confirm-card { width: 94%; padding: 18px 16px; }
+    .od-confirm-card { width: 94%; padding: 18px 16px; }
     /* Reversed: the destructive button goes UP and Cancel sits where the
        thumb naturally lands, so the easy tap is the safe one. */
     .od-confirm-actions { flex-direction: column-reverse; }
@@ -1506,11 +1468,6 @@
       <button type="button" class="ord-btn" style="background:#E9F5F3;color:#0F766E;border:1px solid rgba(20,127,116,0.28);" onclick="openBarcodeLookup()">
         <i class="fa fa-barcode"></i>{% trans "Find by barcode" %}
       </button>
-      {% if not warehouse.is_combined %}
-      <button type="button" class="ord-btn ghost" onclick="document.getElementById('whImportModal').classList.add('show')">
-        <i class="fa fa-file-import"></i>{% trans "Sync Products" %}
-      </button>
-      {% endif %}
     </div>
   </div>
 
@@ -1875,34 +1832,6 @@
 </div>
 
 {% include "operating/partials/_photo_viewer.html" %}
-
-<!-- Import Modal -->
-<div class="wh-modal" id="whImportModal">
-  <div class="wh-modal-card">
-    <h3>{% trans "Import Products from Excel" %}</h3>
-    <p>{% trans "Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity (Miktar), Purchase Price (Alış Fiyatı), Currency." %}</p>
-
-    <div class="wh-drop" id="whDrop" onclick="document.getElementById('whFile').click()">
-      <div class="wh-drop-icon"><i class="fa fa-cloud-upload-alt"></i></div>
-      <p id="whDropText" style="margin:0 0 6px; font:600 13px var(--font-sans); color:var(--gray-700);">
-        {% trans "Drag & drop Excel file here, or click to browse" %}
-      </p>
-      <p style="margin:0; font:500 11px var(--font-sans); color:var(--gray-500);">
-        {% trans "Supports .xlsx · USD/TRY auto-converted" %}
-      </p>
-    </div>
-    <input type="file" id="whFile" accept=".xlsx,.xls" style="display:none;">
-
-    <div id="whImportResult" style="display:none;"></div>
-
-    <div style="display:flex; gap:8px; justify-content:flex-end;">
-      <button type="button" class="ord-btn ghost" onclick="closeWhImportModal()">{% trans "Cancel" %}</button>
-      <button type="button" class="ord-btn primary" id="whUploadBtn" onclick="uploadWhFile()" disabled style="opacity:0.5;">
-        <i class="fa fa-upload"></i>{% trans "Upload & Import" %}
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- Delete Confirm Modal -->
 <div class="od-confirm-overlay" id="whDeleteConfirm">
@@ -2400,8 +2329,6 @@
 
 <script>
   const csrftoken = '{{ csrf_token }}';
-  const importUrl = "{% url 'operating:warehouse_product_import' warehouse.pk %}";
-  let whSelectedFile = null;
   // Group digits the way Django does for the active language, not the browser's
   const NUM_LOCALE = '{{ LANGUAGE_CODE }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
 
@@ -2703,16 +2630,6 @@
     });
   }
 
-  function closeWhImportModal() {
-    document.getElementById('whImportModal').classList.remove('show');
-    document.getElementById('whImportResult').style.display = 'none';
-    whSelectedFile = null;
-    const btn = document.getElementById('whUploadBtn');
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    document.getElementById('whDropText').textContent = '{% trans "Drag & drop Excel file here, or click to browse" %}';
-  }
-
   function openDeleteConfirm() {
     document.getElementById('whDeleteConfirm').classList.add('show');
   }
@@ -2724,7 +2641,6 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       closeDeleteConfirm();
-      closeWhImportModal();
       if (document.getElementById('rollScannerOverlay').classList.contains('show')) {
         closeRollScanner();
       }
@@ -3613,137 +3529,6 @@
     if (e.key === 'Escape' && document.getElementById('rsEditOverlay').classList.contains('show')) closeRsEdit();
   });
 
-  // Drop zone
-  const whDrop = document.getElementById('whDrop');
-  const whFile = document.getElementById('whFile');
-  ['dragenter','dragover'].forEach(e => {
-    whDrop.addEventListener(e, ev => { ev.preventDefault(); whDrop.classList.add('dragging'); });
-  });
-  ['dragleave','drop'].forEach(e => {
-    whDrop.addEventListener(e, ev => { ev.preventDefault(); whDrop.classList.remove('dragging'); });
-  });
-  whDrop.addEventListener('drop', ev => {
-    ev.preventDefault();
-    if (ev.dataTransfer.files.length) handleWhFile(ev.dataTransfer.files[0]);
-  });
-  whFile.addEventListener('change', ev => {
-    if (ev.target.files.length) handleWhFile(ev.target.files[0]);
-  });
-
-  function handleWhFile(file) {
-    whSelectedFile = file;
-    document.getElementById('whDropText').textContent = '✓ ' + file.name;
-    const btn = document.getElementById('whUploadBtn');
-    btn.disabled = false;
-    btn.style.opacity = '1';
-  }
-
-  async function uploadWhFile() {
-    if (!whSelectedFile) return;
-    const fd = new FormData();
-    fd.append('file', whSelectedFile);
-    const btn = document.getElementById('whUploadBtn');
-    const resultDiv = document.getElementById('whImportResult');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Importing..." %}';
-
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = `
-      <div style="padding:14px; background:var(--nejum-teal-50); border:1px solid rgba(20,127,116,0.25); border-radius:10px; margin-bottom:14px;">
-        <div id="whProgressTitle" style="font:700 13px var(--font-sans); color:var(--nejum-teal-700); margin-bottom:8px;">
-          <i class="fa fa-spinner fa-spin"></i> {% trans "Reading file..." %}
-        </div>
-        <div style="height:8px; background:#E0E6EE; border-radius:999px; overflow:hidden; margin-bottom:8px;">
-          <div id="whProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--nejum-teal-500),var(--nejum-teal-600)); transition:width .25s ease;"></div>
-        </div>
-        <div id="whProgressText" style="font:500 12px var(--font-sans); color:var(--nejum-teal-700);">{% trans "Preparing..." %}</div>
-      </div>`;
-
-    try {
-      const res = await fetch(importUrl, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrftoken },
-        body: fd,
-      });
-
-      const ct = res.headers.get('content-type') || '';
-      if (!res.ok && !ct.includes('x-ndjson')) {
-        const data = await res.json();
-        resultDiv.innerHTML = `
-          <div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px;">
-            <div style="font:700 13px var(--font-sans); color:#991B1B;"><i class="fa fa-exclamation-triangle"></i> ${data.error || '{% trans "Import failed" %}'}</div>
-            ${data.detected_headers ? '<div style="font:500 11px var(--font-sans); color:#7F1D1D; margin-top:6px;">{% trans "Detected headers:" %} ' + (data.detected_headers || []).join(', ') + '</div>' : ''}
-          </div>`;
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finalData = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let nl;
-        while ((nl = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, nl).trim();
-          buffer = buffer.slice(nl + 1);
-          if (!line) continue;
-
-          let msg;
-          try { msg = JSON.parse(line); } catch (e) { continue; }
-
-          if (msg.phase === 'start') {
-            const title = document.getElementById('whProgressTitle');
-            const text = document.getElementById('whProgressText');
-            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Importing" %} ' + msg.total + ' {% trans "rows..." %}';
-            if (text) text.textContent = '0 / ' + msg.total;
-          } else if (msg.phase === 'processing') {
-            const pct = Math.min(100, (msg.current / msg.total) * 100);
-            const bar = document.getElementById('whProgressBar');
-            const text = document.getElementById('whProgressText');
-            if (bar) bar.style.width = pct.toFixed(1) + '%';
-            if (text) text.innerHTML = `<b>${msg.current.toLocaleString(NUM_LOCALE)}</b> / ${msg.total.toLocaleString(NUM_LOCALE)} · {% trans "created:" %} <b>${msg.created}</b> · {% trans "updated:" %} <b>${msg.updated}</b> · {% trans "unchanged:" %} <b>${msg.unchanged}</b>`;
-          } else if (msg.phase === 'saving') {
-            const title = document.getElementById('whProgressTitle');
-            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (msg.message || '{% trans "Saving..." %}');
-          } else if (msg.phase === 'done') {
-            finalData = msg;
-          }
-        }
-      }
-
-      if (finalData && finalData.success) {
-        resultDiv.innerHTML = `
-          <div style="padding:14px; background:#D1FAE5; border:1px solid #A7F3D0; border-radius:10px; margin-bottom:14px;">
-            <div style="font:700 13px var(--font-sans); color:#065F46; margin-bottom:6px;">
-              <i class="fa fa-check-circle"></i> {% trans "Import complete" %}
-            </div>
-            <div style="font:500 12.5px var(--font-sans); color:#047857;">
-              {% trans "Created:" %} <b>${finalData.created}</b> · {% trans "Updated:" %} <b>${finalData.updated}</b> · {% trans "Unchanged:" %} <b>${finalData.unchanged}</b> · {% trans "Skipped:" %} <b>${finalData.skipped}</b><br>
-              {% trans "Total processed:" %} <b>${finalData.total.toLocaleString(NUM_LOCALE)}</b> · {% trans "USD/TRY rate:" %} <b>${finalData.usd_to_try_rate}</b>
-            </div>
-          </div>`;
-        setTimeout(() => location.reload(), 1500);
-      } else {
-        resultDiv.innerHTML = `
-          <div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px;">
-            <div style="font:700 13px var(--font-sans); color:#991B1B;">{% trans "Import did not complete cleanly" %}</div>
-          </div>`;
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
-      }
-    } catch (e) {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
-      resultDiv.innerHTML = `<div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; color:#991B1B; font:600 12.5px var(--font-sans);">{% trans "Upload error:" %} ${e.message}</div>`;
-    }
-  }
 </script>
 
 <script>

@@ -604,11 +604,6 @@
           <a href="{% url 'operating:warehouse_edit' w.pk %}" class="ord-action" title="{% trans 'Edit' %}">
             <i class="fa fa-edit"></i>
           </a>
-          {% if not w.is_combined %}
-          <a href="{% url 'operating:warehouse_product_import' w.pk %}" class="ord-action" title="{% trans 'Import products' %}">
-            <i class="fa fa-upload"></i>
-          </a>
-          {% endif %}
           <button type="button" class="ord-action danger" title="{% trans 'Delete' %}"
                   onclick="openDeleteModal({{ w.id }}, '{{ w.name|escapejs }}');">
             <i class="fa fa-trash"></i>

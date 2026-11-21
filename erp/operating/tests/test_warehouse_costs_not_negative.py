@@ -19,7 +19,6 @@ gets typed in now refuses a negative one out loud before writing:
 Run with:
     python manage.py test operating.test_warehouse_costs_not_negative
 """
-import io
 import json
 from decimal import Decimal
 
@@ -200,37 +199,6 @@ class TheRollScanRefusesItBeforeCreatingAnything(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(WarehouseProduct.objects.filter(sku="NEW.SKU").exists())
         self.assertFalse(WarehouseProductItem.objects.exists())
-
-
-class TheExcelImportSkipsANegativeRowAndSaysSo(TestCase):
-    def setUp(self):
-        user = get_user_model().objects.create_superuser(
-            username="importer", password="pw", email="i@m.p")
-        self.client.force_login(user)
-        self.warehouse = a_warehouse()
-
-    def test_the_other_rows_still_land(self):
-        from openpyxl import Workbook
-
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["Name", "Code", "Quantity", "Purchase Price", "Currency"])
-        # A colour in the name, so the new variant has a value to be made with.
-        ws.append(["Good KREM", "GOOD1", 10, 4.25, "USD"])
-        ws.append(["Bad", "BAD1", 10, -4.25, "USD"])
-        upload = io.BytesIO()
-        wb.save(upload)
-        upload.seek(0)
-        upload.name = "stock.xlsx"
-
-        response = self.client.post(
-            reverse("operating:warehouse_product_import", args=[self.warehouse.pk]),
-            {"file": upload})
-        body = b"".join(response.streaming_content).decode()
-
-        self.assertTrue(WarehouseProduct.objects.filter(sku="GOOD1").exists())
-        self.assertFalse(WarehouseProduct.objects.filter(sku="BAD1").exists())
-        self.assertIn("cannot be negative", body)
 
 
 class TheReadymadeImportStopsOnTheSheetRow(TestCase):

@@ -105,6 +105,9 @@ pillow-avif-plugin>=1.4.1
 # is turned into a JPEG every browser and mail client can open
 # (erp/image_optimizer.py). The wheels bundle libheif — no apt package.
 pillow-heif>=0.18
+# Shrinks the photos inside an uploaded PDF, so a scanned invoice is stored
+# light (erp/pdf_optimizer.py). The wheels bundle qpdf — no apt package.
+pikepdf>=10.0
 proglog==0.1.12
 proto-plus==1.27.1
 protobuf==4.23.4

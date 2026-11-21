@@ -135,13 +135,16 @@ def save_cargo_receipts(order, files, user=None):
             continue
         # A photo is stored as a DOCUMENT JPEG (erp.image_optimizer): small
         # enough to mail, and HEIC turned into something every browser and
-        # mail client opens. A PDF, or a photo Pillow can't read, goes up
-        # as it came.
-        if ctype.startswith("image/"):
+        # mail client opens. A heavy PDF has the photos inside it treated
+        # the same way (erp.pdf_optimizer). Anything neither can read goes
+        # up as it came.
+        if ctype.startswith("image/") or ctype == "application/pdf":
             from erp.image_optimizer import DOCUMENT, OptimizedImage, optimize_image
-            jpeg = optimize_image(f, DOCUMENT)
-            if isinstance(jpeg, OptimizedImage):
-                f, ctype, name = jpeg, jpeg.content_type, jpeg.name
+            from erp.pdf_optimizer import OptimizedPdf, optimize_pdf
+            optimize = optimize_pdf if ctype == "application/pdf" else optimize_image
+            smaller = optimize(f, DOCUMENT)
+            if isinstance(smaller, (OptimizedImage, OptimizedPdf)):
+                f, ctype, name = smaller, smaller.content_type, smaller.name
         path = (f"Operating/orders/{order.pk}/cargo/"
                 f"{uuid.uuid4().hex}.{OrderCargoReceipt.ALLOWED_TYPES[ctype]}")
         try:

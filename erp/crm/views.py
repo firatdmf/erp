@@ -1829,14 +1829,18 @@ def save_uploads(request, kind, owner, folder=None):
             continue
         # A phone photo goes in as a DOCUMENT JPEG: a fraction of the
         # size, upright, and HEIC turned into something every browser
-        # opens. A PDF, or an image Pillow can't read, is stored as it came.
-        if content_type_for(upload.name).startswith("image/"):
+        # opens. A heavy PDF has the photos inside it treated the same way
+        # (erp.pdf_optimizer). Anything neither can read is stored as it came.
+        uploaded_type = content_type_for(upload.name)
+        if uploaded_type.startswith("image/") or uploaded_type == "application/pdf":
             from django.core.files.uploadedfile import SimpleUploadedFile
             from erp.image_optimizer import DOCUMENT, OptimizedImage, optimize_image
-            jpeg = optimize_image(upload, DOCUMENT)
-            if isinstance(jpeg, OptimizedImage):
+            from erp.pdf_optimizer import OptimizedPdf, optimize_pdf
+            optimize = optimize_pdf if uploaded_type == "application/pdf" else optimize_image
+            smaller = optimize(upload, DOCUMENT)
+            if isinstance(smaller, (OptimizedImage, OptimizedPdf)):
                 upload = SimpleUploadedFile(
-                    jpeg.name, jpeg.getvalue(), jpeg.content_type)
+                    smaller.name, smaller.getvalue(), smaller.content_type)
         try:
             path, local = _store_attachment(
                 upload, folder or f"{CRM_ATTACHMENT_CDN_FOLDER}/{kind}", owner)

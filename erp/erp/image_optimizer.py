@@ -15,7 +15,8 @@ never passes numbers of its own:
             largest frame in the layout.
 
 A new place that takes images picks one of these, or adds a profile
-here — not a copy of the steps.
+here — not a copy of the steps. A PDF's photos are made for a profile
+by erp.pdf_optimizer.optimize_pdf.
 
     from erp.image_optimizer import DOCUMENT, optimize_image
     stored = optimize_image(upload, DOCUMENT) or upload

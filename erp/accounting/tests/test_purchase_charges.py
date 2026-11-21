@@ -139,7 +139,7 @@ class PurchaseChargeTest(TestCase):
         page = self.client.get(reverse("accounts:purchase_order_detail", args=[invoice.pk]))
         # In cents on the page, exact on hover.
         self.assertContains(page, "With delivery: $4.10 / m (+$0.60)")
-        self.assertContains(page, 'title="With delivery: $4.1000 / m (+$0.6000)"')
+        self.assertContains(page, 'data-exact="With delivery: $4.1000 / m (+$0.6000)"')
         self.assertContains(page, "Goods with delivery: $205.00 ($30.00 on the rolls)")
 
     def test_without_a_delivery_cost_the_page_says_nothing_of_it(self, _upload):

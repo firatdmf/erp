@@ -76,7 +76,17 @@
   .po-item-eq b { color: var(--gray-700); }
   .po-item-total { font: 800 15px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .po-rolls-n { font: 600 12px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .po-item-landed { font: 700 12px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .po-item-landed { position: relative; font: 700 12px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: help; border-bottom: 1px dotted currentColor; outline: none; }
+  /* The exact figure, drawn by the page rather than left to a title
+     attribute: some browsers (phones, editor previews) never show those.
+     Hover shows it; a tap focuses the figure and shows it too. */
+  .po-item-landed::after {
+    content: attr(data-exact); position: absolute; right: 0; top: calc(100% + 6px); z-index: 5;
+    padding: 5px 9px; border-radius: 7px; background: #0F1419; color: #fff;
+    font: 600 11.5px var(--font-sans); white-space: nowrap; pointer-events: none;
+    opacity: 0; transform: translateY(-2px); transition: opacity 120ms, transform 120ms;
+  }
+  .po-item-landed:hover::after, .po-item-landed:focus::after { opacity: 1; transform: none; }
 
   /* What was bought, one fact per row: the SKU, then each attribute under
      its own name. A run-on line hid which value belonged to which
@@ -299,7 +309,7 @@
            is valued at (four places) on hover, since the cents alone don't
            add back up to the delivery.{% endcomment %}
         {% blocktrans asvar landed_exact with cost=it.landed_unit_cost|floatformat:"4g" extra=it.charge_per_unit|floatformat:"4g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
-        <span class="po-item-landed" title="{{ landed_exact }}">
+        <span class="po-item-landed" tabindex="0" data-exact="{{ landed_exact }}" aria-label="{{ landed_exact }}">
           {% blocktrans with cost=it.landed_unit_cost|floatformat:"2g" extra=it.charge_per_unit|floatformat:"2g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
         </span>
         {% endif %}

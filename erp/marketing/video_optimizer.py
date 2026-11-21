@@ -9,7 +9,9 @@ If the encode comes out bigger, the original is kept. Either way the
 still frame the storefront shows before playing is taken from the file
 that stays, and the row is marked done (ProductFile.video_optimized_at).
 
-The encoded file gets a new name in the same folder, and the old one is
+The encoded file is named like a photo and filed in the product's folder
+(a video lives with its product, whichever colours show it), its still
+frame beside it under the same name; the old file is
 retired the way a moved photo is (product_images.RETIRE_DAYS), since cached
 pages and feeds still ask for it a while.
 
@@ -18,7 +20,6 @@ commit (optimize_after_commit), and the hourly housekeeping catches
 whatever a restart cut short (optimize_pending with no product).
 """
 import os
-import secrets
 import shutil
 import tempfile
 import threading
@@ -92,11 +93,16 @@ def optimize(url):
         lighter = encode(source, encoded) and os.path.getsize(encoded) < os.path.getsize(source)
         kept = encoded if lighter else source
 
+        # A new file is named like a photo and filed in the product's folder
+        # (product_images); its still frame takes its name: x.mp4, x.jpg.
+        # A kept original stays where it is, and its still frame gets a
+        # fresh name of its own beside it.
         new_url = url
-        stem = os.path.splitext(name)[0]
+        thumb_name = product_images.new_file_name(row.product, ".jpg")
         if lighter:
             new_name = product_images.new_file_name(row.product, ".mp4")
-            stem = os.path.splitext(new_name)[0]
+            folder = product_images.product_folder(row.product)
+            thumb_name = os.path.splitext(new_name)[0] + ".jpg"
             with open(encoded, "rb") as f:
                 new_url = upload_to_bunny(f, f"{folder}/{new_name}", purge=False)
             uploaded.append(new_url)
@@ -104,7 +110,6 @@ def optimize(url):
         thumbnail = None
         frame = os.path.join(work, "frame.jpg")
         if first_frame(kept, frame):
-            thumb_name = f"{stem}-{secrets.token_hex(3)}-thumb.jpg"
             with open(frame, "rb") as f:
                 thumbnail = upload_to_bunny(f, f"{folder}/{thumb_name}", purge=False)
             uploaded.append(thumbnail)

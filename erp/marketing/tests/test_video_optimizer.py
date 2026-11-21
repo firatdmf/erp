@@ -65,8 +65,7 @@ class Optimizing(TestCase):
         for row in self._fresh():
             self.assertEqual(row.file_url, new_url)
             self.assertIsNotNone(row.video_optimized_at)
-            self.assertRegex(row.video_thumbnail, r"-thumb\.jpg$")
-            self.assertNotEqual(row.video_thumbnail, self.old_thumb)
+            self.assertEqual(row.video_thumbnail, new_url[:-len(".mp4")] + ".jpg")
         self.assertEqual(set(RetiredCdnFile.objects.values_list("url", flat=True)),
                          {self.old, self.old_thumb})
         self.assertTrue(all(c.kwargs["purge"] is False for c in upload.call_args_list))
@@ -76,6 +75,8 @@ class Optimizing(TestCase):
     @patch("marketing.video_optimizer.encode", side_effect=writes(5000))
     def test_an_encode_that_comes_out_bigger_keeps_the_original(self, encode, frame, dl, upload, delete):
         self.assertEqual(video_optimizer.optimize(self.old), self.old)
+        for row in self._fresh():
+            self.assertRegex(row.video_thumbnail, rf"^{CDN}/{FOLDER}/florenza-[0-9a-f]{{6}}\.jpg$")
         for row in self._fresh():
             self.assertEqual(row.file_url, self.old)
             self.assertIsNotNone(row.video_optimized_at)
@@ -111,6 +112,16 @@ class Optimizing(TestCase):
         self.assertEqual(delete.call_count, 2)  # the encoded file and its still frame
         self.assertEqual(video_optimizer.pending(), [moved])  # the next run takes it
         self.assertFalse(RetiredCdnFile.objects.exists())
+
+    @patch("marketing.video_optimizer.first_frame", side_effect=writes(10))
+    @patch("marketing.video_optimizer.encode", side_effect=writes(400))
+    def test_a_video_from_a_variant_or_an_old_folder_lands_in_the_products(
+            self, encode, frame, dl, upload, delete):
+        for old in ("media/product_images/K12767/K12767.G141/florenza-bbbbbb.mp4",
+                    "media/product_images/product_K12767/K12767.mp4"):
+            ProductFile.objects.create(product=self.product, file_url=url(old), file_type="video")
+            new_url = video_optimizer.optimize(url(old))
+            self.assertRegex(new_url, rf"^{CDN}/{FOLDER}/florenza-[0-9a-f]{{6}}\.mp4$")
 
     @patch("marketing.video_optimizer.encode")
     def test_a_copy_of_a_done_video_takes_its_still_frame_without_a_new_encode(
@@ -165,6 +176,16 @@ class UploadingAVideo(TestCase):
         self.assertIsNone(row.video_optimized_at)
         later.assert_called_once_with(self.product.pk)
         self.assertEqual(upload.call_count, 1)  # the video as it came; nothing else yet
+
+    def test_a_video_uploaded_from_a_variants_editor_lands_in_the_products_folder(self, upload):
+        from marketing.models import ProductVariant
+        variant = ProductVariant.objects.create(product=self.product, variant_sku="K12767.G141")
+        with patch("marketing.video_optimizer.optimize_after_commit"):
+            self.client.post("/marketing/api/instant_upload_file/", {
+                "file": SimpleUploadedFile("clip.mp4", b"mp4", content_type="video/mp4"),
+                "product_id": self.product.pk, "for_variant_id": variant.pk,
+            })
+        self.assertRegex(upload.call_args.args[1], r"^media/product_images/K12767/florenza-[0-9a-f]{6}\.mp4$")
 
     def test_a_photo_sets_off_nothing(self, upload):
         with patch("marketing.views.optimize_image", return_value=None), \

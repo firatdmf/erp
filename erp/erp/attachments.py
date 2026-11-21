@@ -35,6 +35,10 @@ from django.template.loader import render_to_string
 logger = logging.getLogger(__name__)
 
 MAX_BYTES = 25 * 1024 * 1024
+# A phone video runs 2–5 MB a second as recorded; it is re-encoded to a
+# fraction of that after the upload (lighten_video), so what is capped here
+# is only what arrives.
+VIDEO_MAX_BYTES = 100 * 1024 * 1024
 
 # Extensions that execute rather than describe. The rule is open-minus-
 # the-dangerous-ones rather than a whitelist: people attach whatever
@@ -78,9 +82,13 @@ def validate_attachment_type(file):
 
 
 def validate_attachment_size(file):
-    """Cap an attachment at 25 MB: a signed contract scan or a spec sheet
-    routinely runs past the 10 MB product-image limit."""
-    if file.size > MAX_BYTES:
+    """Cap an attachment at 25 MB, a video at 100 MB: a signed contract scan
+    or a spec sheet routinely runs past the 10 MB product-image limit, and
+    half a minute of phone video past 25 MB."""
+    if content_type_for(getattr(file, "name", "")).startswith("video/"):
+        if file.size > VIDEO_MAX_BYTES:
+            raise ValidationError("The maximum size for a video is 100MB")
+    elif file.size > MAX_BYTES:
         raise ValidationError("The maximum file size that can be uploaded is 25MB")
     return file
 

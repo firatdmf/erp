@@ -205,13 +205,24 @@ class FoldersFollowUse(TestCase):
         self.assertAlmostEqual(retired.delete_after, timezone.now() + timedelta(days=7),
                                delta=timedelta(minutes=1))
 
+    def test_a_video_one_variant_uses_stays_with_the_product(self, download, upload):
+        in_variant = self._row("media/product_images/K12767/K12767.G141/florenza-v1d30a.mp4",
+                               self.g141, file_type="video")
+        stays = self._row("media/product_images/K12767/florenza-v1d30b.mp4", self.g28, file_type="video")
+        product_images.relocate(self.product.pk)
+        self.assertEqual(ProductFile.objects.get(pk=in_variant.pk).file_url,
+                         url("media/product_images/K12767/florenza-v1d30a.mp4"))
+        self.assertEqual(ProductFile.objects.get(pk=stays.pk).file_url, stays.file_url)
+
     def test_a_video_takes_its_still_frame_along(self, download, upload):
-        self._row("media/product_images/K12767/florenza-aaaaaa.mp4", self.g141, file_type="video",
-                  video_thumbnail=url("media/product_images/K12767/florenza-aaaaaa.jpg"))
+        self._row("media/product_images/K12767/K12767.G141/florenza-aaaaaa.mp4", self.g141,
+                  file_type="video",
+                  video_thumbnail=url("media/product_images/K12767/K12767.G141/florenza-aaaaaa.jpg"))
         product_images.relocate(self.product.pk)
         row = ProductFile.objects.get()
-        self.assertEqual(row.video_thumbnail,
-                         url("media/product_images/K12767/K12767.G141/florenza-aaaaaa.jpg"))
+        self.assertEqual((row.file_url, row.video_thumbnail),
+                         (url("media/product_images/K12767/florenza-aaaaaa.mp4"),
+                          url("media/product_images/K12767/florenza-aaaaaa.jpg")))
 
     def test_a_new_products_uploads_are_brought_in_under_its_name(self, download, upload):
         temp = url("media/temp_product_files/boss_1/K12767.G141-1.avif")

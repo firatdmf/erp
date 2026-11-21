@@ -1931,7 +1931,9 @@ def instant_upload_file(request):
         resource_type = file_type  # 'image' or 'video'
         
         folder_variant = variant
-        if folder_variant is None and request.POST.get('for_variant_id', '').isdigit():
+        if file_type == 'video':
+            folder_variant = None  # a video lives in its product's folder
+        elif folder_variant is None and request.POST.get('for_variant_id', '').isdigit():
             folder_variant = ProductVariant.objects.filter(
                 pk=request.POST['for_variant_id'], product=product).first()
 

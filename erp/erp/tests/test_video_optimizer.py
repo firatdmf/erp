@@ -9,11 +9,13 @@ import os
 import shutil
 import subprocess
 import tempfile
+from types import SimpleNamespace
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 
@@ -167,3 +169,18 @@ class VideoAttachments(TestCase):
             self.assertEqual(attachments.save_uploads(request, self.user, "Operating/orders"), [])
         video = Attachment.objects.get(name="clip.mov")
         later.assert_called_once_with(video.pk)
+
+
+class AttachmentSizes(SimpleTestCase):
+    def _file(self, name, megabytes):
+        return SimpleNamespace(name=name, size=megabytes * 1024 * 1024)
+
+    def test_a_video_may_be_up_to_100_mb(self):
+        attachments.validate_attachment_size(self._file("damage.mov", 100))
+        with self.assertRaises(ValidationError):
+            attachments.validate_attachment_size(self._file("damage.mp4", 101))
+
+    def test_anything_else_stays_at_25_mb(self):
+        attachments.validate_attachment_size(self._file("contract.pdf", 25))
+        with self.assertRaises(ValidationError):
+            attachments.validate_attachment_size(self._file("contract.pdf", 26))

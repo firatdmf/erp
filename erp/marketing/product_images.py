@@ -16,7 +16,8 @@ The folder follows who uses the photo. A variant's editor picks its photos
 from the product's shared pool, and one file can serve several variants (a
 row each, sharing the URL). So a photo used by exactly one variant lives in
 that variant's folder; one shared by several, or by none, lives in the
-product's. When that changes, or a SKU does, the file moves (relocate). The
+product's. A video always lives in the product's: a product has a few,
+often shown for several colours, and a still frame goes with each. When that changes, or a SKU does, the file moves (relocate). The
 database is what knows who uses a photo; the folder only mirrors it.
 
 A move gives the photo a new URL, and the old one is still held for a while
@@ -154,12 +155,14 @@ def _misplaced(urls_q, adopt=()):
 
     adopt = set(adopt)
     uses = {}
-    for url, thumbnail, pid, sku, title, vid, variant_sku in (
+    for url, thumbnail, pid, sku, title, vid, variant_sku, file_type in (
         ProductFile.everywhere.filter(urls_q).exclude(file_url__isnull=True).values_list(
             "file_url", "video_thumbnail", "product_id", "product__sku", "product__title",
-            "product_variant_id", "product_variant__variant_sku")
+            "product_variant_id", "product_variant__variant_sku", "file_type")
     ):
         if in_layout(url) or url in adopt:
+            if file_type == "video":
+                vid, variant_sku = None, ""  # a video lives with its product
             uses.setdefault(url, []).append((thumbnail, pid, sku, title, vid, variant_sku))
 
     plan = []

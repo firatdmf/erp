@@ -708,50 +708,10 @@ class CompanyFollowUp(models.Model):
 
 
 # The rules and the type check are the shared attachments' (erp.attachments);
-# kept importable here for crm.views and the crm migrations that name them.
+# kept importable here for the crm migrations that name them.
 from erp.attachments import (  # noqa: E402
     BLOCKED_EXTENSIONS as BLOCKED_ATTACHMENT_EXTENSIONS, content_type_for,
     validate_attachment_size, validate_attachment_type,
 )
 
 
-class Attachment(models.Model):
-    """Retired: the files moved to the shared erp.Attachment (erp 0009),
-    which any record can carry. Nothing reads or writes this table any
-    more; it stays until its own migration drops it.
-    """
-
-    contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, blank=True, null=True,
-        related_name="+",
-    )
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, blank=True, null=True,
-        related_name="+",
-    )
-    invoice = models.ForeignKey(
-        "accounting.Invoice", on_delete=models.CASCADE, blank=True, null=True,
-        related_name="+",
-    )
-    name = models.CharField(max_length=255)
-    path = models.CharField(
-        max_length=700, blank=True,
-        help_text="Path inside the Bunny Storage Zone",
-    )
-    file = models.FileField(
-        upload_to="crm/attachments/%Y/%m/", blank=True, null=True,
-        validators=[validate_attachment_size, validate_attachment_type],
-    )
-    size = models.PositiveIntegerField(default=0, help_text="Bytes")
-    content_type = models.CharField(max_length=120, blank=True)
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        blank=True, null=True, related_name="crm_attachments",
-    )
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-uploaded_at"]
-
-    def __str__(self):
-        return self.name

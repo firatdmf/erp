@@ -123,6 +123,29 @@ class Translate(TestCase):
         self.assertEqual(counts["translated"], 2)
         self.assertEqual(stored(other)["translations"]["ru"]["title"], "ru:Silk")
 
+    def test_a_translation_carrying_another_products_name_is_asked_again_alone(self, gemini):
+        Product.objects.filter(pk=self.product.pk).update(title="EVAN sheet set")
+        other = Product.objects.create(title="LOVE sheet set", sku="LOVE")
+        sizes = []
+
+        def cross_the_first(parts, **kwargs):
+            answer = json.loads(answer_for(parts[0]))
+            sizes.append(len(answer["items"]))
+            if len(answer["items"]) > 1:
+                answer["items"][0]["ru"]["title"] = "LOVE | Комплект"
+            return json.dumps(answer)
+
+        gemini.side_effect = cross_the_first
+        pt.translate(pause=0)
+        self.assertEqual(sizes, [2, 1])
+        self.assertEqual(stored(self.product)["translations"]["ru"]["title"], "ru:EVAN sheet set")
+        self.assertEqual(stored(other)["translations"]["ru"]["title"], "ru:LOVE sheet set")
+
+    def test_a_code_the_english_lacks_is_refused(self, gemini):
+        self.assertTrue(pt._foreign_words(pt._words("Florenza"), {"title": "Florenza K25318"}, "tr"))
+        self.assertFalse(pt._foreign_words(pt._words("Florenza sheer"), {"title": "Florenza Şeffaf"}, "tr"))
+        self.assertFalse(pt._foreign_words(pt._words("Florenza sheer"), {"title": "Florenza тюль"}, "ru"))
+
     def test_gemini_out_leaves_the_text_as_it_is(self, gemini):
         gemini.side_effect = GeminiUnavailable("no key")
         counts = pt.translate(pause=0)

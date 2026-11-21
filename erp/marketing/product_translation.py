@@ -37,7 +37,7 @@ FIELDS = ("title",) + TEXTS
 # One request carries several products, up to about this much English;
 # the free tier counts requests, not words.
 BATCH_CHARACTERS = 4000
-BATCH_PRODUCTS = 25
+BATCH_PRODUCTS = 10
 # Free-tier requests per minute are few: a run spaces its requests out.
 PAUSE_SECONDS = 4
 HOURLY_REQUESTS = 20
@@ -160,10 +160,11 @@ def _prompt(items):
         "You translate the product texts of a home-textile shop's website from English into "
         f"{languages}.\n"
         "- Keep every HTML tag and attribute exactly as it is; translate only the text between tags.\n"
-        "- Keep product codes, SKUs and the design or collection name itself (such as \"K13094\", "
-        "\"LUCAS\", \"Aura Glitter Ring\", \"Florenza\") as they are, in any capitals. Translate "
-        "every other word of a title: what the product is, its fabric and finish "
-        "(\"ALBERT | Lux Sateen Core Sheet Set\" keeps \"ALBERT\" and translates the rest).\n"
+        "- Keep product codes, SKUs and the design or collection name itself (usually the first "
+        "word or words of a title, or the part before \"|\") as they are. Translate every other "
+        "word of a title: what the product is, its fabric and finish.\n"
+        "- Each product's translation uses only that product's own text: never a word, name or "
+        "code from another product in the list.\n"
         "- Write as a shop writes for its customers: natural and grammatical, not word for word.\n"
         "- Capitals follow each language's own rule for a shop's product titles, whatever the "
         "English or the glossary uses: Turkish titles capitalise each word; Russian titles "
@@ -180,6 +181,31 @@ def _prompt(items):
     )
 
 
+def _words(text):
+    """The words of `text` as compared across languages: tags off, folded."""
+    import re
+
+    from .attributes import fold_term
+
+    return set(re.findall(r"[a-z0-9]+", fold_term(re.sub(r"<[^>]+>", " ", text))))
+
+
+def _foreign_words(source_words, translated, lang):
+    """Words a translation brought in that its own English hasn't: a code
+    (anything with a digit), and in a language not written in Latin
+    letters any Latin word. Another product's name or code in the answer
+    means the batch got crossed; the product is asked again on its own."""
+    import re
+
+    text = " ".join(translated.values())
+    brought = _words(text) - source_words
+    if any(re.search(r"\d", w) for w in brought):
+        return True
+    if lang == "ru":
+        return bool({w for w in brought if len(w) > 2})
+    return False
+
+
 def _ask(items):
     """{product id: {language: texts}} for `items`. Raises GeminiUnavailable;
     {} for an answer that can't be read."""
@@ -192,6 +218,7 @@ def _ask(items):
     except ValueError:
         return {}
     wanted = {item["id"]: [f for f in FIELDS if f in item] for item in items}
+    source_words = {item["id"]: _words(" ".join(str(item[f]) for f in FIELDS if f in item)) for item in items}
     result = {}
     for row in answer.get("items") or []:
         if not isinstance(row, dict) or row.get("id") not in wanted:
@@ -201,7 +228,7 @@ def _ask(items):
         for lang in TARGETS:
             given = row.get(lang) if isinstance(row.get(lang), dict) else {}
             translated = {f: str(given[f]).strip() for f in fields if str(given.get(f) or "").strip()}
-            if len(translated) == len(fields):
+            if len(translated) == len(fields) and not _foreign_words(source_words[row["id"]], translated, lang):
                 texts[lang] = translated
         if texts:
             result[row["id"]] = texts

@@ -78,17 +78,20 @@
     padding: 7px 10px; background: #0F1419; color: #FFF;
     font: 500 11px/1.45 var(--font-sans, sans-serif);
     border-radius: 5px; pointer-events: none;
-    opacity: 0; visibility: hidden; transition: opacity 90ms;
+    display: none;
     z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   }
+  /* display:none, not opacity/visibility: a hidden-but-laid-out tip
+     still counts as page width, and on a phone it made the whole page
+     (and the fixed top and bottom bars) wider than the screen. */
   .cd-type[data-tip]::before {
     content: ""; position: absolute; bottom: calc(100% + 3px); left: 50%;
     transform: translateX(-50%);
     border: 4px solid transparent; border-top-color: #0F1419;
-    opacity: 0; visibility: hidden; transition: opacity 90ms;
+    display: none;
     pointer-events: none; z-index: 200;
   }
-  .cd-type[data-tip]:hover::after, .cd-type[data-tip]:hover::before { opacity: 1; visibility: visible; }
+  .cd-type[data-tip]:hover::after, .cd-type[data-tip]:hover::before { display: block; }
   .cd-type.other    { color: var(--gray-700); background: #EEF1F5; }
   .cd-type.other    .cd-type-dot { background: var(--gray-500); }
 
@@ -259,6 +262,54 @@
   .cd-stat-row + .cd-stat-row { border-top: 1px dashed #EEF1F5; }
   .cd-stat-row .l { color: var(--gray-600); }
   .cd-stat-row .v { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ── Phone. The head stacks, and the two tables turn each row into a
+     small card: a 7-column ledger does not fit 390px, and scrolling it
+     sideways hides the amount behind the description. */
+  @media (max-width: 640px) {
+    .cd { padding: 14px 16px 80px; }
+    .cd-head { flex-direction: column; gap: 14px; margin-bottom: 16px; padding-bottom: 14px; }
+    .cd-head-l { width: 100%; }
+    .cd-title { font-size: 22px; word-break: break-word; }
+    .cd-head-r { justify-content: flex-start; width: 100%; }
+    .cd-head-r .cd-btn { flex: 1 1 auto; justify-content: center; }
+    .cd-quick .cd-btn { flex: 1 1 calc(50% - 4px); justify-content: center; padding: 8px 10px; }
+    .cd-sect { padding: 16px; }
+    .cd-balance { padding: 22px 16px; }
+    .cd-balance .amount { font-size: 30px; }
+    .cd-sect-h { flex-wrap: wrap; }
+    .cd-sect-h .all { margin-left: 0; flex-basis: 100%; }
+    .cd-type[data-tip]::after { left: 0; transform: none; max-width: calc(100vw - 32px); }
+
+    .cd-tbl, .cd-tbl tbody { display: block; }
+    .cd-tbl thead { display: none; }
+    .cd-tbl tbody tr { display: grid; gap: 4px 12px; padding: 12px 16px; border-bottom: 1px solid #EEF1F5; align-items: baseline; }
+    .cd-tbl tbody tr:last-child { border-bottom: none; }
+    .cd-tbl tbody td { padding: 0; border: none; min-width: 0; }
+    .cd-tbl td[data-label]::before { content: attr(data-label) " "; font: 600 10px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); }
+
+    /* Movements: id · date · amount / type · balance / reference / description */
+    .cd-tbl.mv tbody tr { grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: "id date amt" "type type bal" "ref ref ref" "desc desc desc"; }
+    .cd-tbl.mv .mv-amt { white-space: nowrap; }
+    .cd-tbl.mv .mv-id   { grid-area: id; }
+    .cd-tbl.mv .mv-date { grid-area: date; }
+    .cd-tbl.mv .mv-kind { grid-area: type; }
+    .cd-tbl.mv .mv-refc { grid-area: ref; word-break: break-word; }
+    .cd-tbl.mv .mv-desc { grid-area: desc; font-size: 12.5px; color: var(--gray-700); word-break: break-word; }
+    .cd-tbl.mv .mv-amt  { grid-area: amt; }
+    .cd-tbl.mv .mv-bal  { grid-area: bal; font-weight: 500; color: var(--gray-600); font-size: 12px; }
+
+    /* Orders: number · total / date · items / status */
+    .cd-tbl.ord tbody tr { grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "no total" "date items" "st st"; }
+    .cd-tbl.ord .o-no    { grid-area: no; }
+    .cd-tbl.ord .o-date  { grid-area: date; }
+    .cd-tbl.ord .o-st    { grid-area: st; }
+    .cd-tbl.ord .o-items { grid-area: items; font-weight: 500; color: var(--gray-600); font-size: 12px; }
+    .cd-tbl.ord .o-total { grid-area: total; }
+    .cd-tbl .ord-st { white-space: normal; }
+  }
 </style>
 <style>
   .fx-panel { margin-top:10px; padding:10px 12px; border:1px solid #E2E8EE; border-radius:10px;
@@ -272,6 +323,7 @@
                       border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:600; cursor:pointer; }
   .fx-panel .fx-btn:hover { border-color:#94A3B8; }
   .fx-panel .fx-note { margin-top:6px; font-size:11px; color:var(--gray-500); line-height:1.4; }
+  @media (max-width: 640px) { .fx-panel { max-width: none; text-align: left; } }
 </style>
 {% endblock %}
 
@@ -395,7 +447,7 @@
             <span class="ico"><i data-lucide="zap"></i></span>
             <h3>{% trans "Quick Actions" %}</h3>
           </div>
-          <div style="display:flex; gap:8px; flex-wrap: wrap;">
+          <div class="cd-quick" style="display:flex; gap:8px; flex-wrap: wrap;">
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' current_account.book.pk %}?account={{ current_account.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' current_account.book.pk %}?account={{ current_account.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
@@ -414,7 +466,7 @@
             <a href="{% url 'operating:order_list' %}" class="all">{% trans "All" %} →</a>
           </div>
         </div>
-        <table class="cd-tbl">
+        <table class="cd-tbl ord">
           <thead>
             <tr>
               <th>{% trans "Order" %}</th>
@@ -427,14 +479,14 @@
           <tbody>
             {% for o in recent_orders %}
             <tr>
-              <td>
+              <td class="o-no">
                 <a class="invno" href="{% url 'operating:order_detail' o.pk %}"
                    target="_blank" rel="noopener">
                   {% if o.order_number %}{{ o.order_number }}{% else %}#{{ o.pk }}{% endif %}
                 </a>
               </td>
-              <td style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ o.created_at|date:"d M Y" }}</td>
-              <td>
+              <td class="o-date" style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ o.created_at|date:"d M Y" }}</td>
+              <td class="o-st">
                 {% if o.status == "cancelled" or o.status == "returned" %}
                   <span class="ord-st ord-st-cancelled"><i data-lucide="x-circle"></i>{{ o.get_status_display }}</span>
                 {% elif o.status == "shipped" or o.status == "in_transit" or o.status == "out_for_delivery" or o.status == "delivered" %}
@@ -443,8 +495,8 @@
                   <span class="ord-st {% if o.is_pre_order %}ord-st-preorder{% else %}ord-st-pending{% endif %}" title="{% trans 'Pending order — already reflected on the balance' %}"><i data-lucide="clock"></i>{% trans "Pending" %} · {{ o.status_label }}</span>
                 {% endif %}
               </td>
-              <td class="num">{{ o.items.count }}</td>
-              <td class="num">{{ o.currency_symbol }}{{ o.total_value|money }}</td>
+              <td class="num o-items" data-label="{% trans "Items" %}">{{ o.items.count }}</td>
+              <td class="num o-total">{{ o.currency_symbol }}{{ o.total_value|money }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -462,7 +514,7 @@
           </div>
         </div>
         {% if movements %}
-        <table class="cd-tbl">
+        <table class="cd-tbl mv">
           <thead>
             <tr><th class="mv-id-h">#</th><th>{% trans "Date" %}</th><th>{% trans "Type" %}</th><th>{% trans "Description" %}</th><th>{% trans "Reference" %}</th><th class="num">{% trans "Amount" %}</th><th class="num">{% trans "Balance" %}</th></tr>
           </thead>
@@ -484,8 +536,8 @@
                 <a href="{% url 'accounts:movement_detail' current_account.pk m.mv.pk %}"
                    onclick="event.stopPropagation();">{{ m.mv.pk }}</a>
               </td>
-              <td style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ m.mv.date|date:"d M Y" }}</td>
-              <td>
+              <td class="mv-date" style="color: var(--gray-600); font-size: 12.5px; white-space: nowrap;">{{ m.mv.date|date:"d M Y" }}</td>
+              <td class="mv-kind">
                 {% if link_url %}
                   <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
                     {{ m.mv.type_label }}
@@ -495,11 +547,11 @@
                   <span class="mv-type">{{ m.mv.type_label }}</span>
                 {% endif %}
               </td>
-              <td>
+              <td class="mv-desc">
                 {{ m.description|default:"—" }}
                 {% if m.mv.created_by %}<div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">{% blocktrans with name=m.mv.created_by %}by {{ name }}{% endblocktrans %}</div>{% endif %}
               </td>
-              <td style="font-size: 12.5px;">
+              <td class="mv-refc" style="font-size: 12.5px;">
                 {% if pay %}
                   <a href="{% url 'accounts:payment_detail' pay.pk %}"
                      class="mv-ref"
@@ -526,7 +578,7 @@
                 cannot disagree with the balance beside it.
               {% endcomment %}
               {% conversion_facts m.mv as fx %}
-              <td class="num {% if m.mv.amount > 0 %}pos{% elif m.mv.amount < 0 %}neg{% endif %}">
+              <td class="num mv-amt {% if m.mv.amount > 0 %}pos{% elif m.mv.amount < 0 %}neg{% endif %}">
                 {% if m.mv.amount > 0 %}+{% endif %}{{ m.mv.amount|money }} {{ m.mv.currency.code }}
                 {% if own_balance is not None %}
                   {% comment %}
@@ -539,7 +591,7 @@
                   {% if m.own_fx %}{% with cur=current_account.own_currency %}<span class="cd-fx">{{ cur.symbol|default:cur.code }}{{ m.own_fx.amount|absval|money }} @ {{ m.own_fx.rate|format_rate }}</span>{% endwith %}{% endif %}
                 {% elif fx %}<span class="cd-fx">{{ fx.base_symbol }}{{ fx.base_amount|absval|money }} @ {{ fx.rate|format_rate }}</span>{% endif %}
               </td>
-              <td class="num">{{ m.balance_after|money }}</td>
+              <td class="num mv-bal" data-label="{% trans "Balance" %}">{{ m.balance_after|money }}</td>
             </tr>
             {% endwith %}
             {% endfor %}

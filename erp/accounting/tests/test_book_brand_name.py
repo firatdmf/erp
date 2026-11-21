@@ -133,19 +133,6 @@ class InvoiceIssuer(TestCase):
         self.assertEqual(self.invoice.issuer_display_name,
                          "Demfirat Export A.Ş.")
 
-    def test_the_old_legal_suffix_is_never_printed(self):
-        """The profile's legal suffix is retired: not on a named book's
-        invoice, nor on one whose book has no name of its own."""
-        from erp.models import BrandProfile
-        clear_cache()
-        BrandProfile.objects.update(legal_suffix="SAN. TİC. LTD. ŞTİ.")
-        self.assertEqual(brand("BRAND_LEGAL_SUFFIX"), "")
-        self.assertNotIn("ŞTİ", self.invoice.issuer_display_name)
-        self.book.brand_name = ""
-        self.book.save(update_fields=["brand_name"])
-        self.invoice.refresh_from_db()
-        self.assertNotIn("ŞTİ", self.invoice.issuer_display_name)
-
     def test_a_book_without_a_name_of_its_own_signs_like_its_documents(self):
         """Blank on the book: the invoice falls back exactly as the book's
         other documents do (Book.effective_brand_name)."""

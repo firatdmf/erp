@@ -17,10 +17,6 @@ class BrandProfile(models.Model):
         verbose_name = _("Brand profile")
         verbose_name_plural = _("Brand profile")
 
-    # UNUSED since the business name moved to the ledger books
-    # (Book.brand_name). Nothing reads or saves it; the column is dropped
-    # in its own migration once that release is live.
-    short_name = models.CharField(max_length=60, blank=True)
     # Last resort for an auto-minted product SKU or roll barcode, used
     # when the supplier's name yields no consonants to abbreviate — see
     # operating.views_warehouse._consonant_prefix. It reads as the
@@ -31,9 +27,6 @@ class BrandProfile(models.Model):
     # it for its own paperwork (Book.brand_name), which is how two books
     # of one deployment trade under different names.
     display_name = models.CharField(max_length=200, blank=True)
-    # UNUSED, like short_name above: it was only ever appended to that
-    # short name. Dropped in the same later migration.
-    legal_suffix = models.CharField(max_length=100, blank=True)
 
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=50, blank=True)

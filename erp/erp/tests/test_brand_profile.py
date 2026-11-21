@@ -45,12 +45,12 @@ class BrandValues(TestCase):
         self.assertEqual(brand("BRAND_CODE_PREFIX"), "ACM")
 
     def test_there_is_no_short_name_any_more(self):
-        """The business's name is its book's; the old short label is
-        neither read nor handed to templates."""
-        BrandProfile.objects.create(short_name="Acme")
-        self.assertEqual(brand("BRAND_NAME"), "")
+        """The business's name is its book's; the old short label and its
+        legal suffix are not handed to templates."""
         from erp.branding import brand_values
-        self.assertNotIn("BRAND_NAME", brand_values())
+        values = brand_values()
+        self.assertNotIn("BRAND_NAME", values)
+        self.assertNotIn("BRAND_LEGAL_SUFFIX", values)
 
     def test_the_flag_can_be_turned_off(self):
         BrandProfile.objects.create(nejum_credit=False)
@@ -73,7 +73,7 @@ class BrandValues(TestCase):
         """The name a book signs with, and the invoice issuer block."""
         book = Book.objects.create(name="Laleli Fabric")   # no brand_name of its own
         from accounting.services_accounts import brand_name_for
-        BrandProfile.objects.create(display_name="", short_name="Acme")
+        BrandProfile.objects.create(display_name="")
         self.assertEqual(book.effective_brand_name, "Laleli Fabric")
         BrandProfile.objects.create(display_name="Acme Textiles")
         book.refresh_from_db()

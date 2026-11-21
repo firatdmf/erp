@@ -17238,3 +17238,15 @@ msgstr "İşaretli olanlar, bu grubun web sitesindeki listesinde aynı sırayla 
 #: marketing/templates/marketing/partials/_product_group_form_cards.html
 msgid "Website filter"
 msgstr "Sitede filtre"
+
+#: accounting/templates/accounts/purchase_order_detail.html
+#, python-format
+msgid ""
+"Goods with delivery: %(symbol)s%(total)s (%(symbol)s%(extra)s on the rolls)"
+msgstr ""
+"Nakliye dahil mal: %(symbol)s%(total)s (toplara %(symbol)s%(extra)s eklendi)"
+
+#: accounting/templates/accounts/purchase_order_detail.html
+#, python-format
+msgid "With delivery: %(symbol)s%(cost)s / %(unit)s (+%(symbol)s%(extra)s)"
+msgstr "Nakliye dahil: %(symbol)s%(cost)s / %(unit)s (+%(symbol)s%(extra)s)"

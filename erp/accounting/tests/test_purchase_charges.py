@@ -133,6 +133,18 @@ class PurchaseChargeTest(TestCase):
         self.assertEqual(self._balances()["1300"], Decimal("205.00"))
         self._assert_shelves_match_the_ledger()
 
+    def test_the_purchase_page_shows_the_cost_with_delivery(self, _upload):
+        """3.50 a meter + 0.60 of delivery: 4.10, and 205.00 for the 50 m."""
+        invoice = self._receive(self._payload([self._charge(30)]))
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[invoice.pk]))
+        self.assertContains(page, "With delivery: $4.1000 / m (+$0.6000)")
+        self.assertContains(page, "Goods with delivery: $205.00 ($30.00 on the rolls)")
+
+    def test_without_a_delivery_cost_the_page_says_nothing_of_it(self, _upload):
+        invoice = self._receive(self._payload())
+        page = self.client.get(reverse("accounts:purchase_order_detail", args=[invoice.pk]))
+        self.assertNotContains(page, "With delivery")
+
     def test_it_is_spread_by_each_lines_value(self, _upload):
         """175.00 of G07 and 70.00 of G08: of a 49.00 delivery, 35.00 and 14.00."""
         self._receive(self._payload(

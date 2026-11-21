@@ -215,6 +215,26 @@ class PurchaseOrderDetail(View):
             it.pack_count = len(rolls) or len(it.planned_rolls)
             it.pack_one, it.pack_many = units.pack_nouns(pack_type)
             it.pack_noun = units.pack_noun(pack_type, it.pack_count)
+            # What a unit of this line costs on the shelf once its share of
+            # the delivery is in (purchase_charges._spread): the supplier's
+            # price is only part of it. Read off its own rolls, in the
+            # book's base currency, as stock is valued.
+            own = list(it.warehouse_stock_items.all())
+            per_unit = {r.charges_per_unit or 0 for r in own}
+            landed = {r.unit_cost_base for r in own if r.unit_cost_base is not None}
+            it.charge_per_unit = max(per_unit) if per_unit and max(per_unit) > 0 else None
+            it.landed_unit_cost = landed.pop() if len(landed) == 1 else None
+        # The goods as they stand in stock with the delivery inside them:
+        # what arrived, at its landed cost.
+        landed_total = charged_total = None
+        if invoice.charges.exists():
+            from .purchase_charges import charged_value
+            landed_total = sum(
+                (Decimal(r.quantity or 0) * Decimal(r.unit_cost_base or 0)
+                 for it in items for r in it.warehouse_stock_items.all()),
+                Decimal("0"),
+            ).quantize(Decimal("0.01"))
+            charged_total = charged_value(invoice).quantize(Decimal("0.01"))
         # What the whole delivery comes to in goods, beside what it costs:
         # so many meters on so many rolls. Only a unit every line shares
         # is printed — meters and pieces added together are a bare number
@@ -241,6 +261,9 @@ class PurchaseOrderDetail(View):
             "total_unit": total_unit,
             "total_packs": total_packs,
             "total_pack_noun": total_pack_noun,
+            "landed_total": landed_total,
+            "charged_total": charged_total,
+            "base_symbol": invoice.book.effective_base_currency.symbol,
             "warehouse_id": warehouse_id,
             "is_order": invoice.status == "ordered",
             # Our own rolls it sends out to be worked on (accounting.

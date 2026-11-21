@@ -76,6 +76,7 @@
   .po-item-eq b { color: var(--gray-700); }
   .po-item-total { font: 800 15px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .po-rolls-n { font: 600 12px var(--font-sans); color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .po-item-landed { font: 700 12px var(--font-sans); color: var(--nejum-teal-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* What was bought, one fact per row: the SKU, then each attribute under
      its own name. A run-on line hid which value belonged to which
@@ -212,6 +213,13 @@
         {% elif invoice.status == 'ordered' %}{% trans "Owed once the purchase is received." %}
         {% else %}{% trans "Not owed: the purchase is cancelled." %}{% endif %}
       </div>
+      {% comment %}What the goods are now worth in stock with the delivery in
+         them — the figure the delivery changed.{% endcomment %}
+      {% if landed_total and charged_total %}
+      <div class="po-card-sub">
+        {% blocktrans with total=landed_total|money extra=charged_total|money symbol=base_symbol %}Goods with delivery: {{ symbol }}{{ total }} ({{ symbol }}{{ extra }} on the rolls){% endblocktrans %}
+      </div>
+      {% endif %}
     </div>
     {% endif %}{% endwith %}
     {% if invoice.for_order %}
@@ -283,6 +291,13 @@
         </span>
         {% if it.pack_count %}
         <span class="po-rolls-n">{{ it.pack_count }} {{ it.pack_noun }}</span>
+        {% endif %}
+        {% comment %}The unit's cost on the shelf once its share of the
+           delivery is in: the supplier's price above is only part of it.{% endcomment %}
+        {% if it.charge_per_unit and it.landed_unit_cost %}
+        <span class="po-item-landed">
+          {% blocktrans with cost=it.landed_unit_cost|floatformat:"4g" extra=it.charge_per_unit|floatformat:"4g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
+        </span>
         {% endif %}
       </span>
     </div>

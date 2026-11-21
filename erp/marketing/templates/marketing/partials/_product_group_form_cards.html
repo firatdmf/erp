@@ -99,13 +99,15 @@ attribute a preset can pick from).
 {# What each variant of a new product in the group is asked, in order. #}
 <div class="pgd-card">
   <div class="pgd-card-title"><i data-lucide="list-checks"></i>{% trans "Variant attributes" %}</div>
-  <div class="pgd-hint pgd-attr-intro">{% trans "What the goods-receipt page asks about each variant of a new product in this group, in this order. A product can still add others." %}</div>
+  <div class="pgd-hint pgd-attr-intro">{% trans "What the goods-receipt page asks about each variant of a new product in this group, in this order. A product can still add others." %} {% trans "Ticked ones are filters on the website's listing of this group, in the same order." %}</div>
   <input type="hidden" name="variant_attributes_sent" value="1">
   <div class="pgd-attr-list" id="pgdAttrList">
+    {% with filters=group.storefront_filter_names %}
     {% for name in group.variant_attribute_names %}
       <div class="pgd-attr">
         <input type="hidden" name="variant_attributes" value="{{ name }}">
         <span class="pgd-attr-name">{{ name|capfirst }}</span>
+        <label class="pgd-attr-filter"><input type="checkbox" name="storefront_filters" value="{{ name }}" {% if name in filters %}checked{% endif %}>{% trans "Website filter" %}</label>
         <button type="button" class="pgd-attr-btn" title="{% trans 'Move up' %}" onclick="pgdAttrMove(this, -1)">&uarr;</button>
         <button type="button" class="pgd-attr-btn" title="{% trans 'Move down' %}" onclick="pgdAttrMove(this, 1)">&darr;</button>
         <button type="button" class="pgd-attr-btn" title="{% trans 'Remove' %}" onclick="this.closest('.pgd-attr').remove()">&times;</button>
@@ -113,6 +115,7 @@ attribute a preset can pick from).
     {% empty %}
       <div class="pgd-hint pgd-attr-empty">{% trans "No attributes yet — new products in this group are asked their color." %}</div>
     {% endfor %}
+    {% endwith %}
   </div>
   <div class="pgd-attr-add">
     <input class="pgd-input" id="pgdAttrNew" list="pgdAttrOptions" autocomplete="off"
@@ -130,6 +133,9 @@ attribute a preset can pick from).
   .pgd-attr { display: flex; align-items: center; gap: 6px; padding: 6px 10px;
               border: 1px solid var(--border-subtle, #E2E8EE); border-radius: 8px; }
   .pgd-attr-name { flex: 1; font: 600 13px var(--font-sans, sans-serif); }
+  .pgd-attr-filter { display: inline-flex; align-items: center; gap: 5px; margin-right: 4px;
+                     font: 500 12px var(--font-sans, sans-serif); color: var(--fg-muted, #6B7280);
+                     cursor: pointer; white-space: nowrap; }
   .pgd-attr-btn { border: 0; background: transparent; cursor: pointer; font-size: 15px;
                   color: var(--fg-muted, #6B7280); padding: 2px 6px; border-radius: 6px; }
   .pgd-attr-btn:hover { background: var(--bg-subtle, #F1F5F9); }
@@ -162,10 +168,12 @@ attribute a preset can pick from).
     row.innerHTML =
       '<input type="hidden" name="variant_attributes">' +
       '<span class="pgd-attr-name"></span>' +
+      '<label class="pgd-attr-filter"><input type="checkbox" name="storefront_filters">{% trans "Website filter" %}</label>' +
       '<button type="button" class="pgd-attr-btn" title="{% trans 'Move up' %}" onclick="pgdAttrMove(this, -1)">&uarr;</button>' +
       '<button type="button" class="pgd-attr-btn" title="{% trans 'Move down' %}" onclick="pgdAttrMove(this, 1)">&darr;</button>' +
       '<button type="button" class="pgd-attr-btn" title="{% trans 'Remove' %}" onclick="this.closest(\'.pgd-attr\').remove()">&times;</button>';
-    row.querySelector('input').value = name;
+    row.querySelector('input[name="variant_attributes"]').value = name;
+    row.querySelector('input[name="storefront_filters"]').value = name;
     row.querySelector('.pgd-attr-name').textContent = name.charAt(0).toUpperCase() + name.slice(1);
     list.appendChild(row);
   }

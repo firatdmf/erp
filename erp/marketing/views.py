@@ -2796,9 +2796,10 @@ def get_products(request):
             "product_variant_attribute_values": [],
             "product_category": category.name if product_category else None,
             "product_category_description": category.description if product_category and category.description else None,
+            "filter_attributes": category.storefront_filter_names() if product_category else [],
         })
         response["Access-Control-Allow-Origin"] = "*"
-       
+
         return response
 
     # Step 2: Fetch ALL related data in ONE round-trip using CTEs
@@ -3034,6 +3035,9 @@ def get_products(request):
             "product_variant_attribute_values": product_variant_attribute_values_data,
             "product_category": category.name if product_category else None,
             "product_category_description": category.description if product_category and category.description else None,
+            # The attributes the listing offers filters for, in order —
+            # ticked on the product group page.
+            "filter_attributes": category.storefront_filter_names() if product_category else [],
         }
     )
     response["Access-Control-Allow-Origin"] = "*"

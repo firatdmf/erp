@@ -260,18 +260,28 @@ class ProductCategory(models.Model):
         return list(self.variant_attribute_presets.order_by("position", "id")
                     .values_list("attribute__name", flat=True))
 
+    def storefront_filter_names(self):
+        """The attributes the storefront's listing filters this group's
+        products by, in the group's order (CategoryVariantAttribute.storefront_filter)."""
+        return list(self.variant_attribute_presets.filter(storefront_filter=True)
+                    .order_by("position", "id").values_list("attribute__name", flat=True))
+
 
 class CategoryVariantAttribute(models.Model):
     """One attribute in a product group's preset: the questions a new
     product of the group is asked about each variant (fabric: color,
     model…), in order. Edited on the product group page; a product can
-    still describe its variants with attributes beyond its group's."""
+    still describe its variants with attributes beyond its group's.
+
+    `storefront_filter`: the group's listing on the storefront offers a
+    filter for this attribute, in the preset's order."""
 
     category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE,
                                  related_name="variant_attribute_presets")
     attribute = models.ForeignKey("ProductVariantAttribute", on_delete=models.CASCADE,
                                   related_name="category_presets")
     position = models.PositiveSmallIntegerField(default=0)
+    storefront_filter = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["position", "id"]

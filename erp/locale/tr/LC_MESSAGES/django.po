@@ -17230,3 +17230,11 @@ msgid ""
 msgstr ""
 "İngilizce yazın. Web sitesi adı ve metinleri Türkçe ve Rusça da gösterir; "
 "kaydettiğinizde çevrilir."
+
+#: marketing/templates/marketing/partials/_product_group_form_cards.html
+msgid "Ticked ones are filters on the website's listing of this group, in the same order."
+msgstr "İşaretli olanlar, bu grubun web sitesindeki listesinde aynı sırayla filtre olarak çıkar."
+
+#: marketing/templates/marketing/partials/_product_group_form_cards.html
+msgid "Website filter"
+msgstr "Sitede filtre"

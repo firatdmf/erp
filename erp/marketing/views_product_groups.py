@@ -34,7 +34,8 @@ def _save_variant_attributes(group, request):
     """Replace the group's attribute preset with the posted list, in order.
     A name not in the catalog yet is added to it once, in the stored
     spelling (see marketing/attributes.py). Pages that don't send the
-    list leave the preset alone."""
+    list leave the preset alone. `storefront_filters` names the ones the
+    storefront's listing filters by."""
     if not request.POST.get("variant_attributes_sent"):
         return
     names = []
@@ -42,12 +43,14 @@ def _save_variant_attributes(group, request):
         name = normalize_attribute_name(raw)
         if name and name not in names:
             names.append(name)
+    filters = {normalize_attribute_name(raw) for raw in request.POST.getlist("storefront_filters")}
     with transaction.atomic():
         group.variant_attribute_presets.all().delete()
         for position, name in enumerate(names):
             attribute, _created = ProductVariantAttribute.objects.get_or_create(name=name)
             CategoryVariantAttribute.objects.create(
-                category=group, attribute=attribute, position=position)
+                category=group, attribute=attribute, position=position,
+                storefront_filter=name in filters)
 
 
 def _safe_decimal(value):

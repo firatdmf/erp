@@ -192,14 +192,15 @@ def _words(text):
 
 def _foreign_words(source_words, translated, lang):
     """Words a translation brought in that its own English hasn't: a code
-    (anything with a digit), and in a language not written in Latin
-    letters any Latin word. Another product's name or code in the answer
-    means the batch got crossed; the product is asked again on its own."""
+    (letters and digits together, K25318 — a bare number is only rewritten,
+    "6LI" as "6'lı"), and in a language not written in Latin letters any
+    Latin word. Another product's name or code in the answer means the
+    batch got crossed; the product is asked again on its own."""
     import re
 
     text = " ".join(translated.values())
     brought = _words(text) - source_words
-    if any(re.search(r"\d", w) for w in brought):
+    if any(re.search(r"\d", w) and re.search(r"[a-z]", w) for w in brought):
         return True
     if lang == "ru":
         return bool({w for w in brought if len(w) > 2})

@@ -145,6 +145,9 @@ class Translate(TestCase):
         self.assertTrue(pt._foreign_words(pt._words("Florenza"), {"title": "Florenza K25318"}, "tr"))
         self.assertFalse(pt._foreign_words(pt._words("Florenza sheer"), {"title": "Florenza Şeffaf"}, "tr"))
         self.assertFalse(pt._foreign_words(pt._words("Florenza sheer"), {"title": "Florenza тюль"}, "ru"))
+        # A pack count is rewritten, not brought in: "6LI" is "6'lı", "6 шт".
+        self.assertFalse(pt._foreign_words(pt._words("NAPKIN 30*50 6LI"), {"title": "Peçete 30*50 6'lı"}, "tr"))
+        self.assertFalse(pt._foreign_words(pt._words("NAPKIN 30*50 6LI"), {"title": "Салфетка 30*50, 6 шт"}, "ru"))
 
     def test_gemini_out_leaves_the_text_as_it_is(self, gemini):
         gemini.side_effect = GeminiUnavailable("no key")

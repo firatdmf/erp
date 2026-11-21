@@ -25,8 +25,9 @@ So the old file is kept RETIRE_DAYS before it is deleted, and a folder is
 removed only once a listing shows it empty, never with what is in it.
 
 The product page moves a product's photos after each save. Everything else
-— a SKU renamed by a script, an expired file — is caught by an hourly
-sweep the storefront's own calls set off (housekeep_now_and_then).
+— a SKU renamed by a script, an expired file, a video not yet re-encoded
+(video_optimizer) — is caught by an hourly sweep the storefront's own calls
+set off (housekeep_now_and_then).
 
 Only paths in this layout are ever moved. Older uploads
 (`product_<sku>/variant_<sku>/…`) keep their URLs.
@@ -245,7 +246,10 @@ def _carry_out(plan, adopt=()):
 def relocate_after_commit(product_id, adopt=()):
     """relocate() once the save is committed, off the request: a move is a
     download and an upload per photo, which the person saving needn't wait
-    for. Expired retired files are cleared on the same run."""
+    for. Expired retired files are cleared on the same run, and the
+    product's videos made light once they sit where they belong."""
+    from . import video_optimizer
+
     adopt = tuple(adopt)
 
     def work():
@@ -254,6 +258,8 @@ def relocate_after_commit(product_id, adopt=()):
             delete_expired()
         except Exception as exc:
             print(f"[product_images] relocate {product_id} stopped: {exc}")
+        try:
+            video_optimizer.optimize_pending(product_id)
         finally:
             connection.close()
 
@@ -265,7 +271,8 @@ _HOUSEKEEPING_KEY = "marketing.product_images.housekept"
 
 
 def housekeep_now_and_then():
-    """At most once an hour, off the request: sweep() and delete_expired().
+    """At most once an hour, off the request: sweep(), delete_expired() and
+    the videos not yet made light (video_optimizer.optimize_pending).
 
     Nothing here runs on a timer, so the storefront's own calls are the
     clock — it asks for products all day. Each server process keeps its own
@@ -277,11 +284,17 @@ def housekeep_now_and_then():
         return
 
     def work():
+        from . import video_optimizer
+
         try:
             sweep()
             delete_expired()
         except Exception as exc:
             print(f"[product_images] housekeeping stopped: {exc}")
+        try:
+            video_optimizer.optimize_pending()
+        except Exception as exc:
+            print(f"[video_optimizer] hourly run stopped: {exc}")
         # Same hour, the storefront ticks of rule-following groups: a stock
         # change made by a bulk update sets off no signal to recheck them.
         try:

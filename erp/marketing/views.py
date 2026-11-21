@@ -1408,6 +1408,7 @@ class ProductCreate(BaseProductView, generic.CreateView):
                         product=self.object,
                         file_url=file_data['url'],
                         sequence=file_data['sequence'],
+                        file_type=file_data.get('media_type') or 'image',
                     )
                     # Map temp public_id to real DB ID (for variant references)
                     temp_variant_files_map[file_data['public_id']] = product_file.pk
@@ -1423,6 +1424,7 @@ class ProductCreate(BaseProductView, generic.CreateView):
                             product=self.object,
                             file_url=file_data['url'],
                             sequence=file_data['sequence'],
+                            file_type=file_data.get('media_type') or 'image',
                         )
                         # Map temp public_id to real DB ID
                         temp_variant_files_map[file_data['public_id']] = product_file.pk
@@ -1933,7 +1935,8 @@ def instant_upload_file(request):
         try:
             folder = product_images.folder_for(product, folder_variant)
 
-            # Pass resource_type for video uploads (audio will be removed automatically)
+            # A video is stored as it came; marketing.video_optimizer makes it
+            # light (and takes its still frame) once the row is saved.
             file_url = smart_upload(file, folder, resource_type=resource_type, product=product)
             
             if not file_url:
@@ -1948,16 +1951,6 @@ def instant_upload_file(request):
         else:
             max_seq = ProductFile.objects.filter(product=product, product_variant__isnull=True).aggregate(models.Max('sequence'))['sequence__max'] or -1
         
-        # Generate video thumbnail if it's a video
-        video_thumb_url = None
-        if file_type == 'video':
-            try:
-                from marketing.utils.video_thumbnail import generate_video_thumbnail
-                file.seek(0)  # rewind after upload
-                video_thumb_url = generate_video_thumbnail(file, folder)
-            except Exception as e:
-                print(f"⚠️ Video thumbnail generation failed: {e}")
-
         # Save to database with file_type
         product_file = ProductFile.objects.create(
             product=product,
@@ -1965,8 +1958,10 @@ def instant_upload_file(request):
             file_url=file_url,
             sequence=max_seq + 1,
             file_type=file_type,  # 'image' or 'video'
-            video_thumbnail=video_thumb_url,
         )
+        if file_type == 'video':
+            from marketing import video_optimizer
+            video_optimizer.optimize_after_commit(product.pk)
         
         # If uploading to a variant, always ensure product primary is first variant's first image
         if variant:
@@ -2359,7 +2354,6 @@ def temp_upload_file(request):
         # Upload to CDN in a temporary folder
         folder = f"media/temp_product_files/{request.user.username}_{int(time.time())}"
         try:
-            # Pass resource_type for video uploads (audio will be removed automatically)
             file_url = smart_upload(file, folder, resource_type=resource_type)
         except Exception as e:
             return JsonResponse({'success': False, 'error': f'Upload failed: {str(e)}'}, status=500)

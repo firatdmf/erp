@@ -1529,6 +1529,9 @@ class ProductFile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     # Server-generated thumbnail for video files (first frame uploaded to CDN)
     video_thumbnail = models.URLField(blank=True, null=True)
+    # When the video was re-encoded for the storefront (marketing.video_optimizer);
+    # empty = still to do.
+    video_optimized_at = models.DateTimeField(blank=True, null=True)
 
 
     @property

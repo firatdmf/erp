@@ -3,12 +3,6 @@
 Run with:
     python manage.py test marketing.tests.test_video_optimizer
 """
-import json
-import os
-import shutil
-import subprocess
-import tempfile
-from unittest import skipUnless
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -41,56 +35,6 @@ def writes(size):
             f.write(b"v" * size)
         return True
     return run
-
-
-@skipUnless(shutil.which("ffmpeg"), "ffmpeg is not installed")
-class Encoding(TestCase):
-    def setUp(self):
-        self.dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.dir)
-
-    def _clip(self, size, rate=60):
-        path = os.path.join(self.dir, "in.mp4")
-        subprocess.run([
-            "ffmpeg", "-y", "-v", "error",
-            "-f", "lavfi", "-i", f"testsrc2=size={size}:rate={rate}:duration=1",
-            "-f", "lavfi", "-i", "sine=duration=1",
-            "-c:v", "libx264", "-c:a", "aac", "-shortest", path,
-        ], check=True)
-        return path
-
-    def _streams(self, path):
-        out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries",
-             "stream=codec_type,width,height,avg_frame_rate", "-of", "json", path],
-            capture_output=True, check=True).stdout
-        return json.loads(out)["streams"]
-
-    def test_a_landscape_clip_comes_out_720_high_30_fps_without_sound(self):
-        out = os.path.join(self.dir, "out.mp4")
-        self.assertTrue(video_optimizer.encode(self._clip("1920x1080"), out))
-        streams = self._streams(out)
-        self.assertEqual([s["codec_type"] for s in streams], ["video"])
-        self.assertEqual((streams[0]["width"], streams[0]["height"]), (1280, 720))
-        self.assertEqual(streams[0]["avg_frame_rate"], "30/1")
-
-    def test_a_portrait_clip_comes_out_720_wide(self):
-        out = os.path.join(self.dir, "out.mp4")
-        video_optimizer.encode(self._clip("1080x1920"), out)
-        self.assertEqual((self._streams(out)[0]["width"], self._streams(out)[0]["height"]), (720, 1280))
-
-    def test_a_small_clip_is_not_blown_up(self):
-        out = os.path.join(self.dir, "out.mp4")
-        video_optimizer.encode(self._clip("640x360", rate=24), out)
-        stream = self._streams(out)[0]
-        self.assertEqual((stream["width"], stream["height"]), (640, 360))
-        self.assertEqual(stream["avg_frame_rate"], "24/1")
-
-    def test_the_still_frame_is_a_jpeg(self):
-        out = os.path.join(self.dir, "frame.jpg")
-        self.assertTrue(video_optimizer.first_frame(self._clip("1280x720"), out))
-        with open(out, "rb") as f:
-            self.assertEqual(f.read(2), b"\xff\xd8")
 
 
 @override_settings(BUNNY_CDN_URL=CDN)

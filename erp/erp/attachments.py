@@ -11,7 +11,9 @@ and its folder, not by copying steps:
     (Accounting/payments/<id>/, Operating/orders/<id>/, …), never on the
     container's disk, and are read back only through a login-required view;
   * a photo is stored as a DOCUMENT JPEG and a heavy PDF has the photos
-    inside it shrunk (erp.image_optimizer, erp.pdf_optimizer);
+    inside it shrunk (erp.image_optimizer, erp.pdf_optimizer); a video
+    is re-encoded for erp.video_optimizer's DOCUMENT profile, sound kept,
+    after the upload has answered (lighten_video_after_commit);
   * the routes are the record's own: each app wires record_file_views()
     behind the guard that already decides who may open that record, so a
     file opens for exactly the people its record opens for.
@@ -124,8 +126,7 @@ def _store(upload, folder, record):
 
     # A random prefix, so two uploads of "contract.pdf" onto the same
     # record do not overwrite one another.
-    safe = re.sub(r"[^A-Za-z0-9._-]", "-", upload.name)[-80:].strip("-._")
-    path = f"{folder}/{record.pk}/{get_random_string(8)}_{safe}"
+    path = f"{folder}/{record.pk}/{get_random_string(8)}_{_safe_name(upload.name)}"
     try:
         upload_to_bunny(upload, path, content_type=getattr(upload, "content_type", None))
     except Exception as exc:
@@ -174,7 +175,7 @@ def save_uploads(request, record, folder):
         except AttachmentStorageError as exc:
             skipped.append(f"{upload.name}: {exc}")
             continue
-        Attachment.objects.create(
+        attachment = Attachment.objects.create(
             record=record,
             name=upload.name[:255],
             path=path,
@@ -183,7 +184,75 @@ def save_uploads(request, record, folder):
             content_type=content_type_for(upload.name, getattr(upload, "content_type", "")),
             uploaded_by=request.user if request.user.is_authenticated else None,
         )
+        if path and attachment.content_type.startswith("video/"):
+            lighten_video_after_commit(attachment.pk)
     return skipped
+
+
+def _safe_name(name):
+    return re.sub(r"[^A-Za-z0-9._-]", "-", name)[-80:].strip("-._")
+
+
+def lighten_video(attachment_id):
+    """Re-encode a video attachment for the DOCUMENT profile (sound kept)
+    and store it in place of the original, which is then deleted — the
+    file is private, so no cached page still asks for the old path.
+
+    Kept as it came when the encode can't read it or isn't smaller. If the
+    attachment was deleted meanwhile, the new file goes too."""
+    import os
+    import shutil
+    import tempfile
+
+    from django.utils.crypto import get_random_string
+    from erp import video_optimizer as videos
+    from marketing.utils.bunny_storage import delete_from_bunny, download_from_bunny, upload_to_bunny
+    from .models import Attachment
+
+    attachment = Attachment.objects.filter(pk=attachment_id).first()
+    if attachment is None or not attachment.path:
+        return False
+    old_path = attachment.path
+    work = tempfile.mkdtemp(prefix="attachment_video_")
+    try:
+        source = os.path.join(work, "source" + os.path.splitext(old_path)[1])
+        with download_from_bunny(old_path, stream=True) as response:
+            with open(source, "wb") as out:
+                for chunk in response.iter_content(1 << 20):
+                    out.write(chunk)
+        encoded = os.path.join(work, "encoded.mp4")
+        if not videos.lighter(source, encoded, videos.DOCUMENT):
+            return False
+
+        name = f"{os.path.splitext(attachment.name)[0]}.mp4"[-255:]
+        new_path = f"{old_path.rsplit('/', 1)[0]}/{get_random_string(8)}_{_safe_name(name)}"
+        with open(encoded, "rb") as f:
+            upload_to_bunny(f, new_path, content_type="video/mp4", purge=False)
+        changed = Attachment.objects.filter(pk=attachment_id, path=old_path).update(
+            path=new_path, name=name, size=os.path.getsize(encoded), content_type="video/mp4")
+        delete_from_bunny(old_path if changed else new_path)
+        return bool(changed)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def lighten_video_after_commit(attachment_id):
+    """lighten_video() once the upload is committed, off the request: an
+    encode takes seconds to minutes, which the person uploading needn't
+    wait for. Until it lands, the original is what opens."""
+    import threading
+
+    from django.db import connection, transaction
+
+    def work():
+        try:
+            lighten_video(attachment_id)
+        except Exception:
+            logger.exception("Could not re-encode video attachment %s", attachment_id)
+        finally:
+            connection.close()
+
+    transaction.on_commit(lambda: threading.Thread(target=work, daemon=True).start())
 
 
 def files_of(record):

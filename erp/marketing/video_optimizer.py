@@ -2,13 +2,10 @@
 
 A phone clip arrives at 4–10 Mbps with a sound track; the storefront shows
 it muted in a box a few hundred pixels wide. So every product video is
-re-encoded once, after it is saved:
+re-encoded once, after it is saved, for erp.video_optimizer's WEB profile
+(720p, 30 fps, no sound — the numbers live there).
 
-    H.264, at most 720 px on its short side, at most 30 fps,
-    CRF 26 capped at 2.5 Mbps, no sound, no metadata, faststart
-
-The cap is what keeps a fine-detailed fabric from coming out bigger than
-it went in; and if it still does, the original is kept. Either way the
+If the encode comes out bigger, the original is kept. Either way the
 still frame the storefront shows before playing is taken from the file
 that stays, and the row is marked done (ProductFile.video_optimized_at).
 
@@ -23,7 +20,6 @@ whatever a restart cut short (optimize_pending with no product).
 import os
 import secrets
 import shutil
-import subprocess
 import tempfile
 import threading
 from datetime import timedelta
@@ -32,55 +28,17 @@ from django.core.cache import cache
 from django.db import connection, transaction
 from django.utils import timezone
 
+from erp import video_optimizer as videos
+from erp.video_optimizer import FfmpegMissing, first_frame
+
 from . import product_images
 
-SHORT_SIDE_MAX = 720
-FPS_MAX = 30
-CRF = 26
-MAXRATE = "2500k"
-BUFSIZE = "5000k"
-THUMBNAIL_WIDTH = 480
-ENCODE_TIMEOUT = 10 * 60
-_LOCK_SECONDS = ENCODE_TIMEOUT + 60
-
-
-class FfmpegMissing(Exception):
-    """ffmpeg is not installed here: try again where it is, later."""
-
-
-def _run(args, timeout):
-    try:
-        return subprocess.run(args, capture_output=True, timeout=timeout).returncode == 0
-    except FileNotFoundError as exc:
-        raise FfmpegMissing(str(exc)) from exc
-    except subprocess.TimeoutExpired:
-        return False
+_LOCK_SECONDS = videos.ENCODE_TIMEOUT + 60
 
 
 def encode(source, target):
-    """Write `source` re-encoded to `target`. False when ffmpeg can't."""
-    short_side = (
-        f"scale='if(gt(iw,ih),-2,min({SHORT_SIDE_MAX},iw))'"
-        f":'if(gt(iw,ih),min({SHORT_SIDE_MAX},ih),-2)'"
-    )
-    return _run([
-        "ffmpeg", "-y", "-v", "error", "-i", source,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-map_metadata", "-1",
-        "-vf", short_side, "-fpsmax", str(FPS_MAX),
-        "-c:v", "libx264", "-preset", "medium", "-crf", str(CRF),
-        "-maxrate", MAXRATE, "-bufsize", BUFSIZE,
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-        target,
-    ], ENCODE_TIMEOUT) and os.path.getsize(target) > 0
-
-
-def first_frame(source, target):
-    """Write the video's first frame to `target` as a JPEG."""
-    return _run([
-        "ffmpeg", "-y", "-v", "error", "-i", source,
-        "-frames:v", "1", "-q:v", "2", "-vf", f"scale={THUMBNAIL_WIDTH}:-2",
-        target,
-    ], 60) and os.path.getsize(target) > 0
+    """`source` re-encoded for the storefront into `target`."""
+    return videos.encode(source, target, videos.WEB)
 
 
 def pending(product_id=None):

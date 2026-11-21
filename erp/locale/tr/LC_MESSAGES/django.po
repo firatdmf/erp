@@ -17138,3 +17138,9 @@ msgid "The first %(n)s holds %(pct)s%% of what is left"
 msgid_plural "The first %(n)s hold %(pct)s%% of what is left"
 msgstr[0] "İlk %(n)s desen kalanın %%%(pct)s kadarını tutuyor"
 msgstr[1] "İlk %(n)s desen kalanın %%%(pct)s kadarını tutuyor"
+
+#, python-format
+msgid "%(n)s variant"
+msgid_plural "%(n)s variants"
+msgstr[0] "%(n)s varyant"
+msgstr[1] "%(n)s varyant"

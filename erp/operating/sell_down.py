@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import DecimalField, F, Sum
+from django.db.models import Count, DecimalField, F, Sum
 from django.utils import timezone
 
 from .models import SellDownGoal, SellDownGoalBook, WarehouseProductItem
@@ -55,8 +55,10 @@ class Design:
     unit: str
     value: Decimal
     quantity: Decimal
+    pack_type: str = ""
     share: Decimal = ZERO          # of the value left, 0–100
     running_share: Decimal = ZERO  # this one and every bigger one, 0–100
+    variants: list = field(default_factory=list)  # filled by the goal page only
 
 
 def designs(goal, book_ids):
@@ -65,7 +67,8 @@ def designs(goal, book_ids):
             .values("product__catalog_variant__product",
                     "product__catalog_variant__product__sku",
                     "product__catalog_variant__product__title",
-                    "product__catalog_variant__product__unit")
+                    "product__catalog_variant__product__unit",
+                    "product__catalog_variant__product__pack_type")
             .annotate(value=Sum(F("quantity_remaining") * F("unit_cost_base"),
                                 output_field=_DEC),
                       quantity=Sum("quantity_remaining", output_field=_DEC))
@@ -75,7 +78,8 @@ def designs(goal, book_ids):
                   title=r["product__catalog_variant__product__title"] or "",
                   unit=r["product__catalog_variant__product__unit"] or "",
                   value=r["value"] or ZERO,
-                  quantity=r["quantity"] or ZERO)
+                  quantity=r["quantity"] or ZERO,
+                  pack_type=r["product__catalog_variant__product__pack_type"] or "")
            for r in rows]
     total = sum((d.value for d in out), ZERO)
     running = ZERO
@@ -84,6 +88,39 @@ def designs(goal, book_ids):
         if total:
             d.share = d.value * 100 / total
             d.running_share = running * 100 / total
+    return out
+
+
+@dataclass
+class Variant:
+    """One variant's stock under the goal: what a design's row opens to."""
+    variant_id: int
+    sku: str
+    value: Decimal
+    quantity: Decimal
+    items: int
+
+
+def variants_by_design(goal, book_ids):
+    """{product id: [Variant, …]} for every design under the goal, each
+    design's variants most value first — one query for the whole page."""
+    rows = (stock_items(goal, book_ids)
+            .values("product__catalog_variant",
+                    "product__catalog_variant__variant_sku",
+                    "product__catalog_variant__product")
+            .annotate(value=Sum(F("quantity_remaining") * F("unit_cost_base"),
+                                output_field=_DEC),
+                      quantity=Sum("quantity_remaining", output_field=_DEC),
+                      items=Count("id"))
+            .order_by("-value", "product__catalog_variant__variant_sku"))
+    out = {}
+    for r in rows:
+        out.setdefault(r["product__catalog_variant__product"], []).append(Variant(
+            variant_id=r["product__catalog_variant"],
+            sku=r["product__catalog_variant__variant_sku"] or "",
+            value=r["value"] or ZERO,
+            quantity=r["quantity"] or ZERO,
+            items=r["items"]))
     return out
 
 

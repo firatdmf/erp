@@ -38,6 +38,13 @@ def sd_money(value, symbol=""):
 
 
 @register.filter
+def sd_items(count, pack_type):
+    """How many stock items, named by the pack: "3 rolls", "1 box"."""
+    from marketing.units import pack_noun
+    return f"{count} {pack_noun(pack_type, count)}"
+
+
+@register.filter
 def sd_qty(quantity, unit):
     """A whole-number quantity with its unit: "145,622 m"."""
     try:

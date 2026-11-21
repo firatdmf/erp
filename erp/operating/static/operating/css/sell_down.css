@@ -80,6 +80,17 @@
 .sd-share { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
 .sd-share-bar { flex: 0 0 90px; height: 6px; border-radius: 999px; background: var(--bg-muted, #EEF2F5); overflow: hidden; }
 .sd-share-bar i { display: block; height: 100%; background: var(--fg-brand, #005354); }
+/* A design's row opens to its variants. */
+.sd-item > summary { list-style: none; cursor: pointer; }
+.sd-item > summary::-webkit-details-marker { display: none; }
+.sd-item > summary:hover { background: var(--bg-subtle, #F7F9FA); }
+.sd-chev { font-size: 10px; width: 12px; margin-right: 6px; color: var(--fg-muted, #6B7280); transition: transform .15s; }
+.sd-item[open] .sd-chev { transform: rotate(90deg); }
+.sd-item[open] > summary { background: var(--bg-subtle, #F7F9FA); }
+.sd-var { background: var(--bg-subtle, #F7F9FA); padding-top: 5px; padding-bottom: 5px; font-size: 12.5px; }
+.sd-var .sd-design b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; overflow-wrap: anywhere; }
+.sd-muted { color: var(--fg-muted, #6B7280); }
+.sd-design small + small { margin-top: 1px; }
 @media (max-width: 720px) {
   .sd-row, .sd-row.no-money { grid-template-columns: 34px minmax(0, 1fr) auto; row-gap: 2px; }
   .sd-row.head { display: none; }

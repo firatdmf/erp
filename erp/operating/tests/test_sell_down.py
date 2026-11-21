@@ -139,6 +139,35 @@ class SellDownTests(TestCase):
             for figure in ("4,370", "874", "4.37"):
                 self.assertNotIn(figure, html, url)
 
+    def test_goal_page_opens_each_design_to_its_variants(self, _up):
+        a = self._design("K24520")
+        big = self._roll(a, self.ergene, Decimal("300"), Decimal("4.11"))
+        # A second roll of the same variant counts in that variant.
+        WarehouseProductItem.objects.create(
+            product=big.product, quantity=Decimal("100"), quantity_remaining=Decimal("100"),
+            barcode="R-EXTRA", status="in_stock", unit_cost_base=Decimal("4.11"))
+        self._roll(a, self.laleli, Decimal("50"), Decimal("4.11"))
+        goal = self._goal([self.ergene, self.laleli])
+        by_design = sell_down.variants_by_design(goal, [self.ergene.pk, self.laleli.pk])
+        self.assertEqual([(v.sku, v.quantity, v.items) for v in by_design[a.pk]],
+                         [("K24520.V1", Decimal("400"), 2), ("K24520.V2", Decimal("50"), 1)])
+        url = reverse("operating:sell_down_detail", args=[goal.pk])
+        self.client.force_login(self._member("boss", self.ergene, self.laleli))
+        html = self.client.get(url).content.decode()
+        self.assertIn("K24520.V1", html)
+        self.assertIn("2 variants", html)
+        self.assertIn("$1,644", html)  # 400 m × 4.11
+        # A Laleli-only reader opens to Laleli's variant alone.
+        self.client.force_login(self._member("laleli", self.laleli))
+        html = self.client.get(url).content.decode()
+        self.assertIn("K24520.V2", html)
+        self.assertNotIn("K24520.V1", html)
+        # A rep sees the variants without their values.
+        self.client.force_login(self._member("rep", self.ergene, rep=True))
+        html = self.client.get(url).content.decode()
+        self.assertIn("K24520.V1", html)
+        self.assertNotIn("1,644", html)
+
     # ── what to push ────────────────────────────────────────────────
     def test_focus_is_the_fewest_designs_holding_the_share(self, _up):
         for sku, value in (("A", 50), ("B", 25), ("C", 10), ("D", 10), ("E", 5)):

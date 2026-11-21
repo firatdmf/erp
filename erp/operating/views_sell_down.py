@@ -60,9 +60,14 @@ class SellDownDetail(View):
 
     def get(self, request, pk):
         goal = get_object_or_404(SellDownGoal, pk=pk)
-        p = sell_down.progress(goal, sell_down.readable_book_ids(_member(request)))
+        book_ids = sell_down.readable_book_ids(_member(request))
+        p = sell_down.progress(goal, book_ids)
         if p is None:
             raise Http404
+        # Each design's row opens to its variants.
+        by_design = sell_down.variants_by_design(goal, [b.pk for b in p.books])
+        for d in p.designs:
+            d.variants = by_design.get(d.product_id, [])
         focus_ids = {d.product_id for d in p.focus}
         return render(request, self.template_name, {
             "p": p,

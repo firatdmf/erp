@@ -62,13 +62,24 @@ focus line are the ones that hold the goal's focus share.{% endcomment %}
     {% if forloop.counter0 == p.focus|length %}
     <div class="sd-list-head" style="border-top:1px solid var(--border-default,#E6ECEE)"><span class="sd-list-sum">{% trans "The rest" %}</span></div>
     {% endif %}
-    <div class="sd-row{% if not show_money %} no-money{% endif %}">
-      <span class="sd-rank">{{ forloop.counter }}</span>
-      <span class="sd-design"><a href="{% url 'marketing:product_detail' d.product_id %}">{{ d.sku|default:d.title }}</a>{% if d.title and d.title != d.sku %}<small>{{ d.title }}</small>{% endif %}</span>
-      {% if show_money %}<span class="sd-num">{{ d.value|sd_money:currency }}</span>{% endif %}
-      <span class="sd-num">{{ d.quantity|sd_qty:d.unit }}</span>
-      {% if show_money %}<span class="sd-share"><span class="sd-share-bar"><i style="width: {{ d.share|floatformat:'1u' }}%"></i></span>{{ d.share|floatformat:1 }}% · {{ d.running_share|floatformat:0 }}%</span>{% endif %}
-    </div>
+    <details class="sd-item">
+      <summary class="sd-row{% if not show_money %} no-money{% endif %}" title="{% trans 'Show variants' %}">
+        <span class="sd-rank"><i class="fa fa-chevron-right sd-chev" aria-hidden="true"></i>{{ forloop.counter }}</span>
+        <span class="sd-design"><a href="{% url 'marketing:product_detail' d.product_id %}">{{ d.sku|default:d.title }}</a>{% if d.title and d.title != d.sku %}<small>{{ d.title }}</small>{% endif %}<small>{% blocktrans count n=d.variants|length %}{{ n }} variant{% plural %}{{ n }} variants{% endblocktrans %}</small></span>
+        {% if show_money %}<span class="sd-num">{{ d.value|sd_money:currency }}</span>{% endif %}
+        <span class="sd-num">{{ d.quantity|sd_qty:d.unit }}</span>
+        {% if show_money %}<span class="sd-share"><span class="sd-share-bar"><i style="width: {{ d.share|floatformat:'1u' }}%"></i></span>{{ d.share|floatformat:1 }}% · {{ d.running_share|floatformat:0 }}%</span>{% endif %}
+      </summary>
+      {% for v in d.variants %}
+      <div class="sd-row sd-var{% if not show_money %} no-money{% endif %}">
+        <span></span>
+        <span class="sd-design"><b>{{ v.sku }}</b><small>{{ v.items|sd_items:d.pack_type }}</small></span>
+        {% if show_money %}<span class="sd-num">{{ v.value|sd_money:currency }}</span>{% endif %}
+        <span class="sd-num">{{ v.quantity|sd_qty:d.unit }}</span>
+        {% if show_money %}<span class="sd-num sd-muted">{% if d.value %}{% widthratio v.value d.value 100 %}%{% endif %}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </details>
     {% empty %}
     <div class="sd-empty" style="border:none">{% trans "Nothing left on the shelves." %}</div>
     {% endfor %}

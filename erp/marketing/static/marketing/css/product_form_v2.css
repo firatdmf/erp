@@ -665,3 +665,36 @@ main:has(#Product_Form_Page) { max-width: none !important; padding-left: 16px !i
   #campaign_card .cmp-tier > div:nth-child(3) { grid-area: pct; }
   #campaign_card .cmp-tier > .cmp-tier-rm { grid-area: rm; }
 }
+
+/* ───────── MORE (folded away) ─────────
+   Shipping, attributes, campaign and the manufacturing recipe: what most
+   products leave alone, under one bar across the page. */
+.more-section {
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
+  background: var(--pf-bg-soft);
+}
+.more-summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.more-summary::-webkit-details-marker { display: none; }
+.more-summary-title { font-weight: 700; font-size: 14px; color: var(--pf-ink); }
+.more-summary-hint { font-size: 12.5px; color: var(--pf-ink-3); }
+.more-chevron { margin-left: auto; color: var(--pf-ink-4); transition: transform 160ms; }
+.more-section[open] .more-chevron { transform: rotate(180deg); }
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 22px;
+  align-items: start;
+  padding: 0 18px 18px;
+}
+.more-grid .more-wide { grid-column: 1 / -1; }
+@media (max-width: 768px) {
+  .more-summary { flex-wrap: wrap; }
+  .more-grid { padding: 0 10px 10px; }
+}

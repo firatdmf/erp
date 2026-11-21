@@ -6,7 +6,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
-<link rel="stylesheet" href="{% static 'marketing/css/product_form_v2.css' %}?v=12">
+<link rel="stylesheet" href="{% static 'marketing/css/product_form_v2.css' %}?v=13">
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 <style>
   .quill-wrap { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #fff; }
@@ -19,6 +19,9 @@
   .html-source-btn.active { background: #333; color: #fff; border-color: #333; }
   .html-source-area { display: none; width: 100%; min-height: 120px; font-family: monospace; font-size: 13px; padding: 10px; border: none; border-top: 1px solid #e0e0e0; resize: vertical; box-sizing: border-box; }
   .html-source-area.visible { display: block; }
+  .trans-note { margin: 10px 0 0; font-size: 12px; color: #5B6470; }
+  /* The phone layout forces every .form-row to flex; hidden still wins. */
+  #pack_count_row[hidden] { display: none !important; }
   .tracking-switch-note { margin-top: 8px; padding: 8px 10px; border-radius: 8px;
     background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; font-size: 12.5px; line-height: 1.45; }
   .tracking-switch-note p { margin: 0; }
@@ -174,68 +177,34 @@
     <!-- LEFT COLUMN (MAIN CONTENT) -->
     <div class="form-main-column">
 
-      <!-- 1. General Information -->
+      <!-- 1. Product: its name and texts, written in English -->
       <div class="form-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="info"></i></span>{% trans "General Information" %}</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="info"></i></span>{% trans "Product" %}</div>
         <div class="form-group">
-          <label for="id_title">{% trans "Title" %}</label>
+          <label for="id_title">{% trans "Name" %}</label>
           {{ form.title }}
         </div>
-        <!-- Hidden original description field -->
+        {# The texts travel as {"translations": {"en": {...}}} in this hidden field; #}
+        {# the server keeps the other languages (product_translation). #}
         <div style="display:none;">{{ form.description }}</div>
 
-        <!-- Multi-language translations UI -->
         <div class="form-group">
-          <div class="trans-container">
-            <div class="trans-tab-bar">
-              <button type="button" class="trans-tab active" data-lang="en">
-                <span class="trans-tab-flag">EN</span>
-                <span class="trans-tab-name">{% trans "English" %}</span>
-              </button>
-              <button type="button" class="trans-tab" data-lang="tr">
-                <span class="trans-tab-flag">TR</span>
-                <span class="trans-tab-name">{% trans "Turkish" %}</span>
-              </button>
-            </div>
-            <div class="trans-panel active" data-lang="en">
-              <label class="trans-label">{% trans "Product Name" %}</label>
-              <input type="text" class="trans-input trans-title" data-lang="en" placeholder="{% trans 'Enter product name...' %}">
-              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-en" class="trans-desc" data-lang="en"></div>
-                <textarea id="html-source-en" class="html-source-area" data-lang="en"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-care-en" class="trans-care" data-lang="en"></div>
-                <textarea id="html-care-source-en" class="html-source-area" data-lang="en"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-extra-en" class="trans-extra" data-lang="en"></div>
-                <textarea id="html-extra-source-en" class="html-source-area" data-lang="en"></textarea>
-              </div>
-            </div>
-            <div class="trans-panel" data-lang="tr">
-              <label class="trans-label">{% trans "Product Name" %}</label>
-              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="{% trans 'Enter product name...' %}">
-              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-tr" class="trans-desc" data-lang="tr"></div>
-                <textarea id="html-source-tr" class="html-source-area" data-lang="tr"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-care-tr" class="trans-care" data-lang="tr"></div>
-                <textarea id="html-care-source-tr" class="html-source-area" data-lang="tr"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-extra-tr" class="trans-extra" data-lang="tr"></div>
-                <textarea id="html-extra-source-tr" class="html-source-area" data-lang="tr"></textarea>
-              </div>
-            </div>
+          <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+          <div class="quill-wrap">
+            <div id="quill-en" class="trans-desc" data-lang="en"></div>
+            <textarea id="html-source-en" class="html-source-area" data-lang="en"></textarea>
           </div>
+          <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+          <div class="quill-wrap">
+            <div id="quill-care-en" class="trans-care" data-lang="en"></div>
+            <textarea id="html-care-source-en" class="html-source-area" data-lang="en"></textarea>
+          </div>
+          <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+          <div class="quill-wrap">
+            <div id="quill-extra-en" class="trans-extra" data-lang="en"></div>
+            <textarea id="html-extra-source-en" class="html-source-area" data-lang="en"></textarea>
+          </div>
+          <p class="trans-note">{% trans "Write in English. The website shows the name and texts in Turkish and Russian too, translated when you save." %}</p>
         </div>
       </div>
 
@@ -245,7 +214,7 @@
           <div class="form-card-title"><span class="form-card-ico"><i data-lucide="image"></i></span>{% trans "Media" %}</div>
           {% if product %}
           <button type="button" id="openFileManagerBtn" class="btn-link">
-            <i class="fa fa-plus"></i> {% trans "Add from URL" %}
+            <i class="fa fa-plus"></i> {% trans "Add or remove files" %}
           </button>
           {% endif %}
         </div>
@@ -381,9 +350,9 @@
 
     <!-- RIGHT COLUMN, top half: beside General information and Media -->
     <div class="form-sidebar-column">
-      <!-- Sales Channels -->
+      <!-- Selling: where the product is sold, its price, its minimum -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="radio-tower"></i></span>{% trans "Sales Channels" %}</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="tag"></i></span>{% trans "Selling" %}</div>
 
         <div class="toggle-item">
           <div class="toggle-info">
@@ -414,11 +383,9 @@
             <span class="switch-slider"></span>
           </label>
         </div>
-      </div>
 
-      <!-- Pricing (Moved to Sidebar) -->
-      <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="tag"></i></span>{% trans "Pricing" %}</div>
+        <div class="channel-divider"></div>
+
         {% comment %}Price and cost are typed on each variant; this shows what
         they come to.{% endcomment %}
         <div id="variants_summary">
@@ -465,11 +432,7 @@
             </p>
           </div>
         </div>
-      </div>
 
-      <!-- Order rules (wholesale minimums) -->
-      <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="scale"></i></span>{% trans "Order rules" %}</div>
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
             <label for="id_minimum_order_quantity">
@@ -484,431 +447,6 @@
             </p>
           </div>
         </div>
-      </div>
-
-
-      {# ============ CAMPAIGN / DISCOUNT ============ #}
-      <div class="form-card sidebar-card" id="campaign_card">
-        <div class="form-card-title">
-          <span class="form-card-ico"><i data-lucide="badge-percent"></i></span>
-          {% trans "Campaign / Discount" %}
-        </div>
-        <p class="cmp-help">
-          {% blocktrans %}Add <b>one</b> kind of campaign to this product. Either a flat percentage discount with an end date, OR volume-tier (bulk) pricing where the price drops as the buyer orders more.{% endblocktrans %}
-        </p>
-
-        <!-- Hidden state holders submitted with the form -->
-        <input type="hidden" name="campaign_type" id="cmp_type"
-               value="{{ campaign.campaign_type|default:'none' }}">
-        <input type="hidden" name="campaign_tiers_json" id="cmp_tiers_json" value="">
-
-        <!-- Type picker -->
-        <div class="cmp-types" role="tablist" aria-label="Campaign type">
-          <button type="button" class="cmp-type" data-type="none">
-            <i data-lucide="ban"></i><span>{% trans "None" %}</span>
-            <small>{% trans "No discount" %}</small>
-          </button>
-          <button type="button" class="cmp-type" data-type="percentage">
-            <i data-lucide="percent"></i><span>{% trans "Flat % off" %}</span>
-            <small>{% trans "Until a date" %}</small>
-          </button>
-          <button type="button" class="cmp-type" data-type="volume">
-            <i data-lucide="layers"></i><span>{% trans "Volume tiers" %}</span>
-            <small>{% trans "By quantity" %}</small>
-          </button>
-        </div>
-
-        <!-- Percentage panel -->
-        <div class="cmp-panel" data-panel="percentage" hidden>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="cmp_percent">{% trans "Discount (%)" %}</label>
-              <input type="number" name="campaign_discount_percent"
-                     id="cmp_percent" class="form-control"
-                     min="0" max="100" step="0.01"
-                     placeholder="{% trans 'e.g. 15' %}"
-                     value="{% if campaign.campaign_type == 'percentage' %}{{ campaign.discount_percent|stringformat:'g' }}{% endif %}">
-            </div>
-            <div class="form-group">
-              <label for="cmp_end_date">{% trans "Ends on" %}</label>
-              <input type="date" name="campaign_end_date"
-                     id="cmp_end_date" class="form-control"
-                     value="{% if campaign.campaign_type == 'percentage' and campaign.end_date %}{{ campaign.end_date|date:'Y-m-d' }}{% endif %}">
-            </div>
-          </div>
-          <p class="cmp-hint">
-            <i data-lucide="info"></i>
-            Whole catalog price will drop by this % until the chosen
-            end date (inclusive).
-          </p>
-        </div>
-
-        <!-- Volume tiers panel -->
-        <div class="cmp-panel" data-panel="volume" hidden>
-          <div class="cmp-tier-list" id="cmp_tier_list">
-            <!-- rows injected by JS -->
-          </div>
-          <button type="button" class="cmp-add-tier" id="cmp_add_tier">
-            <i data-lucide="plus"></i> {% trans "Add tier" %}
-          </button>
-          <p class="cmp-hint">
-            <i data-lucide="info"></i>
-            Each tier is "from X units → %Y off". Leave the top tier's
-            <b>Max</b> empty to mean "X+ and above".
-          </p>
-        </div>
-
-        <!-- Existing volume tiers JSON for JS bootstrap -->
-        {% if campaign.campaign_type == 'volume' %}
-        <script id="cmp_tiers_initial" type="application/json">
-          [{% for t in campaign.tiers.all %}{"min_qty": {{ t.min_qty }}, "max_qty": {{ t.max_qty|default_if_none:'null' }}, "discount_percent": "{{ t.discount_percent }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
-        </script>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Variants take the page's whole width, between the two halves. -->
-    <div class="form-wide-row">
-      <!-- 6. Variants (PRESERVED) -->
-      <div class="form-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="layers"></i></span>{% trans "Variants" %}</div>
-        <div class="form-description">{% trans "Add options like size or color to create variants for this product." %}</div>
-        {% variant_form current_url=request.path product=product variants=variants %}
-      </div>
-    </div>
-
-    <!-- LEFT COLUMN, bottom half -->
-    <div class="form-main-column">
-
-      <!-- 7. Manufacturing Recipe (BOM) -->
-      <div class="form-card" id="manufacturing_section">
-        <div class="form-card-header">
-          <div class="form-card-title">
-            <span class="form-card-ico"><i data-lucide="factory"></i></span>Manufacturing Recipe (BOM)
-          </div>
-          <div class="toggle-item" style="margin: 0; gap: 10px;">
-            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">{% trans "Track Manufacturing" %}</span>
-            <label class="switch-container">
-              <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
-              <span class="switch-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <div id="bom_content" style="display: none; margin-top: 1rem;">
-          <!-- Material Search -->
-          <div class="bom-search-container" style="position: relative; margin-bottom: 1rem;">
-            <div class="input-icon-wrapper">
-              <i class="fa fa-search input-icon"
-                style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
-              <input type="text" id="bom_material_search" class="form-input"
-                placeholder="{% trans 'Search raw materials to add...' %}" style="padding-left: 2.5rem;">
-            </div>
-            <div id="bom_search_results" class="dropdown-menu"
-              style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-            </div>
-          </div>
-
-          <!-- Materials Table -->
-          <div class="table-responsive">
-            <table class="modern-table" id="bom_table">
-              <thead>
-                <tr>
-                  <th style="width: 40%;">{% trans "Raw Material" %}</th>
-                  <th style="width: 20%;">{% trans "Qty Used" %}</th>
-                  <th style="width: 20%;">{% trans "Unit Cost" %}</th>
-                  <th style="width: 15%;">{% trans "Total Cost" %}</th>
-                  <th style="width: 5%;"></th>
-                </tr>
-              </thead>
-              <tbody id="bom_table_body">
-                <!-- Rows will be added here via JS -->
-                {% if product and product.bill_of_materials %}
-                {% for item in product.bill_of_materials.items.all %}
-                <tr data-material-id="{{ item.raw_material.id }}">
-                  <td>
-                    <div class="bom-item-name">{{ item.raw_material.name }}</div>
-                    <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">{{ item.raw_material.sku }}</div>
-                    <input type="hidden" name="bom_material_id[]" value="{{ item.raw_material.id }}">
-                  </td>
-                  <td>
-                    <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
-                      <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]"
-                        value="{{ item.quantity }}" style="width: 80px; padding: 4px 8px;">
-                      <span class="unit-badge">{{ item.raw_material.unit_of_measurement }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
-                      ${{ item.raw_material.unit_cost|default:0|floatformat:"2g" }}
-                    </div>
-                  </td>
-                  <td>
-                    <div class="total-cost-display fw-bold">
-                      <!-- Calc via JS -->
-                    </div>
-                  </td>
-                  <td>
-                    <button type="button" class="btn-icon text-danger remove-bom-row">
-                      <i class="fa fa-times"></i>
-                    </button>
-                  </td>
-                </tr>
-                {% endfor %}
-                {% endif %}
-              </tbody>
-              <tfoot>
-                <tr style="background-color: #f9fafb;">
-                  <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
-                    {% trans "Total Material Cost per Unit:" %}</td>
-                  <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
-                    $0.00</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Empty State -->
-          <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
-            <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
-            <p>{% trans "No materials added. Search above to create a recipe." %}</p>
-          </div>
-        </div>
-      </div>
-
-
-
-    </div>
-
-    <!-- RIGHT COLUMN, bottom half: beside the recipe -->
-    <div class="form-sidebar-column">
-      <!-- Packaging (B2B wholesale) -->
-      <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="package"></i></span>{% trans "Packaging" %}</div>
-        <div class="toggle-item">
-          <div class="toggle-info">
-            <span class="toggle-label">{% trans "Sold as a pack" %}</span>
-            <span class="toggle-desc">{% trans "e.g. pack of 12, pack of 5" %}</span>
-          </div>
-          <label class="switch-container">
-            {{ form.is_packaged }}
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-        <div class="form-row" id="pack_count_row" style="margin-top: 12px;">
-          <div class="form-group" style="width: 100%;">
-            <label for="id_pack_count">{% trans "Items per pack" %}</label>
-            {{ form.pack_count }}
-          </div>
-        </div>
-        <script>
-          (function () {
-            var cb = document.getElementById('id_is_packaged');
-            var row = document.getElementById('pack_count_row');
-            if (!cb || !row) return;
-            function sync() { row.style.display = cb.checked ? '' : 'none'; }
-            cb.addEventListener('change', sync);
-            sync();
-          })();
-        </script>
-      </div>
-
-      <!-- Inventory (Moved to Sidebar) -->
-      <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="boxes"></i></span>{% trans "Inventory" %}</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="id_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
-            {{ form.sku }}
-            {% if not is_update %}
-            <p class="sku-hint">{% trans "No dots. Variant SKUs are built from it: K24644 → K24644.WHITE-140." %}</p>
-            {% endif %}
-            {% if product and product.sku %}
-              {% with cat=product.category.name|default:'fabric'|lower %}
-              <a href="https://demfirat.com/tr/product/{{ cat }}/{{ product.sku }}/"
-                 target="_blank" rel="noopener"
-                 style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#3b82f6;text-decoration:none;font-weight:500;">
-                <i class="fas fa-external-link-alt" style="font-size:10px;"></i>
-                {% trans "View on demfirat.com" %}
-              </a>
-              {% endwith %}
-            {% endif %}
-          </div>
-          <div class="form-group">
-            <label for="id_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
-            {{ form.barcode }}
-          </div>
-        </div>
-        <div style="height: 15px;"></div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>{% trans "Quantity" %}</label>
-            {# Read-only: stock is what the warehouse holds, not a field. #}
-            <div class="form-input" style="background:#F8FAFC;color:#475569;">
-              {% if product.live_quantity is not None %}
-                {{ product.live_quantity|floatformat:"-2g" }}
-              {% else %}
-                <span style="color:#94A3B8;">{% trans "Not stocked \u2014 made to order" %}</span>
-              {% endif %}
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="id_unit">{% trans "Unit" %}</label>
-            {{ form.unit }}
-          </div>
-          <div class="form-group">
-            <label for="id_pack_type">{% trans "Packed as" %}</label>
-            {{ form.pack_type }}
-          </div>
-          <div class="form-group">
-            <label for="id_tracking">{% trans "Tracking" %}</label>
-            {{ form.tracking }}
-          </div>
-          <div class="form-group">
-            <label for="id_minimum_inventory_level">{% trans "Min. Inventory Level" %}</label>
-            {{ form.minimum_inventory_level }}
-          </div>
-        </div>
-        {% if tracking_switch.notes %}
-        {# Shown while Tracking is set away from what is saved: what the switch does. #}
-        <div class="tracking-switch-note" id="trackingSwitchNote"
-             data-to="{{ tracking_switch.to }}" hidden>
-          {% for note in tracking_switch.notes %}<p>{{ note }}</p>{% endfor %}
-        </div>
-        <script>
-          (function () {
-            var sel = document.getElementById('id_tracking');
-            var note = document.getElementById('trackingSwitchNote');
-            if (!sel || !note) return;
-            function show() { note.hidden = sel.value !== note.dataset.to; }
-            sel.addEventListener('change', show);
-            show();
-          })();
-        </script>
-        {% endif %}
-      </div>
-
-      <!-- Shipping (Moved to Sidebar) -->
-      <div class="form-card sidebar-card">
-        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="truck"></i></span>{% trans "Shipping" %}</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="id_weight">{% trans "Weight" %}</label>
-            {{ form.weight }}
-          </div>
-          <div class="form-group">
-            <label for="id_unit_of_weight">{% trans "Unit" %}</label>
-            {{ form.unit_of_weight }}
-          </div>
-        </div>
-        {# Fabric only: the packing list works each roll's kilos out from it. #}
-        <div class="form-group">
-          <label for="id_gsm">{% trans "GSM (g/m²)" %}</label>
-          {{ form.gsm }}
-        </div>
-      </div>
-
-      <!-- Product Attributes (Moved to Sidebar) -->
-      <div class="form-card sidebar-card" id="product_attributes_section">
-        <div class="form-card-header">
-          <div class="form-card-title"><span class="form-card-ico"><i data-lucide="list"></i></span>{% trans "Product Attributes" %}</div>
-        </div>
-
-        {# Quick-add preset chips — click to insert an attribute with that name pre-filled #}
-        <div class="attr-presets" role="group" aria-label="{% trans 'Quick-add attribute presets' %}">
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Color" %}')" title="{% trans 'Color' %}">
-            <i data-lucide="palette"></i><span>{% trans "Color" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Size" %}')" title="{% trans 'Size' %}">
-            <i data-lucide="ruler"></i><span>{% trans "Size" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Material" %}')" title="{% trans 'Material' %}">
-            <i data-lucide="layers-3"></i><span>{% trans "Material" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Weight" %}')" title="{% trans 'Weight' %}">
-            <i data-lucide="weight"></i><span>{% trans "Weight" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Dimensions" %}')" title="{% trans 'Dimensions' %}">
-            <i data-lucide="box"></i><span>{% trans "Dimensions" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Brand" %}')" title="{% trans 'Brand' %}">
-            <i data-lucide="badge"></i><span>{% trans "Brand" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Style" %}')" title="{% trans 'Style' %}">
-            <i data-lucide="sparkles"></i><span>{% trans "Style" %}</span>
-          </button>
-          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Pattern" %}')" title="{% trans 'Pattern' %}">
-            <i data-lucide="grip"></i><span>{% trans "Pattern" %}</span>
-          </button>
-          <button type="button" class="attr-preset attr-preset-plus" onclick="addProductAttribute()" title="{% trans 'Custom attribute' %}">
-            <i data-lucide="plus"></i>
-          </button>
-        </div>
-
-        <style>
-          .attr-presets {
-            display: flex; flex-wrap: wrap; gap: 6px;
-            margin: 4px 0 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px dashed #E5E7EB;
-          }
-          .attr-preset {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 5px 10px;
-            background: #F4F7FB;
-            border: 1px solid #E0E6EE;
-            border-radius: 999px;
-            font: 600 11.5px 'Plus Jakarta Sans', system-ui, sans-serif;
-            color: #4D5760;
-            cursor: pointer;
-            transition: all 140ms;
-          }
-          .attr-preset i { width: 13px; height: 13px; stroke-width: 1.8; }
-          .attr-preset:hover {
-            background: #E5F1F0;
-            border-color: #008080;
-            color: #005354;
-            transform: translateY(-1px);
-          }
-          .attr-preset:active { transform: translateY(0); }
-          .attr-preset-plus {
-            padding: 5px 8px;
-            background: white;
-            border-style: dashed;
-            color: #008080;
-          }
-          .attr-preset-plus span { display: none; }
-        </style>
-
-        <div id="product_attributes_container" class="attributes-container">
-          {% if product %}
-          {% for attr in product.attributes.all %}
-          <div class="attribute-card">
-            <div class="attribute-inputs">
-              <div class="attribute-input-wrapper">
-                <input type="text" class="attribute-input" name="attribute_names[]" placeholder="{% trans 'Name (e.g. Color)' %}"
-                  value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
-              </div>
-              <div class="attribute-input-wrapper">
-                <input type="text" class="attribute-input" name="attribute_values[]" placeholder="{% trans 'Value (e.g. Red)' %}"
-                  value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
-              </div>
-            </div>
-            <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="{% trans 'Delete' %}">
-              <i class="fa fa-trash"></i>
-            </button>
-          </div>
-          {% endfor %}
-          {% endif %}
-        </div>
-
-        {% if not product.attributes.all %}
-        <div id="empty_attributes_placeholder" class="empty-placeholder">
-          <p>{% trans "No attributes yet." %}</p>
-        </div>
-        {% endif %}
-
-        <div id="attr_save_status"></div>
       </div>
 
       <!-- Product Organization -->
@@ -1033,6 +571,426 @@
       </div>
 
     </div>
+
+    <!-- Variants take the page's whole width, between the two halves. -->
+    <div class="form-wide-row">
+      <!-- Variants & stock: the codes, units and packing every variant shares, then the variants -->
+      <div class="form-card">
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="layers"></i></span>{% trans "Variants & stock" %}</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
+            {{ form.sku }}
+            {% if not is_update %}
+            <p class="sku-hint">{% trans "No dots. Variant SKUs are built from it: K24644 → K24644.WHITE-140." %}</p>
+            {% endif %}
+            {% if product and product.sku %}
+              {% with cat=product.category.name|default:'fabric'|lower %}
+              <a href="https://demfirat.com/tr/product/{{ cat }}/{{ product.sku }}/"
+                 target="_blank" rel="noopener"
+                 style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#3b82f6;text-decoration:none;font-weight:500;">
+                <i class="fas fa-external-link-alt" style="font-size:10px;"></i>
+                {% trans "View on demfirat.com" %}
+              </a>
+              {% endwith %}
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <label for="id_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
+            {{ form.barcode }}
+          </div>
+        </div>
+        <div style="height: 15px;"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>{% trans "Quantity" %}</label>
+            {# Read-only: stock is what the warehouse holds, not a field. #}
+            <div class="form-input" style="background:#F8FAFC;color:#475569;">
+              {% if product.live_quantity is not None %}
+                {{ product.live_quantity|floatformat:"-2g" }}
+              {% else %}
+                <span style="color:#94A3B8;">{% trans "Not stocked \u2014 made to order" %}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="id_unit">{% trans "Unit" %}</label>
+            {{ form.unit }}
+          </div>
+          <div class="form-group">
+            <label for="id_pack_type">{% trans "Packed as" %}</label>
+            {{ form.pack_type }}
+          </div>
+          <div class="form-group">
+            <label for="id_tracking">{% trans "Tracking" %}</label>
+            {{ form.tracking }}
+          </div>
+          <div class="form-group">
+            <label for="id_minimum_inventory_level">{% trans "Min. Inventory Level" %}</label>
+            {{ form.minimum_inventory_level }}
+          </div>
+        </div>
+        {% if tracking_switch.notes %}
+        {# Shown while Tracking is set away from what is saved: what the switch does. #}
+        <div class="tracking-switch-note" id="trackingSwitchNote"
+             data-to="{{ tracking_switch.to }}" hidden>
+          {% for note in tracking_switch.notes %}<p>{{ note }}</p>{% endfor %}
+        </div>
+        <script>
+          (function () {
+            var sel = document.getElementById('id_tracking');
+            var note = document.getElementById('trackingSwitchNote');
+            if (!sel || !note) return;
+            function show() { note.hidden = sel.value !== note.dataset.to; }
+            sel.addEventListener('change', show);
+            show();
+          })();
+        </script>
+        {% endif %}
+
+        <div style="height: 15px;"></div>
+        <div class="toggle-item">
+          <div class="toggle-info">
+            <span class="toggle-label">{% trans "Sold as a pack" %}</span>
+            <span class="toggle-desc">{% trans "e.g. pack of 12, pack of 5" %}</span>
+          </div>
+          <label class="switch-container">
+            {{ form.is_packaged }}
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div class="form-row" id="pack_count_row" style="margin-top: 12px;">
+          <div class="form-group" style="width: 100%;">
+            <label for="id_pack_count">{% trans "Items per pack" %}</label>
+            {{ form.pack_count }}
+          </div>
+        </div>
+        <script>
+          (function () {
+            var cb = document.getElementById('id_is_packaged');
+            var row = document.getElementById('pack_count_row');
+            if (!cb || !row) return;
+            function sync() { row.hidden = !cb.checked; }
+            cb.addEventListener('change', sync);
+            sync();
+          })();
+        </script>
+
+        <div class="form-description">{% trans "Add options like size or color to create variants for this product." %}</div>
+        {% variant_form current_url=request.path product=product variants=variants %}
+      </div>
+    </div>
+
+    {% comment %}What most products leave alone, folded away: shipping weights,
+    attributes, a campaign, a manufacturing recipe. Closed, its fields are
+    still sent with the form.{% endcomment %}
+    <details class="form-wide-row more-section" id="more_section">
+      <summary class="more-summary">
+        <span class="more-summary-title">{% trans "More" %}</span>
+        <span class="more-summary-hint">{% trans "Shipping, attributes, campaign, manufacturing" %}</span>
+        <i class="fa fa-chevron-down more-chevron"></i>
+      </summary>
+      <div class="more-grid">
+      <!-- Shipping -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="truck"></i></span>{% trans "Shipping" %}</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_weight">{% trans "Weight" %}</label>
+            {{ form.weight }}
+          </div>
+          <div class="form-group">
+            <label for="id_unit_of_weight">{% trans "Unit" %}</label>
+            {{ form.unit_of_weight }}
+          </div>
+        </div>
+        {# Fabric only: the packing list works each roll's kilos out from it. #}
+        <div class="form-group">
+          <label for="id_gsm">{% trans "GSM (g/m²)" %}</label>
+          {{ form.gsm }}
+        </div>
+      </div>
+
+      <!-- Product Attributes -->
+      <div class="form-card sidebar-card" id="product_attributes_section">
+        <div class="form-card-header">
+          <div class="form-card-title"><span class="form-card-ico"><i data-lucide="list"></i></span>{% trans "Product Attributes" %}</div>
+        </div>
+
+        {# Quick-add preset chips — click to insert an attribute with that name pre-filled #}
+        <div class="attr-presets" role="group" aria-label="{% trans 'Quick-add attribute presets' %}">
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Color" %}')" title="{% trans 'Color' %}">
+            <i data-lucide="palette"></i><span>{% trans "Color" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Size" %}')" title="{% trans 'Size' %}">
+            <i data-lucide="ruler"></i><span>{% trans "Size" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Material" %}')" title="{% trans 'Material' %}">
+            <i data-lucide="layers-3"></i><span>{% trans "Material" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Weight" %}')" title="{% trans 'Weight' %}">
+            <i data-lucide="weight"></i><span>{% trans "Weight" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Dimensions" %}')" title="{% trans 'Dimensions' %}">
+            <i data-lucide="box"></i><span>{% trans "Dimensions" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Brand" %}')" title="{% trans 'Brand' %}">
+            <i data-lucide="badge"></i><span>{% trans "Brand" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Style" %}')" title="{% trans 'Style' %}">
+            <i data-lucide="sparkles"></i><span>{% trans "Style" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Pattern" %}')" title="{% trans 'Pattern' %}">
+            <i data-lucide="grip"></i><span>{% trans "Pattern" %}</span>
+          </button>
+          <button type="button" class="attr-preset attr-preset-plus" onclick="addProductAttribute()" title="{% trans 'Custom attribute' %}">
+            <i data-lucide="plus"></i>
+          </button>
+        </div>
+
+        <style>
+          .attr-presets {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin: 4px 0 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px dashed #E5E7EB;
+          }
+          .attr-preset {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 10px;
+            background: #F4F7FB;
+            border: 1px solid #E0E6EE;
+            border-radius: 999px;
+            font: 600 11.5px 'Plus Jakarta Sans', system-ui, sans-serif;
+            color: #4D5760;
+            cursor: pointer;
+            transition: all 140ms;
+          }
+          .attr-preset i { width: 13px; height: 13px; stroke-width: 1.8; }
+          .attr-preset:hover {
+            background: #E5F1F0;
+            border-color: #008080;
+            color: #005354;
+            transform: translateY(-1px);
+          }
+          .attr-preset:active { transform: translateY(0); }
+          .attr-preset-plus {
+            padding: 5px 8px;
+            background: white;
+            border-style: dashed;
+            color: #008080;
+          }
+          .attr-preset-plus span { display: none; }
+        </style>
+
+        <div id="product_attributes_container" class="attributes-container">
+          {% if product %}
+          {% for attr in product.attributes.all %}
+          <div class="attribute-card">
+            <div class="attribute-inputs">
+              <div class="attribute-input-wrapper">
+                <input type="text" class="attribute-input" name="attribute_names[]" placeholder="{% trans 'Name (e.g. Color)' %}"
+                  value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
+              </div>
+              <div class="attribute-input-wrapper">
+                <input type="text" class="attribute-input" name="attribute_values[]" placeholder="{% trans 'Value (e.g. Red)' %}"
+                  value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
+              </div>
+            </div>
+            <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="{% trans 'Delete' %}">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+
+        {% if not product.attributes.all %}
+        <div id="empty_attributes_placeholder" class="empty-placeholder">
+          <p>{% trans "No attributes yet." %}</p>
+        </div>
+        {% endif %}
+
+        <div id="attr_save_status"></div>
+      </div>
+
+      {# ============ CAMPAIGN / DISCOUNT ============ #}
+      <div class="form-card sidebar-card" id="campaign_card">
+        <div class="form-card-title">
+          <span class="form-card-ico"><i data-lucide="badge-percent"></i></span>
+          {% trans "Campaign / Discount" %}
+        </div>
+        <p class="cmp-help">
+          {% blocktrans %}Add <b>one</b> kind of campaign to this product. Either a flat percentage discount with an end date, OR volume-tier (bulk) pricing where the price drops as the buyer orders more.{% endblocktrans %}
+        </p>
+
+        <!-- Hidden state holders submitted with the form -->
+        <input type="hidden" name="campaign_type" id="cmp_type"
+               value="{{ campaign.campaign_type|default:'none' }}">
+        <input type="hidden" name="campaign_tiers_json" id="cmp_tiers_json" value="">
+
+        <!-- Type picker -->
+        <div class="cmp-types" role="tablist" aria-label="Campaign type">
+          <button type="button" class="cmp-type" data-type="none">
+            <i data-lucide="ban"></i><span>{% trans "None" %}</span>
+            <small>{% trans "No discount" %}</small>
+          </button>
+          <button type="button" class="cmp-type" data-type="percentage">
+            <i data-lucide="percent"></i><span>{% trans "Flat % off" %}</span>
+            <small>{% trans "Until a date" %}</small>
+          </button>
+          <button type="button" class="cmp-type" data-type="volume">
+            <i data-lucide="layers"></i><span>{% trans "Volume tiers" %}</span>
+            <small>{% trans "By quantity" %}</small>
+          </button>
+        </div>
+
+        <!-- Percentage panel -->
+        <div class="cmp-panel" data-panel="percentage" hidden>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cmp_percent">{% trans "Discount (%)" %}</label>
+              <input type="number" name="campaign_discount_percent"
+                     id="cmp_percent" class="form-control"
+                     min="0" max="100" step="0.01"
+                     placeholder="{% trans 'e.g. 15' %}"
+                     value="{% if campaign.campaign_type == 'percentage' %}{{ campaign.discount_percent|stringformat:'g' }}{% endif %}">
+            </div>
+            <div class="form-group">
+              <label for="cmp_end_date">{% trans "Ends on" %}</label>
+              <input type="date" name="campaign_end_date"
+                     id="cmp_end_date" class="form-control"
+                     value="{% if campaign.campaign_type == 'percentage' and campaign.end_date %}{{ campaign.end_date|date:'Y-m-d' }}{% endif %}">
+            </div>
+          </div>
+          <p class="cmp-hint">
+            <i data-lucide="info"></i>
+            Whole catalog price will drop by this % until the chosen
+            end date (inclusive).
+          </p>
+        </div>
+
+        <!-- Volume tiers panel -->
+        <div class="cmp-panel" data-panel="volume" hidden>
+          <div class="cmp-tier-list" id="cmp_tier_list">
+            <!-- rows injected by JS -->
+          </div>
+          <button type="button" class="cmp-add-tier" id="cmp_add_tier">
+            <i data-lucide="plus"></i> {% trans "Add tier" %}
+          </button>
+          <p class="cmp-hint">
+            <i data-lucide="info"></i>
+            Each tier is "from X units → %Y off". Leave the top tier's
+            <b>Max</b> empty to mean "X+ and above".
+          </p>
+        </div>
+
+        <!-- Existing volume tiers JSON for JS bootstrap -->
+        {% if campaign.campaign_type == 'volume' %}
+        <script id="cmp_tiers_initial" type="application/json">
+          [{% for t in campaign.tiers.all %}{"min_qty": {{ t.min_qty }}, "max_qty": {{ t.max_qty|default_if_none:'null' }}, "discount_percent": "{{ t.discount_percent }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+        </script>
+        {% endif %}
+      </div>
+
+      <!-- 7. Manufacturing Recipe (BOM) -->
+      <div class="form-card more-wide" id="manufacturing_section">
+        <div class="form-card-header">
+          <div class="form-card-title">
+            <span class="form-card-ico"><i data-lucide="factory"></i></span>Manufacturing Recipe (BOM)
+          </div>
+          <div class="toggle-item" style="margin: 0; gap: 10px;">
+            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">{% trans "Track Manufacturing" %}</span>
+            <label class="switch-container">
+              <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div id="bom_content" style="display: none; margin-top: 1rem;">
+          <!-- Material Search -->
+          <div class="bom-search-container" style="position: relative; margin-bottom: 1rem;">
+            <div class="input-icon-wrapper">
+              <i class="fa fa-search input-icon"
+                style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
+              <input type="text" id="bom_material_search" class="form-input"
+                placeholder="{% trans 'Search raw materials to add...' %}" style="padding-left: 2.5rem;">
+            </div>
+            <div id="bom_search_results" class="dropdown-menu"
+              style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            </div>
+          </div>
+
+          <!-- Materials Table -->
+          <div class="table-responsive">
+            <table class="modern-table" id="bom_table">
+              <thead>
+                <tr>
+                  <th style="width: 40%;">{% trans "Raw Material" %}</th>
+                  <th style="width: 20%;">{% trans "Qty Used" %}</th>
+                  <th style="width: 20%;">{% trans "Unit Cost" %}</th>
+                  <th style="width: 15%;">{% trans "Total Cost" %}</th>
+                  <th style="width: 5%;"></th>
+                </tr>
+              </thead>
+              <tbody id="bom_table_body">
+                <!-- Rows will be added here via JS -->
+                {% if product and product.bill_of_materials %}
+                {% for item in product.bill_of_materials.items.all %}
+                <tr data-material-id="{{ item.raw_material.id }}">
+                  <td>
+                    <div class="bom-item-name">{{ item.raw_material.name }}</div>
+                    <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">{{ item.raw_material.sku }}</div>
+                    <input type="hidden" name="bom_material_id[]" value="{{ item.raw_material.id }}">
+                  </td>
+                  <td>
+                    <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
+                      <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]"
+                        value="{{ item.quantity }}" style="width: 80px; padding: 4px 8px;">
+                      <span class="unit-badge">{{ item.raw_material.unit_of_measurement }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
+                      ${{ item.raw_material.unit_cost|default:0|floatformat:"2g" }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="total-cost-display fw-bold">
+                      <!-- Calc via JS -->
+                    </div>
+                  </td>
+                  <td>
+                    <button type="button" class="btn-icon text-danger remove-bom-row">
+                      <i class="fa fa-times"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+              <tfoot>
+                <tr style="background-color: #f9fafb;">
+                  <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
+                    {% trans "Total Material Cost per Unit:" %}</td>
+                  <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
+                    $0.00</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
+            <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+            <p>{% trans "No materials added. Search above to create a recipe." %}</p>
+          </div>
+        </div>
+      </div>
+
+      </div>
+    </details>
   </form>
 </div>
 
@@ -1772,8 +1730,10 @@
     const countEl = document.getElementById('selected_count');
     const masterCb = document.getElementById('select_all_images');
 
-    if (items.length === 0) {
-      toolbar.style.display = 'none';
+    // Shown only while something is picked: tick a photo's corner to start.
+    if (!toolbar || selected.length === 0) {
+      if (toolbar) toolbar.style.display = 'none';
+      if (masterCb) { masterCb.checked = false; masterCb.indeterminate = false; }
       return;
     }
 
@@ -1876,13 +1836,6 @@
     }, 350);
   }
 
-  // Show toolbar on load if there are images
-  document.addEventListener('DOMContentLoaded', function() {
-    const items = document.querySelectorAll('#sortable_images .media-item.sortable-image');
-    if (items.length > 0) {
-      document.getElementById('media_bulk_toolbar').style.display = 'flex';
-    }
-  });
 </script>
 
 <!-- File Manager Modal -->
@@ -2430,28 +2383,16 @@
 
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
-// ── Translation Tabs Logic ──────────────────────────────────
+// ── Product texts (English) ─────────────────────────────────
 (function() {
   const descField = document.getElementById('id_description');
   if (!descField) return;
 
-  const langs = ['tr', 'en'];
-  const tabBtns = document.querySelectorAll('.trans-tab');
-  const panels = document.querySelectorAll('.trans-panel');
+  // English only: the other languages are written from it on the server.
+  const langs = ['en'];
   const quillEditors = {};
   const quillCareEditors = {};
   const quillExtraEditors = {};
-
-  // ── Tab switching ──
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const lang = btn.dataset.lang;
-      tabBtns.forEach(b => b.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelector(`.trans-panel[data-lang="${lang}"]`).classList.add('active');
-    });
-  });
 
   // ── Initialize Quill editors ──
   const toolbarOptions = [
@@ -2494,8 +2435,7 @@
       const extraEditor = new Quill(extraContainer, {
         theme: 'snow',
         modules: { toolbar: toolbarOptions },
-        placeholder: lang === 'en' ? 'Additional info (optional)...'
-          : 'Ek bilgi (opsiyonel)...'
+        placeholder: '{% filter escapejs %}{% trans "Additional info (optional)..." %}{% endfilter %}'
       });
       quillExtraEditors[lang] = extraEditor;
       extraEditor.on('text-change', syncToDescription);
@@ -2625,8 +2565,6 @@
       const translations = data.translations || {};
       langs.forEach(lang => {
         const t = translations[lang] || {};
-        const titleInput = document.querySelector(`.trans-title[data-lang="${lang}"]`);
-        if (titleInput && t.title) titleInput.value = t.title;
         if (t.description && quillEditors[lang]) {
           quillEditors[lang].root.innerHTML = t.description;
         }
@@ -2637,10 +2575,9 @@
           quillExtraEditors[lang].root.innerHTML = t.additional_info;
         }
       });
-      updateHasContentDots();
     } catch(e) {
-      if (quillEditors['tr']) {
-        quillEditors['tr'].root.innerHTML = `<p>${raw}</p>`;
+      if (quillEditors['en']) {
+        quillEditors['en'].root.innerHTML = `<p>${raw}</p>`;
       }
     }
   }
@@ -2650,13 +2587,11 @@
     const translations = {};
     let hasAny = false;
     langs.forEach(lang => {
-      const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
       const desc = getDescHtml(lang);
       const care = getCareHtml(lang);
       const extra = getExtraHtml(lang);
-      if (title || desc || care || extra) {
+      if (desc || care || extra) {
         translations[lang] = {};
-        if (title) translations[lang].title = title;
         if (desc) translations[lang].description = desc;
         if (care) translations[lang].care_instructions = care;
         if (extra) translations[lang].additional_info = extra;
@@ -2664,25 +2599,7 @@
       }
     });
     descField.value = hasAny ? JSON.stringify({ translations }, null, 2) : '';
-    updateHasContentDots();
   }
-
-  // ── Show blue dots on tabs with content ──
-  function updateHasContentDots() {
-    tabBtns.forEach(btn => {
-      const lang = btn.dataset.lang;
-      const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
-      const desc = getDescHtml(lang);
-      const care = getCareHtml(lang);
-      const extra = getExtraHtml(lang);
-      btn.classList.toggle('has-content', !!(title || desc || care || extra));
-    });
-  }
-
-  // ── Bind title input events ──
-  document.querySelectorAll('.trans-title').forEach(el => {
-    el.addEventListener('input', syncToDescription);
-  });
 
   // ── Sync before form submit ──
   const form = descField.closest('form');

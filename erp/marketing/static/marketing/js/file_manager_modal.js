@@ -215,6 +215,9 @@ const modalCSS = `
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 16px;
   min-height: 200px;
+  /* Rows hug their tiles; without this a single row stretches to the
+     min-height and every tile grows an empty strip under its image. */
+  align-content: start;
 }
 
 .fm-file-item {
@@ -244,7 +247,7 @@ const modalCSS = `
 
 .fm-file-img {
   width: 100%;
-  height: 150px;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
 }
@@ -591,10 +594,6 @@ const modalCSS = `
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 12px;
   }
-  
-  .fm-file-img {
-    height: 120px;
-  }
 }
 
 /* Video Play Icon Overlay */
@@ -622,7 +621,7 @@ const modalCSS = `
 
 .fm-file-video {
   width: 100%;
-  height: 150px;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
   background: #1a1a2e;

@@ -42,7 +42,7 @@ from .signals import cdn_url_in_use
 from erp.image_optimizer import WEB, OptimizedImage, optimize_image
 import os
 from types import SimpleNamespace
-from . import product_images
+from . import product_images, product_translation
 from .product_images import new_file_name
 from django.utils.translation import gettext as _gettext
 from erp.storefront import answers_in_storefront_language
@@ -1446,6 +1446,8 @@ class ProductCreate(BaseProductView, generic.CreateView):
             for file_list in temp_files.get('variant_images', {}).values():
                 temp_urls.extend(d['url'] for d in file_list)
             product_images.relocate_after_commit(self.object.pk, adopt=temp_urls)
+            # Its text in the storefront's other languages, from the English.
+            product_translation.translate_after_commit(self.object.pk)
 
             # Update variants_json to replace temp IDs with real DB IDs
             variants_json_str = self.request.POST.get("variants_json", "[]")
@@ -1816,6 +1818,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # Photos whose folder no longer fits who uses them, or the SKU,
             # move once this save is committed.
             product_images.relocate_after_commit(self.object.pk)
+            # The storefront's other languages follow an edit to the English.
+            product_translation.translate_after_commit(self.object.pk)
 
         # Persist campaign / discount selection for this product (Update path)
         self._save_campaign()

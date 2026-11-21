@@ -305,6 +305,13 @@ def housekeep_now_and_then():
             storefront_visibility.apply()
         except Exception as exc:
             print(f"[storefront_visibility] hourly recheck stopped: {exc}")
+        # And the product texts a save didn't get translated (no key,
+        # Gemini out, a product written by a receipt or a shell).
+        try:
+            from . import product_translation
+            product_translation.translate(max_requests=product_translation.HOURLY_REQUESTS)
+        except Exception as exc:
+            print(f"[product_translation] hourly run stopped: {exc}")
         finally:
             connection.close()
 

@@ -89,6 +89,17 @@ class ProductForm(forms.ModelForm):
             chosen.append(collection or ProductCollection.objects.create(title=name))
         self.instance.collections.set(chosen)
 
+    def clean_description(self):
+        """The page posts the English texts only. They replace the stored
+        English; the other languages, written from it by
+        product_translation, are kept. Not posted at all, nothing changes."""
+        from .product_translation import with_english
+
+        stored = self.instance.description if self.instance.pk else None
+        if "description" not in self.data:
+            return stored
+        return with_english(stored, self.cleaned_data.get("description"))
+
     def clean_tags(self):
         """Each tag once, lower case, as the storefront reads them
         ("Embroidery" would not be found by its "embroidery")."""

@@ -17208,3 +17208,25 @@ msgstr "Satın alma teslim alındığında borç yazılır."
 #: accounting/templates/accounts/purchase_order_detail.html
 msgid "Not owed: the purchase is cancelled."
 msgstr "Borç yok: satın alma iptal edildi."
+
+msgid "Selling"
+msgstr "Satış"
+
+msgid "Variants & stock"
+msgstr "Varyantlar ve stok"
+
+msgid "Shipping, attributes, campaign, manufacturing"
+msgstr "Kargo, özellikler, kampanya, üretim"
+
+msgid "Add or remove files"
+msgstr "Dosya ekle veya kaldır"
+
+msgid "Additional info (optional)..."
+msgstr "Ek bilgi (isteğe bağlı)..."
+
+msgid ""
+"Write in English. The website shows the name and texts in Turkish and "
+"Russian too, translated when you save."
+msgstr ""
+"İngilizce yazın. Web sitesi adı ve metinleri Türkçe ve Rusça da gösterir; "
+"kaydettiğinizde çevrilir."

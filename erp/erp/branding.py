@@ -19,9 +19,7 @@ CACHE_KEY = "brand_profile_values"
 # field on BrandProfile → the name its readers ask for it by. Text
 # fields only.
 TEXT_FIELDS = {
-    "short_name": "BRAND_NAME",
     "display_name": "BRAND_DISPLAY_NAME",
-    "legal_suffix": "BRAND_LEGAL_SUFFIX",
     "address": "BRAND_ADDRESS",
     "phone": "BRAND_PHONE",
     "fax": "BRAND_FAX",

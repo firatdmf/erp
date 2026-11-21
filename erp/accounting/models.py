@@ -260,12 +260,11 @@ class Book(models.Model):
     def effective_brand_name(self) -> str:
         """What to print. Same override-then-default shape as
         Product.effective_*: the book's own value wins, else the brand
-        profile (Settings page), else the short
+        profile's name on documents (Settings page), else the book's
         internal name."""
         from erp.branding import brand
         return ((self.brand_name or "").strip()
                 or brand("BRAND_DISPLAY_NAME")
-                or brand("BRAND_NAME")
                 or self.name)
 
 

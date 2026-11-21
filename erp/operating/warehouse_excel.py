@@ -129,8 +129,11 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
                              show_empty=False, reserved_only=False):
     from openpyxl import Workbook
 
-    from erp.branding import brand as brand_value
-    brand = brand_value("BRAND_NAME") or "Nejum"
+    # The business whose stock this is. A combined warehouse that pools
+    # more than one book belongs to none of them — the heading names the
+    # warehouse then, and each row says which business it belongs to.
+    owning = warehouse.owning_book
+    brand = owning.effective_brand_name if owning else ""
     products = list(_filtered_products(warehouse, search, sort, search_by,
                                        show_empty, reserved_only))
 
@@ -155,9 +158,9 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
 
     # ── Header ──
     r = 1
-    cell(ws, r, 1, brand.upper(), font=F_TITLE)
+    cell(ws, r, 1, (brand or warehouse.name).upper(), font=F_TITLE)
     merge(ws, r, 1, 4)
-    cell(ws, r, 5, warehouse.name, font=F_DOCNO, align=RIGHT)
+    cell(ws, r, 5, warehouse.name if brand else "", font=F_DOCNO, align=RIGHT)
     merge(ws, r, 5, ncols)
     r += 1
     cell(ws, r, 1, _gettext("Warehouse product list"), font=F_SUB)
@@ -221,7 +224,10 @@ def build_warehouse_workbook(warehouse, search="", sort="value_desc",
         cell(ws, r, c, p.model or "—", font=F_VAL, border=GRID); c += 1
         cell(ws, r, c, p.barcode or "—", font=F_VAL, border=GRID, fmt=TEXT); c += 1
         if show_location:
-            cell(ws, r, c, p.warehouse.name, font=F_VAL, border=GRID); c += 1
+            where = p.warehouse.name
+            if not owning and p.warehouse.accounting_book_id:
+                where += " · " + p.warehouse.accounting_book.effective_brand_name
+            cell(ws, r, c, where, font=F_VAL, border=GRID); c += 1
         cell(ws, r, c, _dec(p.quantity), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1
         cell(ws, r, c, p.roll_count or 0, font=F_VAL, border=GRID, align=RIGHT); c += 1
         cell(ws, r, c, _dec(p.reserved), font=F_VAL, border=GRID, align=RIGHT, fmt="#,##0.00"); c += 1

@@ -108,13 +108,10 @@ def _s(name):
 
 
 def _issuer(book):
-    """Who the document is from: the book's brand name, else the short
-    BRAND_NAME — the same precedence the old invoice used."""
-    name = ((getattr(book, "brand_name", "") or "").strip() if book else "")
-    if not name:
-        base = brand("BRAND_NAME") or "Nejum ERP"
-        suffix = _s("BRAND_LEGAL_SUFFIX").strip()
-        name = f"{base} {suffix}".strip() if suffix else base
+    """Who the document is from: the name the book signs with — the same
+    precedence Invoice.issuer_display_name uses."""
+    from accounting.services_accounts import brand_name_for
+    name = brand_name_for(book)
     return Party(
         name=name,
         address=_s("BRAND_ADDRESS"), phone=_s("BRAND_PHONE"), fax=_s("BRAND_FAX"),

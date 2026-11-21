@@ -133,23 +133,28 @@ class InvoiceIssuer(TestCase):
         self.assertEqual(self.invoice.issuer_display_name,
                          "Demfirat Export A.Ş.")
 
-    def test_the_legal_suffix_is_not_pinned_onto_an_entered_name(self):
-        """The legal suffix pads the short-name fallback only — appending
-        it to a lockup would print "… Karven Home Collection SAN. TİC.
-        LTD. ŞTİ." on a tax document."""
+    def test_the_old_legal_suffix_is_never_printed(self):
+        """The profile's legal suffix is retired: not on a named book's
+        invoice, nor on one whose book has no name of its own."""
+        from erp.models import BrandProfile
         clear_cache()
-        suffix = brand("BRAND_LEGAL_SUFFIX")
-        self.assertTrue(suffix)
-        self.assertNotIn(suffix, self.invoice.issuer_display_name)
+        BrandProfile.objects.update(legal_suffix="SAN. TİC. LTD. ŞTİ.")
+        self.assertEqual(brand("BRAND_LEGAL_SUFFIX"), "")
+        self.assertNotIn("ŞTİ", self.invoice.issuer_display_name)
+        self.book.brand_name = ""
+        self.book.save(update_fields=["brand_name"])
+        self.invoice.refresh_from_db()
+        self.assertNotIn("ŞTİ", self.invoice.issuer_display_name)
 
-    def test_the_short_name_fallback_still_carries_the_legal_suffix(self):
+    def test_a_book_without_a_name_of_its_own_signs_like_its_documents(self):
+        """Blank on the book: the invoice falls back exactly as the book's
+        other documents do (Book.effective_brand_name)."""
         clear_cache()
         self.book.brand_name = ""
         self.book.save(update_fields=["brand_name"])
         self.invoice.refresh_from_db()
-        self.assertEqual(
-            self.invoice.issuer_display_name,
-            f"{brand('BRAND_NAME')} {brand('BRAND_LEGAL_SUFFIX')}".strip())
+        self.assertEqual(self.invoice.issuer_display_name,
+                         self.book.effective_brand_name)
 
     def test_the_excel_and_the_printed_invoice_agree(self):
         from accounting.invoice_doc import build_purchase_doc

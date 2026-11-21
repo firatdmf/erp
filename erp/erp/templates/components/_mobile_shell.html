@@ -12,7 +12,7 @@
   <button class="m-icon-btn m-hamburger" type="button" onclick="mobileToggleDrawer()" aria-label="Open menu">
     <span class="m-hamburger-bars" aria-hidden="true"></span>
   </button>
-  <h1 class="m-page-title" id="mobilePageTitle">{{ BRAND_NAME|default:"Nejum" }}</h1>
+  <h1 class="m-page-title" id="mobilePageTitle"></h1>
   <div class="m-shell-bar-actions">
     <button class="m-icon-btn" type="button" onclick="mobileOpenSearch()" aria-label="{% trans 'Search' %}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -53,9 +53,13 @@
       <span class="m-drawer-close-x" aria-hidden="true"></span>
     </button>
     <div class="m-drawer-hero-inner">
-      <span class="m-drawer-brand-mark">{{ BRAND_NAME|default:"Nejum"|first|upper }}</span>
+      {% comment %}
+        The product's name, as the desktop sidebar's logo says it. Which
+        business you are in is the book card just below.
+      {% endcomment %}
+      <span class="m-drawer-brand-mark">{{ NEJUM_NAME|first|upper }}</span>
       <div>
-        <div class="m-drawer-brand-name">{{ BRAND_NAME|default:"Nejum" }}</div>
+        <div class="m-drawer-brand-name">{{ NEJUM_NAME }}</div>
         <div class="m-drawer-brand-sub">{% trans "Workspace" %}</div>
       </div>
     </div>
@@ -211,13 +215,16 @@
     }
     setActiveTab();
 
-    // Set page title — prefer <title> excluding "| Nejum ERP" suffix
+    // The bar names the page: <title> without its "| Nejum ERP" suffix.
+    // A long one is cut with an ellipsis by the CSS, not swapped for
+    // something else — a bar that read the page on short titles and the
+    // company on long ones looked like it changed meaning page to page.
     try {
-      var raw = document.title || '';
-      var clean = raw.split('|')[0].trim();
-      if (clean) {
-        var el = document.getElementById('mobilePageTitle');
-        if (el && clean.length < 30) el.textContent = clean;
+      var clean = (document.title || '').split('|')[0].trim();
+      var el = document.getElementById('mobilePageTitle');
+      if (el && clean) {
+        el.textContent = clean;
+        el.title = clean;
       }
     } catch (e) {}
   })();

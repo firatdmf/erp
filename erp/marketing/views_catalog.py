@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from erp.branding import brand
+from accounting.services_accounts import brand_name_for
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -160,8 +160,9 @@ def _context(request=None):
         "page_title": "Catalog",
         "catalog_css": read_catalog_css(),
         "brand": {
-            "name": brand("BRAND_NAME") or "Demfirat",
-            "collection": "Karven Home Collection",
+            # The name the business signs with (its book's); the
+            # collection line under it went with the hard-coded name.
+            "name": brand_name_for(),
             "website": website,
             "qr_svg": _qr_svg(f"https://{website}"),
         },

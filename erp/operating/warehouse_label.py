@@ -15,7 +15,6 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 
-from erp.branding import brand as brand_value
 from marketing import units
 
 from .models import Warehouse, WarehouseProduct
@@ -33,7 +32,11 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
         "product": product,
         "base": cat["base_name"] or product.name,
         "variant": cat["original_token"] or "",
-        "brand": brand_value("BRAND_NAME") or "Nejum",
+        # The business this row's stock belongs to, as its label prints it.
+        # A row always sits in a normal warehouse (a combined one holds
+        # none of its own), so it always has a book.
+        "brand": product.warehouse.accounting_book.effective_brand_name
+                 if product.warehouse.accounting_book_id else "",
     })
 
 

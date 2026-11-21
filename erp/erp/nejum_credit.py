@@ -53,7 +53,7 @@ def credit_runs(book=None):
     try:
         name = brand_name_for(book)
     except Exception:
-        name = brand("BRAND_DISPLAY_NAME") or brand("BRAND_NAME")
+        name = brand("BRAND_DISPLAY_NAME")
     # Translators: %(brand)s is the company's own name, %(nejum)s is
     # "Nejum". Each prints in its own colour, so keep both placeholders.
     sentence = _("%(brand)s is powered by %(nejum)s")

@@ -436,7 +436,7 @@
       </div>
       <div class="doc-logo">
         {% if BRAND_LOGO_URL %}
-          <img src="{{ BRAND_LOGO_URL }}" alt="{{ BRAND_NAME }}">
+          <img src="{{ BRAND_LOGO_URL }}" alt="{{ iss.name }}">
         {% else %}
           {{ iss.name|default:"NEJUM" }}
         {% endif %}

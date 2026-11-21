@@ -6,14 +6,13 @@ from operator import attrgetter
 from django.db.models import Value, CharField
 from django.core.cache import cache
 from erp.branding import brand_values
-from erp.nejum_credit import NEJUM_URL, credit_html, credit_text
+from erp.nejum_credit import NEJUM_NAME, NEJUM_URL, credit_html, credit_text
 
 
 def brand_identity(request):
     """Expose the company's identity to every template.
 
-    BRAND_NAME is the SHORT label, for UI chrome. The name a customer-
-    facing document signs with lives on the ledger Book instead
+    The business's NAME is not here: it lives on the ledger Book
     (Book.brand_name), because it is editable per book — views resolve
     it with accounting.services_accounts.brand_name_for().
 
@@ -29,6 +28,9 @@ def brand_identity(request):
         "NEJUM_CREDIT": credit_text(),
         "NEJUM_CREDIT_HTML": credit_html(),
         "NEJUM_URL": NEJUM_URL,
+        # The product's own name, for its logo and app chrome — one
+        # constant, not the word typed into each template.
+        "NEJUM_NAME": NEJUM_NAME,
     }
 
 # This is for base view functions to work on everywhere

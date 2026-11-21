@@ -1,4 +1,4 @@
-{% load i18n %}{% autoescape off %}{{ BRAND_NAME|default:"Nejum" }}
+{% load i18n %}{% autoescape off %}{{ brand_name }}
 {% trans "Order" %} {{ order_ref|safe }} — {{ event_label }}
 {% if customer_name %}
 {% blocktrans %}Hi {{ customer_name }},{% endblocktrans %}{% endif %}
@@ -38,7 +38,7 @@
 {% endif %}{% endif %}
 {% trans "Questions about your order? Just reply to this email." %}
 
-{{ BRAND_NAME|default:"Nejum" }}{% if BRAND_ADDRESS %}
+{{ brand_name }}{% if BRAND_ADDRESS %}
 {{ BRAND_ADDRESS }}{% endif %}{% if BRAND_PHONE %}
 {{ BRAND_PHONE }}{% endif %}{% if BRAND_EMAIL %}
 {{ BRAND_EMAIL }}{% endif %}{% if NEJUM_CREDIT %}

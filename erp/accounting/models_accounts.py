@@ -1198,24 +1198,14 @@ class Invoice(models.Model):
         """Who this invoice says it is from.
 
         Precedence: the per-invoice snapshot, then the issuing book's
-        brand name, then the short BRAND_NAME.
-
-        The brand profile's legal suffix is appended only to that last
-        fallback. A name typed on the invoice or on the book is taken as
-        complete — otherwise a lockup like "DEMFIRAT® | Karven Home
-        Collection" would print with a "SAN. TİC. LTD. ŞTİ." bolted onto
-        the end of the marketing half of it.
+        name — the same one every other document of that book signs
+        with (Book.effective_brand_name).
         """
-        from django.conf import settings
         explicit = (self.issuer_name or "").strip()
-        if not explicit and self.book_id:
-            explicit = (self.book.brand_name or "").strip()
         if explicit:
             return explicit
-        from erp.branding import brand
-        base = brand("BRAND_NAME") or "Nejum ERP"
-        suffix = brand("BRAND_LEGAL_SUFFIX")
-        return f"{base} {suffix}".strip() if suffix else base
+        from accounting.services_accounts import brand_name_for
+        return brand_name_for(self.book if self.book_id else None)
 
     @property
     def display_number(self):

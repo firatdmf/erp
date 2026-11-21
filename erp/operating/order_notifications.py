@@ -574,7 +574,7 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
             "order_subtotal": order_subtotal,
             "order_adjustments": order_adjustments,
             "currency_symbol": _currency_symbol(order),
-            "BRAND_NAME": brand_name,
+            "brand_name": brand_name,
             "BRAND_EMAIL": brand_email,
             "BRAND_PHONE": brand("BRAND_PHONE"),
             "BRAND_ADDRESS": brand("BRAND_ADDRESS"),

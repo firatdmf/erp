@@ -205,7 +205,9 @@ def lines_for_movement(movement):
         if fx and fx["difference"] != ZERO:
             return _lines_with_realised_fx(movement, amount, contra, cash_account, memo, fx)
     if kind == "invoice_purchase" and amount < ZERO:
-        stock = _purchase_stock_value(movement, -amount)
+        stock = (_charge_stock_value(movement, -amount)
+                 if _source_model_name(movement) == "purchasecharge"
+                 else _purchase_stock_value(movement, -amount))
         if stock is not None:
             return _lines_with_purchase_fraction(movement, -amount, stock, memo)
     if amount > ZERO:
@@ -255,12 +257,48 @@ def _purchase_stock_value(movement, owed):
         return None
     value = ZERO
     for roll in rolls:
-        value += Decimal(roll.quantity or 0) * Decimal(roll.unit_cost_base)
+        # What the supplier billed: the charges inside the cost are owed
+        # to their own accounts (_charge_stock_value).
+        value += Decimal(roll.quantity or 0) * (Decimal(roll.unit_cost_base)
+                                                 - Decimal(roll.charges_per_unit or 0))
     lines = InvoiceItem.objects.filter(invoice_id=movement.source_id).count()
     gap = owed - value
     if gap == ZERO or abs(gap) > _HALF_CENT * lines:
         return None
     return value
+
+
+def _charge_stock_value(movement, owed):
+    """What a purchase charge's payable puts into stock, when the rolls
+    carry its purchase's charges a fraction of a cent away from what they
+    came to. None otherwise.
+
+    The charges are spread per unit at four places (purchase_charges), so
+    the rolls carry them give or take that rounding. The purchase's first
+    posted charge takes the whole fraction, so it is counted once however
+    many charges there are; the others post what they are owed.
+    """
+    from .models_charges import PurchaseCharge
+    from .purchase_charges import charged_value
+
+    charge = (PurchaseCharge.objects.select_related("invoice")
+              .filter(pk=movement.source_id).first())
+    if charge is None:
+        return None
+    posted = list(PurchaseCharge.objects.filter(invoice_id=charge.invoice_id,
+                                                posted_movement__isnull=False)
+                  .order_by("pk").values_list("pk", "posted_movement__amount_base"))
+    if not posted or posted[0][0] != charge.pk:
+        return None
+    from operating.models import WarehouseProductItem
+    measured = sum((Decimal(q or 0) for q in WarehouseProductItem.objects
+                    .filter(purchase_invoice_item__invoice_id=charge.invoice_id)
+                    .values_list("quantity", flat=True)), ZERO)
+    gap = -sum((Decimal(a or 0) for _, a in posted), ZERO) - charged_value(charge.invoice)
+    # Half of the fourth place, per unit spread over.
+    if gap == ZERO or abs(gap) > measured * Decimal("0.00005") + _HALF_CENT:
+        return None
+    return owed - gap
 
 
 def _lines_with_purchase_fraction(movement, owed, stock, memo):

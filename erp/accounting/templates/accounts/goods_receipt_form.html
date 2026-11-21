@@ -197,6 +197,31 @@ site's menus and the page's own way back are left out.{% endcomment %}
      to opt back out explicitly or it shows up empty before an account is
      picked (which is exactly what it did in the sidebar this came from). */
   .np-sup-chip[hidden] { display: none; }
+  /* Delivery cost rows: four fields side by side, stacked on a phone. */
+  .np-cost-row {
+    display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1fr) auto;
+    gap: 10px; align-items: end; padding: 12px; margin-bottom: 10px;
+    border: 1px solid #E2E8EE; border-radius: 10px; background: #FBFCFD;
+  }
+  .np-cost-row .np-field { min-width: 0; }
+  .np-cost-amt { display: flex; align-items: center; gap: 6px; }
+  .np-cost-amt .np-input { flex: 1; min-width: 0; }
+  .np-cost-cur { font: 700 12px var(--font-mono); color: var(--gray-600); min-width: 30px; }
+  button.np-cost-del {
+    width: 40px; height: 40px; padding: 0; border: 1px solid #E2E8EE; border-radius: 9px;
+    background: #fff; color: var(--gray-500); cursor: pointer;
+  }
+  button.np-cost-del:hover { color: #C0392B; border-color: #F1C9C4; }
+  button.np-cost-add {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px;
+    border: 1px dashed #BFE0DB; border-radius: 9px; background: #fff;
+    font: 700 13px var(--font-sans); color: var(--nejum-teal-500, #147F74); cursor: pointer;
+  }
+  button.np-cost-add:hover { background: #EFF6F5; }
+  @media (max-width: 720px) {
+    .np-cost-row { grid-template-columns: minmax(0, 1fr); }
+    button.np-cost-del { justify-self: end; }
+  }
   .np-sup-new { margin-top: 8px; padding: 12px; border: 1px solid #E2E8EE; background: #F8FAFC; border-radius: 10px; }
   .np-sup-new-t { font: 700 11px var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
                   color: var(--gray-500); margin-bottom: 8px; }
@@ -901,6 +926,20 @@ site's menus and the page's own way back are left out.{% endcomment %}
       </button>
     </section>
 
+    {% comment %}What bringing the goods cost (accounting.purchase_charges): owed to
+       whoever brought them, and part of what the goods cost.{% endcomment %}
+    <section class="gr-sec" id="npCostSec">
+      <div class="gr-sec-h">
+        <span class="gr-sec-n"><i class="fa fa-truck"></i></span>
+        <span class="gr-sec-t">{% trans "Delivery cost" %}</span>
+        <span class="gr-sec-d">{% trans "What bringing these goods cost, owed to whoever brought them. It goes on their account when the purchase is received, and onto the goods' cost, spread by each line's value." %}</span>
+      </div>
+      <div id="npCostRows"></div>
+      <button type="button" class="np-cost-add" onclick="npCostAdd()">
+        <i class="fa fa-plus"></i> {% trans "Add a cost" %}
+      </button>
+    </section>
+
     {% comment %}A saved purchase's files go up as they are picked; a new one's
        wait and go up with its first save (pdDocs.uploadTo, in the saves below).{% endcomment %}
     <section class="gr-sec">
@@ -971,6 +1010,7 @@ site's menus and the page's own way back are left out.{% endcomment %}
 {{ variant_attribute_names|json_script:"np-attrs-data" }}
 {% if intake_plan %}{{ intake_plan|json_script:"gr-plan-data" }}{% endif %}
 {{ order_line_prices|json_script:"gr-order-prices" }}
+{{ charges|json_script:"gr-charges-data" }}
 <script>
 (function () {
   if (!document.getElementById('grDoc')) return;   // no warehouse to receive into
@@ -2033,6 +2073,117 @@ site's menus and the page's own way back are left out.{% endcomment %}
       .catch(function () { alert('{% trans "Account could not be created." %}'); })
       .finally(function () { btn.disabled = false; btn.innerHTML = orig; });
   };
+
+  // ── Delivery cost ─────────────────────────────────────────────────
+  // One row per cost: who it is owed to (any account of this book, the
+  // same list as the account above), what it is, how much in that
+  // account's currency, and their invoice number.
+  window.npCostAdd = function (c) {
+    c = c || {};
+    const row = document.createElement('div');
+    row.className = 'np-cost-row';
+    row.innerHTML =
+      '<div class="np-field"><label>{% filter escapejs %}{% trans "Owed to" %}{% endfilter %}</label>' +
+        '<div class="np-sup"><input type="text" class="np-input np-cost-search" autocomplete="off" ' +
+          'placeholder="{% filter escapejs %}{% trans "Type an account name…" %}{% endfilter %}">' +
+          '<div class="np-sup-results" hidden></div></div>' +
+        '<div class="np-sup-chip" hidden><i class="fa fa-truck-field"></i><span></span>' +
+          '<button type="button" class="np-sup-clear" title="{% filter escapejs %}{% trans "Change account" %}{% endfilter %}">&times;</button></div>' +
+      '</div>' +
+      '<div class="np-field"><label>{% filter escapejs %}{% trans "What" %}{% endfilter %}</label>' +
+        '<input type="text" class="np-input np-cost-desc" maxlength="200" ' +
+          'placeholder="{% filter escapejs %}{% trans "Delivery" %}{% endfilter %}"></div>' +
+      '<div class="np-field"><label>{% filter escapejs %}{% trans "Amount" %}{% endfilter %}</label>' +
+        '<div class="np-cost-amt"><input type="text" inputmode="decimal" class="np-input np-cost-amount">' +
+          '<span class="np-cost-cur"></span></div></div>' +
+      '<div class="np-field"><label>{% filter escapejs %}{% trans "Their invoice no." %}{% endfilter %}</label>' +
+        '<input type="text" class="np-input np-cost-ref" maxlength="60" ' +
+          'placeholder="{% filter escapejs %}{% trans "Optional" %}{% endfilter %}"></div>' +
+      '<button type="button" class="np-cost-del" title="{% filter escapejs %}{% trans "Remove" %}{% endfilter %}">' +
+        '<i class="fa fa-trash"></i></button>';
+    document.getElementById('npCostRows').appendChild(row);
+
+    const search = row.querySelector('.np-cost-search');
+    const results = row.querySelector('.np-sup-results');
+    const chip = row.querySelector('.np-sup-chip');
+    function pick(id, name, currency) {
+      row.dataset.accountId = id || '';
+      row.querySelector('.np-cost-cur').textContent = currency || '';
+      chip.querySelector('span').textContent = name || '';
+      chip.hidden = !id;
+      search.parentNode.hidden = !!id;
+      results.hidden = true;
+    }
+    function find(q) {
+      const needle = npSupFold(q);
+      const matches = npSupOptions().filter(function (o) {
+        return !needle || npSupFold(o.textContent).indexOf(needle) !== -1;
+      });
+      results.innerHTML = matches.length
+        ? matches.map(function (o) {
+            return '<div class="np-sup-opt" data-id="' + o.value + '"><span>' + npEsc(o.textContent) +
+                   '</span><span class="pfx">' + npEsc(o.getAttribute('data-currency') || '') + '</span></div>';
+          }).join('')
+        : '<div class="np-sup-empty">{% filter escapejs %}{% trans "No account matches" %}{% endfilter %}</div>';
+      results.hidden = false;
+      Array.prototype.forEach.call(results.querySelectorAll('.np-sup-opt'), function (el) {
+        el.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          const o = npSupOptions().filter(function (x) { return x.value === el.dataset.id; })[0];
+          pick(el.dataset.id, o ? o.textContent : '', o ? o.getAttribute('data-currency') : '');
+          window.npDirty = true;
+        });
+      });
+    }
+    search.addEventListener('input', function () { find(search.value); });
+    search.addEventListener('focus', function () { find(search.value); });
+    search.addEventListener('blur', function () { setTimeout(function () { results.hidden = true; }, 150); });
+    chip.querySelector('.np-sup-clear').onclick = function () {
+      pick('', '', ''); search.value = ''; search.focus(); window.npDirty = true;
+    };
+    row.querySelector('.np-cost-del').onclick = function () { row.remove(); window.npDirty = true; };
+    row.querySelectorAll('input').forEach(function (i) {
+      i.addEventListener('input', function () { window.npDirty = true; });
+    });
+
+    row.querySelector('.np-cost-desc').value = c.description || '';
+    row.querySelector('.np-cost-amount').value = c.amount || '';
+    row.querySelector('.np-cost-ref').value = c.reference || '';
+    if (c.account_id) pick(String(c.account_id), c.account_name, c.currency);
+    else if (!c.description) search.focus();
+  };
+
+  function npCostRows() {
+    return Array.prototype.slice.call(document.querySelectorAll('#npCostRows .np-cost-row'));
+  }
+  function npCostHasRows() { return npCostRows().length > 0; }
+
+  // The rows as the save sends them, or null (and the row shown) when one
+  // is half filled in.
+  function npCostCollect() {
+    const out = [];
+    for (const row of npCostRows()) {
+      const amount = row.querySelector('.np-cost-amount').value.trim();
+      const description = row.querySelector('.np-cost-desc').value.trim();
+      const reference = row.querySelector('.np-cost-ref').value.trim();
+      const id = row.dataset.accountId || '';
+      if (!id && !amount && !description && !reference) continue;
+      if (!id || !(parseFloat(amount.replace(',', '.')) > 0)) {
+        alert(!id ? '{% filter escapejs %}{% trans "Pick who each cost is owed to." %}{% endfilter %}'
+                  : '{% filter escapejs %}{% trans "Enter what each cost came to." %}{% endfilter %}');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return null;
+      }
+      out.push({ account_id: id, description: description, amount: amount, reference: reference });
+    }
+    return out;
+  }
+
+  (function npCostLoad() {
+    const el = document.getElementById('gr-charges-data');
+    if (!document.getElementById('npCostRows')) return;
+    (el ? JSON.parse(el.textContent) : []).forEach(function (c) { npCostAdd(c); });
+  })();
 
   (function npSupWireKeys() {
     const search = document.getElementById('npSupplierSearch');
@@ -3991,6 +4142,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   function npOrderPayload() {
     const payload = npCollect();
     if (!payload) return null;
+    const charges = npCostCollect();
+    if (!charges) return null;
+    payload.charges = charges;
     payload.warehouse_id = npWhId();
     payload.date = (document.getElementById('npOrderDate') || {}).value || '';
     payload.delivery_date = (document.getElementById('npDeliveryDate') || {}).value || '';
@@ -4083,7 +4237,9 @@ site's menus and the page's own way back are left out.{% endcomment %}
   window.npReceiveNow = function () {
     // Work on our rolls is received against a saved order, so a new one
     // is saved first, like a purchase bought for a customer.
-    if (!GR_ORDER_ID && !npCustomer && !GR_FOR_ORDER_ID && !npWorkHasRows()) { npSave(); return; }
+    // So is one with a delivery cost: the cost is a line of the saved order.
+    if (!GR_ORDER_ID && !npCustomer && !GR_FOR_ORDER_ID && !npWorkHasRows()
+        && !npCostHasRows()) { npSave(); return; }
     const btn = document.getElementById('npSaveBtn');
     const payload = npOrderPayload();
     if (!payload) return;

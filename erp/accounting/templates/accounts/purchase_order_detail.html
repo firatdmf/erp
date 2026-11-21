@@ -194,6 +194,26 @@
         {{ total_packs }} {{ total_pack_noun }}
       </div>
     </div>
+    {% comment %}What bringing it cost (accounting.purchase_charges): owed to each
+       account once received, and inside the goods' cost.{% endcomment %}
+    {% with charges=invoice.charges.all %}{% if charges %}
+    <div class="po-card">
+      <div class="po-card-l">{% trans "Delivery cost" %}</div>
+      {% for c in charges %}
+      <div class="po-card-v" style="font-size:14px;">
+        {{ c.amount|money }} {{ c.currency_code }}
+        <span style="font-weight:600; color:#64748B;">· {{ c.description }} ·</span>
+        <a href="{% url 'accounts:detail' c.current_account_id %}">{{ c.current_account.name }}</a>
+        {% if c.reference %}<span style="font-weight:500; color:#64748B; font-size:12px;">({{ c.reference }})</span>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="po-card-sub">
+        {% if invoice.status == 'received' %}{% trans "Owed to them, and part of the goods' cost." %}
+        {% elif invoice.status == 'ordered' %}{% trans "Owed once the purchase is received." %}
+        {% else %}{% trans "Not owed: the purchase is cancelled." %}{% endif %}
+      </div>
+    </div>
+    {% endif %}{% endwith %}
     {% if invoice.for_order %}
     <div class="po-card">
       <div class="po-card-l">{% trans "For customer order" %}</div>

@@ -1380,3 +1380,4 @@ from .models_transfer import *  # noqa: E402,F401,F403
 
 # Our own rolls sent to a supplier to be worked on, as purchase lines.
 from .models_processing import *  # noqa: E402,F401,F403
+from .models_charges import *  # noqa: E402,F401,F403

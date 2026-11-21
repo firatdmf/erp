@@ -5137,6 +5137,13 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
 
         old_account = invoice.current_account
         account = _intake_account(data)
+        from accounting.purchase_charges import (
+            ChargeError, parse_charges, post_charges, save_charges,
+        )
+        try:
+            charges = parse_charges(data, account)
+        except ChargeError as exc:
+            raise IntakeError({"success": False, "error": str(exc)}, status=400)
         _intake_check_supplier_skus(products_in, account)
         account_changed = account.pk != old_account.pk
         if account_changed and invoice.allocations.exists():
@@ -5450,9 +5457,10 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                 price_changed = item is None or billed["unit_price"] != item.unit_price
                 if price_changed and price and price > 0 and line_roll_ids:
                     # What these rolls cost is what this purchase says they
-                    # cost — a corrected price is the one that was paid.
+                    # cost — a corrected price is the one that was paid,
+                    # with its share of the purchase's charges on top.
                     WarehouseProductItem.objects.filter(pk__in=line_roll_ids).update(
-                        unit_cost_base=target["cost_usd"])
+                        unit_cost_base=target["cost_usd"] + F("charges_per_unit"))
                     if item is not None:
                         repriced_roll_ids.update(line_roll_ids)
                     # The product's last-purchase price follows too, unless a
@@ -5543,6 +5551,13 @@ def perform_purchase_edit(invoice_pk, warehouse, data, *, user=None, member=None
                 StockMovement.objects.filter(stock_item_id__in=repriced_roll_ids)
                 .select_related("stock_item__purchase_invoice_item",
                                 "product__warehouse__accounting_book")))
+
+        # What bringing it cost, spread again over the goods as they now are.
+        try:
+            save_charges(invoice, charges)
+            post_charges(invoice, user=user)
+        except ChargeError as exc:
+            raise IntakeError({"success": False, "error": str(exc)}, status=400)
 
     return {"invoice": invoice, "warnings": warnings, "reservations_trimmed": trimmed}
 

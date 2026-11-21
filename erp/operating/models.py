@@ -2485,6 +2485,14 @@ class WarehouseProductItem(models.Model):
         help_text="Unit cost when received, in the owning book's base currency",
         validators=[MinValueValidator(Decimal("0"))],
     )
+    # Of unit_cost_base, what its purchase's charges add per unit — the
+    # delivery owed to a carrier, spread over the goods it brought
+    # (accounting.purchase_charges). Kept apart so a charge changed later
+    # replaces its share instead of piling onto it.
+    charges_per_unit = models.DecimalField(
+        max_digits=14, decimal_places=4, default=Decimal("0"),
+        help_text="Part of unit_cost_base that is the purchase's charges",
+    )
     # Set while the roll is away at a supplier being worked on (crystals,
     # embroidery, …): the open processing line of the purchase that sent
     # it. Still ours and still valued, but no order can pick it and the

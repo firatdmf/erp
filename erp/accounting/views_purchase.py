@@ -31,6 +31,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .models import CurrencyCategory, Invoice, InvoiceItem
 from .models_accounts import CurrentAccount, CurrentAccountSettings
+from .purchase_charges import charge_rows_for_form
 from .purchase_audit import (
     decorate_changes, diff_fields, diff_plans, log_purchase, snapshot_fields,
 )
@@ -471,6 +472,8 @@ class GoodsReceipt(View):
             "delivery_date": (doc.delivery_date.isoformat()
                               if doc and doc.delivery_date else ""),
             "received_on": (invoice.posting_date.isoformat() if invoice else ""),
+            # What bringing it cost, owed to whoever brought it.
+            "charges": charge_rows_for_form(doc),
             "back_url": back_url,
             # The page's book, same as the warehouses: an account from any
             # other book would be refused on save (_intake_check_book).
@@ -775,6 +778,11 @@ class PurchaseOrderSave(View):
             customer = parse_customer(data)
         except CustomerOrderError as exc:
             return JsonResponse({"success": False, "error": str(exc)}, status=400)
+        from .purchase_charges import ChargeError, parse_charges, save_charges
+        try:
+            charges = parse_charges(data, current_account)
+        except ChargeError as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=400)
 
         lines = plan_lines(data)
         # Rolls going out to be worked on may be sent before anyone knows
@@ -888,6 +896,8 @@ class PurchaseOrderSave(View):
                 # Rebuilt from the plan every save — a draft has no rolls pointing
                 # at its items, so there is nothing to preserve by editing in place.
                 rebuild_draft_items(invoice, lines)
+                # What bringing it costs: written now, owed once received.
+                save_charges(invoice, charges)
                 # A draft order is already an intention to buy from them, and it
                 # is the account page's own answer to "who do we buy from" that
                 # goes stale otherwise.
@@ -977,6 +987,7 @@ class PurchaseOrderConfirm(View):
                 {"success": False,
                  "error": _gettext("This order has no goods-receipt details — edit it and save again.")}, status=400)
 
+        from .purchase_charges import ChargeError, post_charges
         try:
             with transaction.atomic():
                 result = perform_intake(
@@ -985,8 +996,13 @@ class PurchaseOrderConfirm(View):
                     member=getattr(request.user, "member", None),
                     invoice=invoice,
                 )
+                # Owed to the carrier, and part of what the goods cost.
+                invoice.refresh_from_db()
+                post_charges(invoice, user=request.user)
         except IntakeError as exc:
             return JsonResponse(exc.payload, status=exc.status)
+        except ChargeError as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=400)
         announce_order_hold(request, result)
 
         return JsonResponse({
@@ -1144,6 +1160,9 @@ def cancel_purchase_invoice(invoice_pk, user, *, reason, origin="purchase", mirr
         release_lines(invoice, user=user)
 
         _remove_purchase_rolls(rolls, reason="Purchase cancelled", user=user)
+        # Nothing was brought, so nothing is owed for bringing it.
+        from .purchase_charges import unpost_charges
+        unpost_charges(invoice)
 
         was = invoice.status
         invoice.cancel(user=user)
@@ -1313,6 +1332,9 @@ def undo_purchase_receipt(invoice_pk, user, *, origin="purchase"):
             plan.update({"unit": unit, "products": [_plan_product(p) for p in products]})
 
         _remove_purchase_rolls(rolls, reason="Purchase receipt undone", user=user)
+        # Its costs stay on the order and are owed again when it comes in.
+        from .purchase_charges import unpost_charges
+        unpost_charges(invoice)
         # Away again: the purchase is an order for that work once more.
         unreceive_lines(invoice, user=user, keep_away=True)
         invoice.unreceive(user=user)

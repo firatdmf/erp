@@ -17144,3 +17144,67 @@ msgid "%(n)s variant"
 msgid_plural "%(n)s variants"
 msgstr[0] "%(n)s varyant"
 msgstr[1] "%(n)s varyant"
+
+#: accounting/purchase_charges.py
+msgid "Pick who each cost is owed to."
+msgstr "Her masrafın kime ödeneceğini seçin."
+
+#: accounting/purchase_charges.py
+#, python-format
+msgid ""
+"%(account)s keeps its books elsewhere — a cost on this purchase is owed in "
+"its own book."
+msgstr ""
+"%(account)s başka bir defterde tutuluyor — bu satın almanın masrafı kendi "
+"defterindeki bir hesaba yazılır."
+
+#: accounting/purchase_charges.py
+msgid "Enter what each cost came to."
+msgstr "Her masrafın tutarını girin."
+
+#: accounting/purchase_charges.py
+msgid "This purchase has no goods for its costs to go on."
+msgstr "Bu satın almada masrafların ekleneceği mal yok."
+
+#: accounting/templates/accounts/goods_receipt_form.html
+#: accounting/templates/accounts/purchase_order_detail.html
+msgid "Delivery cost"
+msgstr "Nakliye masrafı"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid ""
+"What bringing these goods cost, owed to whoever brought them. It goes on "
+"their account when the purchase is received, and onto the goods' cost, "
+"spread by each line's value."
+msgstr ""
+"Bu malları getirmenin maliyeti; getiren kişiye ödenir. Satın alma teslim "
+"alındığında onun hesabına yazılır ve her satırın tutarına göre dağıtılarak "
+"malın maliyetine eklenir."
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "Add a cost"
+msgstr "Masraf ekle"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "Owed to"
+msgstr "Alacaklı"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "What"
+msgstr "Açıklama"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "Their invoice no."
+msgstr "Fatura no."
+
+#: accounting/templates/accounts/purchase_order_detail.html
+msgid "Owed to them, and part of the goods' cost."
+msgstr "Hesaplarına borç yazıldı ve malın maliyetine dahil."
+
+#: accounting/templates/accounts/purchase_order_detail.html
+msgid "Owed once the purchase is received."
+msgstr "Satın alma teslim alındığında borç yazılır."
+
+#: accounting/templates/accounts/purchase_order_detail.html
+msgid "Not owed: the purchase is cancelled."
+msgstr "Borç yok: satın alma iptal edildi."

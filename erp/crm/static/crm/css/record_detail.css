@@ -246,6 +246,9 @@
   display: inline-flex; align-items: center; justify-content: center;
   background: #F1F5F9; color: var(--gray-600); font-size: 13px;
 }
+/* A photo shows itself in the list; a click opens it in a new tab. */
+.od-file-ico.thumb { width: 44px; height: 44px; overflow: hidden; }
+.od-file-ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .od-file-body { flex: 1; min-width: 0; }
 .od-file-name {
   display: block; font: 600 13px var(--font-sans); color: var(--ink);

@@ -3,13 +3,19 @@
 in the detail page, so an upload can swap just this list back in.{% endcomment %}
 {% for f in attachments %}
   <div class="od-file" id="attachment-{{ f.id }}">
+    {% if f.is_image %}
+    <a class="od-file-ico thumb" href="{{ f.href }}" target="_blank" rel="noopener"
+       aria-hidden="true" tabindex="-1">
+      <img src="{{ f.href }}" alt="" loading="lazy">
+    </a>
+    {% else %}
     <span class="od-file-ico">
-      {% if f.is_image %}<i class="fa fa-file-image"></i>
-      {% elif f.extension == 'PDF' %}<i class="fa fa-file-pdf"></i>
+      {% if f.extension == 'PDF' %}<i class="fa fa-file-pdf"></i>
       {% elif f.extension in 'XLSX,XLS,CSV' %}<i class="fa fa-file-excel"></i>
       {% elif f.extension in 'DOC,DOCX' %}<i class="fa fa-file-word"></i>
       {% else %}<i class="fa fa-file"></i>{% endif %}
     </span>
+    {% endif %}
     <div class="od-file-body">
       <a class="od-file-name" href="{{ f.href }}" target="_blank" rel="noopener">{{ f.name }}</a>
       <div class="od-file-meta">

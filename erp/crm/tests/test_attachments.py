@@ -282,6 +282,17 @@ class AttachmentsOnThePage(TestCase):
         self.assertIn("spec.xlsx", html)
         self.assertNotIn("<html", html)
 
+    def test_a_photo_shows_a_thumbnail(self):
+        """A photo shows itself in the list; a PDF keeps its icon."""
+        photo = Attachment.objects.create(contact=self.contact, name="shop.jpg",
+                                          path="p/shop.jpg", content_type="image/jpeg")
+        pdf = Attachment.objects.create(contact=self.contact, name="contract.pdf",
+                                        path="p/contract.pdf", content_type="application/pdf")
+        html = self.client.get(
+            reverse("crm:contact_detail", args=[self.contact.pk])).content.decode()
+        self.assertIn(f'<img src="{photo.href}"', html)
+        self.assertNotIn(f'<img src="{pdf.href}"', html)
+
 
 class AttachmentDownload(TestCase):
     """Files are read through the app, so a session is required."""

@@ -22,6 +22,8 @@ with pdDocs.uploadTo(id) once the purchase exists.{% endcomment %}
   .pd-doc:last-child { border-bottom: none; }
   .pd-doc-ico { flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; background: #E5F1F0; color: #005354;
     display: inline-flex; align-items: center; justify-content: center; }
+  .pd-doc-ico.thumb { width: 44px; height: 44px; overflow: hidden; background: #F1F5F9; }
+  .pd-doc-ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .pd-doc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .pd-doc-name { font: 600 13px var(--font-sans, sans-serif); color: #0F1419; text-decoration: none; overflow-wrap: anywhere; }
   .pd-doc-name:hover { color: #005354; text-decoration: underline; }

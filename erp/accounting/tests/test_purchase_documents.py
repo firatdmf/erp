@@ -63,7 +63,15 @@ class PurchaseDocumentsTest(TestCase):
         self.assertIsNone(doc.contact_id)
         self.assertIsNone(doc.company_id)
         self.assertEqual(doc.uploaded_by, self.user)
-        self.assertTrue(doc.path.startswith(f"Accounting/purchases/{self.purchase.pk}/"), doc.path)
+        self.assertTrue(doc.path.startswith(f"Operating/purchases/{self.purchase.pk}/"), doc.path)
+
+    def test_a_heavy_scanned_pdf_is_stored_lighter_under_its_name(self, upload, _delete):
+        from erp.tests.test_pdf_optimizer import _scan
+        scan = _scan(size=(1500, 2000), pages=1)
+        self.assertTrue(self._upload(scan).json()["success"])
+        doc = Attachment.everywhere.get(invoice=self.purchase)
+        self.assertEqual((doc.name, doc.content_type), ("hakan-invoice.pdf", "application/pdf"))
+        self.assertLess(doc.size, scan.size // 2)
 
     def test_a_program_is_refused_by_name_and_the_rest_kept(self, upload, _delete):
         r = self._upload(self._pdf(), SimpleUploadedFile("setup.exe", b"MZ", "application/octet-stream"))
@@ -84,6 +92,18 @@ class PurchaseDocumentsTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(b"".join(r.streaming_content), b"%PDF-1.4 ...")
         self.assertIn("inline", r["Content-Disposition"])
+
+    def test_a_photo_shows_a_thumbnail(self, upload, _delete):
+        """A photo shows itself in the list; a PDF keeps its icon."""
+        from erp.tests.test_image_optimizer import _image_file
+        self._upload(self._pdf(), _image_file("goods.jpg", "JPEG", size=(400, 300),
+                                              content_type="image/jpeg"))
+        docs = {d.name: d for d in Attachment.everywhere.filter(invoice=self.purchase)}
+        page = self.client.get(self._url("purchase_order_detail")).content.decode()
+        photo_url = self._url("purchase_document_file", docs["goods.jpg"].pk)
+        pdf_url = self._url("purchase_document_file", docs["hakan-invoice.pdf"].pk)
+        self.assertIn(f'<img src="{photo_url}"', page)
+        self.assertNotIn(f'<img src="{pdf_url}"', page)
 
     def test_the_form_shows_a_saved_purchases_documents(self, upload, _delete):
         wh = Warehouse.objects.create(name="Fabrika", accounting_book=self.book)
@@ -112,7 +132,7 @@ class PurchaseDocumentsTest(TestCase):
                 default_currency=self.purchase.currency),
             currency=self.purchase.currency, type="purchase", number="PUR-L-1",
             date=date(2026, 11, 20), due_date=date(2026, 12, 20))
-        doc = Attachment.everywhere.create(invoice=theirs, name="theirs.pdf", path="Accounting/purchases/x.pdf",
+        doc = Attachment.everywhere.create(invoice=theirs, name="theirs.pdf", path="Operating/purchases/x.pdf",
                                            content_type="application/pdf")
         self.assertEqual(self._upload(self._pdf(), purchase=theirs).status_code, 404)
         self.assertEqual(self.client.get(self._url("purchase_document_file", doc.pk, purchase=theirs)).status_code, 404)

@@ -25,7 +25,7 @@ class TheTwoStatusColumnsStayAlike(TestCase):
     def test_a_release_writing_the_other_column_reaches_both(self):
         order = Order.objects.create()
         with connection.cursor() as c:
-            c.execute("UPDATE operating_order SET status = 'cancelled' WHERE id = %s", [order.pk])
+            c.execute("UPDATE operating_order SET order_status = 'cancelled' WHERE id = %s", [order.pk])
         self.assertEqual(self.columns(order), ("cancelled", "cancelled"))
         order.refresh_from_db()
         self.assertEqual(order.status, "cancelled")

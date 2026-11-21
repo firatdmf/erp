@@ -623,13 +623,11 @@ class Order(models.Model):
         blank=True,
         help_text="Customer-facing order reference, e.g. ORD-2026-000001"
     )
-    # The order's one status. The column kept its old name, order_status,
-    # so the rename needed no table change.
+    # The order's one status.
     status = models.CharField(
         max_length=32,
         choices=ORDER_STATUS_CHOICES,
         default="pending",
-        db_column="order_status",
         help_text=_("The order status shown to the customer")
     )
     # Set the moment the catalog stock is first deducted for this

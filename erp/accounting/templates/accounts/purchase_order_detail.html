@@ -295,8 +295,12 @@
         {% comment %}The unit's cost on the shelf once its share of the
            delivery is in: the supplier's price above is only part of it.{% endcomment %}
         {% if it.charge_per_unit and it.landed_unit_cost %}
-        <span class="po-item-landed">
-          {% blocktrans with cost=it.landed_unit_cost|floatformat:"4g" extra=it.charge_per_unit|floatformat:"4g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
+        {% comment %}In cents, like the price above it; the exact figure stock
+           is valued at (four places) on hover, since the cents alone don't
+           add back up to the delivery.{% endcomment %}
+        {% blocktrans asvar landed_exact with cost=it.landed_unit_cost|floatformat:"4g" extra=it.charge_per_unit|floatformat:"4g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
+        <span class="po-item-landed" title="{{ landed_exact }}">
+          {% blocktrans with cost=it.landed_unit_cost|floatformat:"2g" extra=it.charge_per_unit|floatformat:"2g" unit=it.unit_short symbol=base_symbol %}With delivery: {{ symbol }}{{ cost }} / {{ unit }} (+{{ symbol }}{{ extra }}){% endblocktrans %}
         </span>
         {% endif %}
       </span>

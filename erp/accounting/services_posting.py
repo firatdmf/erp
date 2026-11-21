@@ -273,8 +273,8 @@ def _charge_stock_value(movement, owed):
     carry its purchase's charges a fraction of a cent away from what they
     came to. None otherwise.
 
-    The charges are spread per unit at four places (purchase_charges), so
-    the rolls carry them give or take that rounding. The purchase's first
+    The charges are spread per unit at four places, rounded up
+    (purchase_charges), so the rolls carry them plus that rounding. The purchase's first
     posted charge takes the whole fraction, so it is counted once however
     many charges there are; the others post what they are owed.
     """
@@ -295,8 +295,8 @@ def _charge_stock_value(movement, owed):
                     .filter(purchase_invoice_item__invoice_id=charge.invoice_id)
                     .values_list("quantity", flat=True)), ZERO)
     gap = -sum((Decimal(a or 0) for _, a in posted), ZERO) - charged_value(charge.invoice)
-    # Half of the fourth place, per unit spread over.
-    if gap == ZERO or abs(gap) > measured * Decimal("0.00005") + _HALF_CENT:
+    # The fourth place, per unit spread over.
+    if gap == ZERO or abs(gap) > measured * Decimal("0.0001") + _HALF_CENT:
         return None
     return owed - gap
 

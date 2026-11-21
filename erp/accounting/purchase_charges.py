@@ -26,7 +26,7 @@ and only the rest stays on the shelf.
 A payload with no "charges" key leaves the lines as they are: the order's
 own purchase panel saves the goods without them.
 """
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext as _
@@ -222,8 +222,10 @@ def _spread(rolls, total):
     for line_id, line_rolls in by_line.items():
         per_unit = ZERO
         if total and line_id in lines and whole:
+            # Always up: a roll never carries less than was paid to
+            # bring it, only a fraction of a cent more.
             per_unit = (total * weights[line_id] / whole / measured[line_id]).quantize(
-                PER_UNIT, rounding=ROUND_HALF_UP)
+                PER_UNIT, rounding=ROUND_CEILING)
         for roll in line_rolls:
             before = Decimal(roll.charges_per_unit or 0)
             if before == per_unit:

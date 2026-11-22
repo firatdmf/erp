@@ -84,6 +84,41 @@ class AccountsAndCustomersTests(TestCase):
         results = self.client.get("/search/?q=Zircon&type=all").json()["results"]
         self.assertFalse([r for r in results if is_accounts_path(r.get("url") or "")])
 
+    def suppliers_and_customers(self):
+        from crm.models import Company
+        from operating.models import Warehouse
+        # The receipt lists its accounts once the book has somewhere to receive into.
+        Warehouse.objects.create(name="Ergene Factory", accounting_book=self.book)
+        mill = Company.objects.create(name="Zircon Mill")
+        buyer = Company.objects.create(name="Zircon Buyer")
+        CurrentAccount.objects.create(book=self.book, code="S-MILL", name="Zircon Mill",
+                                      type="supplier", company=mill, default_currency=self.usd)
+        CurrentAccount.objects.create(book=self.book, code="C-BUYER", name="Zircon Buyer",
+                                      type="customer", company=buyer, default_currency=self.usd)
+
+    def test_operations_find_suppliers_only(self):
+        self.suppliers_and_customers()
+        self.operations()
+        found = self.client.get("/crm/customer_autocomplete/?customer=zircon").content.decode()
+        self.assertIn("Zircon Mill", found)
+        self.assertNotIn("Zircon Buyer", found)
+        nothing = self.client.get("/crm/customer_autocomplete/?customer=nobody").content.decode()
+        self.assertNotIn("customer-ac-create", nothing)
+
+        receipt = self.client.get(f"/accounting/books/{self.book.pk}/purchases/new/")
+        self.assertEqual(receipt.status_code, 200)
+        self.assertContains(receipt, "Zircon Mill")
+        self.assertNotContains(receipt, "Zircon Buyer")
+
+    def test_a_role_with_it_still_finds_everyone(self):
+        self.suppliers_and_customers()
+        self.sign_in("orders", "beyond_sales", "accounts_customers", "prices_customers")
+        found = self.client.get("/crm/customer_autocomplete/?customer=zircon").content.decode()
+        self.assertIn("Zircon Mill", found)
+        self.assertIn("Zircon Buyer", found)
+        receipt = self.client.get(f"/accounting/books/{self.book.pk}/purchases/new/")
+        self.assertContains(receipt, "Zircon Buyer")
+
     def test_a_role_with_it_sees_everything_as_before(self):
         user = self.sign_in("orders", "beyond_sales", "accounts_customers", "prices_customers")
         self.assertTrue(sees_accounts(user))

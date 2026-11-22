@@ -1340,16 +1340,33 @@ def customer_autocomplete(request):
 
     ?only=company answers with companies alone and no "create" row — the
     order form's new-contact panel asks it which company the person works
-    for, and a name with no match is simply the new company to be made."""
+    for, and a name with no match is simply the new company to be made.
+
+    A role without Accounts and customers (Operations) buys without the
+    customer list, so it is answered with suppliers alone — those with an
+    account we buy through in one of its books — and offered no customer
+    to create (erp.roles.ACCOUNTS_OPEN_PREFIXES lets it reach this one
+    search for purchasing)."""
     from django.utils.html import escape
+
+    from accounting.services_accounts import member_books
+    from erp.roles import sees_accounts
 
     query = request.GET.get("customer", "")
     if query == "":
         return HttpResponse("")
     only_companies = request.GET.get("only") == "company"
-    contacts = [] if only_companies else \
-        Contact.objects.here().filter(unaccent_icontains(query, "name"))[:5]
-    companies = Company.objects.here().filter(unaccent_icontains(query, "name"))[:8 if only_companies else 5]
+    contacts = Contact.objects.here().filter(unaccent_icontains(query, "name"))
+    companies = Company.objects.here().filter(unaccent_icontains(query, "name"))
+    suppliers_only = not sees_accounts(request.user)
+    if suppliers_only:
+        buying = {"current_account_accounts__type__in": ("supplier", "both"),
+                  "current_account_accounts__book__in": member_books(
+                      getattr(request.user, "member", None))}
+        contacts = contacts.filter(**buying).distinct()
+        companies = companies.filter(**buying).distinct()
+    contacts = [] if only_companies else contacts[:5]
+    companies = companies[:8 if only_companies else 5]
     if only_companies and not companies:
         return HttpResponse("")
 
@@ -1374,6 +1391,7 @@ def customer_autocomplete(request):
         )
     if not contacts and not companies:
         parts.append(f"<li class='customer-ac-empty'>{escape(_gettext('No results found.'))}</li>")
+    if not contacts and not companies and not suppliers_only:
         parts.append(
             "<li class='customer-ac-create' "
             f"data-name=\"{escape(query)}\" style='cursor:pointer;'>"

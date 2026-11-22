@@ -859,7 +859,7 @@ def _slug_token(text):
     return "".join(ch for ch in folded if ch.isalnum())[:10]
 
 
-def _account_choices(book=None, include=None):
+def _account_choices(book=None, include=None, suppliers_only=False):
     """Current account accounts for the goods-receipt account picker, each with its derived
     barcode prefix so the UI can preview it instantly.
 
@@ -878,7 +878,13 @@ def _account_choices(book=None, include=None):
     `book` — the book the form is entering the purchase in; the member's
     default book only when the caller names none. The purchase posts in
     the account's book, so listing another book's accounts would let the
-    debt and the stock land in two different ledgers."""
+    debt and the stock land in two different ledgers.
+
+    `suppliers_only` — for a role without Accounts and customers, which
+    buys without the customer list: the accounts we have bought from.
+    One we have not, a customer bought from for the first time, is still
+    reached by typing its name: warehouse_account_create answers with the
+    account of that name rather than making a second."""
     try:
         from accounting.models_accounts import CurrentAccount
         from accounting.services_accounts import get_default_book
@@ -888,6 +894,8 @@ def _account_choices(book=None, include=None):
         # `include` — the account a reopened document is already posted
         # to, listed even if it has been deactivated since.
         wanted = Q(book=book or get_default_book(), is_active=True)
+        if suppliers_only:
+            wanted &= Q(type__in=("supplier", "both"))
         if include:
             wanted |= Q(pk=include)
         rows = (CurrentAccount.objects

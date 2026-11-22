@@ -405,6 +405,7 @@ class GoodsReceipt(View):
     template_name = "accounts/goods_receipt_form.html"
 
     def get(self, request, pk=None):
+        from erp.roles import sees_accounts
         from operating.views_warehouse import (
             _account_choices, _pack_type_choices, _product_category_choices,
         )
@@ -543,7 +544,8 @@ class GoodsReceipt(View):
             # The page's book, same as the warehouses: an account from any
             # other book would be refused on save (_intake_check_book).
             "accounts": _account_choices(getattr(request, "book", None),
-                                         include=doc.current_account_id if doc else None),
+                                         include=doc.current_account_id if doc else None,
+                                         suppliers_only=not sees_accounts(request.user)),
             "product_categories": _product_category_choices(),
             "pack_types": _pack_type_choices(),
             # Every attribute a variant can be described by, for "+ Attribute".

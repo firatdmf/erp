@@ -24,6 +24,7 @@ from django.views.generic import RedirectView
 from marketing import views_email as email_views
 from django.http import HttpResponse
 from . import views
+from .health import healthz
 from django.contrib.auth import views as auth_views
 
 
@@ -31,6 +32,7 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
+    path("healthz/", healthz, name="healthz"),
     path("dashboard/", views.Dashboard.as_view(), name="dashboard"),
     path("settings/",views.user_settings.as_view(),name="user_settings"),
     # The company's own identity — what its documents print (admin only).

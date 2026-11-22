@@ -75,6 +75,8 @@ ALLOWED_HOSTS = [
     "www.nejum.com",
     "demfirat.nejum.com",
     "erp-production-52e2.up.railway.app",
+    # Railway's health check before a release takes traffic (erp/health.py).
+    "healthcheck.railway.app",
     '192.168.1.106',
     '48c4e0a19cf1.ngrok-free.app',
 ]

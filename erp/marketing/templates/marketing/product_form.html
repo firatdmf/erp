@@ -708,6 +708,12 @@
         <div class="form-group">
           <label for="id_gsm">{% trans "GSM (g/m²)" %}</label>
           {{ form.gsm }}
+          {% if measured_gsm %}
+          <div style="margin-top:4px; font-size:12px; color:#5B6470;">
+            {% blocktrans count n=measured_gsm_rolls with gsm=measured_gsm %}Its weighed roll says ≈ {{ gsm }} g/m².{% plural %}Its {{ n }} weighed rolls say ≈ {{ gsm }} g/m².{% endblocktrans %}
+            {% trans "Packing lists use each variant's weighed rolls first, so this can stay empty." %}
+          </div>
+          {% endif %}
         </div>
       </div>
 

@@ -15063,6 +15063,24 @@ msgstr "Gramaj (g/m²)"
 msgid "GSM (g/m²)"
 msgstr "Gramaj (g/m²)"
 
+#: marketing/templates/marketing/product_detail.html
+#, python-format
+msgid "from %(n)s weighed roll"
+msgid_plural "from %(n)s weighed rolls"
+msgstr[0] "tartılmış %(n)s toptan"
+msgstr[1] "tartılmış %(n)s toptan"
+
+#: marketing/templates/marketing/product_form.html
+#, python-format
+msgid "Its weighed roll says ≈ %(gsm)s g/m²."
+msgid_plural "Its %(n)s weighed rolls say ≈ %(gsm)s g/m²."
+msgstr[0] "Tartılmış %(n)s topuna göre ≈ %(gsm)s g/m²."
+msgstr[1] "Tartılmış %(n)s topuna göre ≈ %(gsm)s g/m²."
+
+#: marketing/templates/marketing/product_form.html
+msgid "Packing lists use each variant's weighed rolls first, so this can stay empty."
+msgstr "Çeki listeleri önce her varyantın tartılmış toplarını kullanır; bu alan boş kalabilir."
+
 msgid "Gross"
 msgstr "Brüt"
 

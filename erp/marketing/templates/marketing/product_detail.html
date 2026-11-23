@@ -133,6 +133,19 @@
           </div>
           {% endif %}
           {% endif %}
+          {% if product.gsm %}
+          <div class="info-item">
+            <span class="label">{% trans "GSM (g/m²)" %}</span>
+            <span class="value">{{ product.gsm|floatformat:"-1" }}</span>
+          </div>
+          {% elif measured_gsm %}
+          {# Nobody typed it: worked out from the weighed rolls, never stored. #}
+          <div class="info-item">
+            <span class="label">{% trans "GSM (g/m²)" %}</span>
+            <span class="value">≈ {{ measured_gsm }}
+              <span class="text-muted" style="font-weight:400;font-size:12px;">{% blocktrans count n=measured_gsm_rolls %}from {{ n }} weighed roll{% plural %}from {{ n }} weighed rolls{% endblocktrans %}</span></span>
+          </div>
+          {% endif %}
           {% if product.weight %}
           <div class="info-item">
             <span class="label">{% trans "Weight" %}</span>

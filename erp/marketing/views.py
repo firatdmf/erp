@@ -415,6 +415,10 @@ class ProductDetail(generic.DetailView):
         context['product_suppliers'] = supplier_rows(
             self.object, getattr(self.request.user, "member", None))
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
+        # No GSM typed: what its weighed rolls say instead.
+        if not self.object.gsm:
+            from operating.weights import measured_gsm
+            context["measured_gsm"], context["measured_gsm_rolls"] = measured_gsm(self.object)
         # Stock items the last save gave a barcode (switched to "each item"):
         # their labels, ready to print, once.
         from erp.roles import may_print_labels
@@ -1599,6 +1603,9 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         # Forcing evaluation with list() can cause cursor issues
         context["variants"] = self.object.variants.all()
         context["tracking_switch"] = self._tracking_switch()
+        # Under the GSM box: what the weighed rolls say, to type or to leave.
+        from operating.weights import measured_gsm
+        context["measured_gsm"], context["measured_gsm_rolls"] = measured_gsm(self.object)
         return context
 
     def _tracking_switch(self):

@@ -1,5 +1,6 @@
 """Weights for export papers: a roll's own kilos when its label gave them,
-else the fabric's GSM over its width, else nothing; the sack's weight off
+else what its variant's weighed rolls say, else the fabric's GSM over its
+width, else nothing; the sack's weight off
 the scale; and the packing list's net and gross totals."""
 from decimal import Decimal
 from io import BytesIO
@@ -18,7 +19,7 @@ from operating.models import (Order, OrderItem, OrderStockReservation, Pack,
                               Warehouse, WarehouseProduct, WarehouseProductItem)
 from operating.views import _order_weights, _pack_roll_rows, _pack_weights
 from operating.views_warehouse import _add_stock_to_variant
-from operating.weights import net_kg
+from operating.weights import measured_gsm, net_kg
 
 
 def _value(attr_name, value):
@@ -67,6 +68,88 @@ class NetKg(TestCase):
         self.product.unit = "piece"
         self.assertEqual(net_kg(Decimal("3"), self.roll(), self.product, self.variant),
                          (None, False))
+
+
+class MeasuredWeights(TestCase):
+    """No label weight on an item: the same variant's weighed items say
+    what it weighs, before any typed GSM; the product page shows the GSM
+    they work out to."""
+
+    def setUp(self):
+        self.product = Product.objects.create(title="Bamboo", sku="BAM", unit="m")
+        wh = Warehouse.objects.create(
+            name="WH", accounting_book=Book.objects.get_or_create(name="Laleli")[0])
+        self.variants, self.wps = {}, {}
+        for sku in ("BAM.ECRU-305", "BAM.WHITE-305"):
+            v = ProductVariant.objects.create(product=self.product, variant_sku=sku)
+            v.product_variant_attribute_values.add(_value("width", "305"))
+            self.variants[sku] = v
+            self.wps[sku] = WarehouseProduct.objects.create(
+                warehouse=wh, name=sku, sku=sku, catalog_variant=v)
+
+    def roll(self, sku, qty, weight=None, status="in_stock"):
+        return WarehouseProductItem.objects.create(
+            unit_cost_base=Decimal("1"), product=self.wps[sku], quantity=Decimal(qty),
+            quantity_remaining=Decimal(qty), weight_kg=weight, status=status)
+
+    def fresh(self, sku):
+        return ProductVariant.objects.get(variant_sku=sku)
+
+    def test_an_unweighed_roll_takes_its_variants_median_kg_per_meter(self):
+        self.roll("BAM.ECRU-305", "50", Decimal("8.3"))
+        self.roll("BAM.ECRU-305", "50", Decimal("8.4"))
+        self.roll("BAM.ECRU-305", "36", Decimal("6"), status="consumed")  # used up, still weighed
+        # Another variant's rolls are another cloth.
+        self.roll("BAM.WHITE-305", "50", Decimal("20"))
+        # Median of 0.166, 0.168, 0.1667 kg/m = 0.1667 × 30 m.
+        self.assertEqual(net_kg(Decimal("30"), self.roll("BAM.ECRU-305", "50"),
+                                self.product, self.fresh("BAM.ECRU-305")),
+                         (Decimal("5.00"), True))
+
+    def test_the_variants_weighed_rolls_come_before_a_typed_gsm(self):
+        self.product.gsm = Decimal("320")
+        self.roll("BAM.ECRU-305", "50", Decimal("8.3"))
+        self.assertEqual(net_kg(Decimal("30"), self.roll("BAM.ECRU-305", "50"),
+                                self.product, self.fresh("BAM.ECRU-305")),
+                         (Decimal("4.98"), True))
+
+    def test_no_weighed_roll_falls_back_to_gsm(self):
+        self.product.gsm = Decimal("54")
+        # 0.054 kg/m² × 3.05 m × 30 m
+        self.assertEqual(net_kg(Decimal("30"), self.roll("BAM.ECRU-305", "50"),
+                                self.product, self.fresh("BAM.ECRU-305")),
+                         (Decimal("4.94"), True))
+
+    def test_measured_gsm_is_the_median_over_every_variant(self):
+        self.roll("BAM.ECRU-305", "50", Decimal("8.3"))   # 54.4
+        self.roll("BAM.WHITE-305", "50", Decimal("8.4"))  # 55.1
+        self.roll("BAM.WHITE-305", "52", Decimal("8.6"))  # 54.2
+        self.roll("BAM.WHITE-305", "50")                  # not weighed
+        self.assertEqual(measured_gsm(self.product), (Decimal("54"), 3))
+
+    def test_measured_gsm_needs_a_width_and_meters(self):
+        self.roll("BAM.ECRU-305", "50", Decimal("8.3"))
+        self.product.unit = "piece"
+        self.assertEqual(measured_gsm(self.product), (None, 0))
+        self.product.unit = "m"
+        for v in self.variants.values():
+            v.product_variant_attribute_values.clear()
+        self.assertEqual(measured_gsm(self.product), (None, 0))
+
+    def test_the_product_page_shows_it_when_none_is_typed(self):
+        self.client.force_login(User.objects.create_superuser("g", "g@t.com", "pw"))
+        self.roll("BAM.ECRU-305", "50", Decimal("8.3"))
+        url = reverse("marketing:product_detail", kwargs={"pk": self.product.pk})
+        page = self.client.get(url).content.decode()
+        self.assertIn("≈ 54", page)
+        self.assertIn("from 1 weighed roll", page)
+        self.product.gsm = Decimal("60")
+        self.product.save(update_fields=["gsm"])
+        gsm_item = self.client.get(url).content.decode().split("GSM (g/m²)", 1)[1][:120]
+        self.assertIn("60", gsm_item)
+        self.assertNotIn("≈", gsm_item)
+        edit = self.client.get(reverse("marketing:product_edit", kwargs={"pk": self.product.pk}))
+        self.assertContains(edit, "≈ 54 g/m²")
 
 
 class PackingListWeights(TestCase):

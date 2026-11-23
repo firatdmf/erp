@@ -7057,18 +7057,20 @@ def _apply_status_to_one(order, new_status, carrier=None, tracking=None,
     if refusal:
         return False, refusal
 
-    # Stash any cargo info the caller carried.
+    # Stash any cargo info the caller carried. None means the caller sent
+    # no such field and the order keeps its own; a blank one clears it —
+    # every form posting these fields starts from the saved values.
     if carrier is not None:
-        c = (carrier or "").strip()
+        c = carrier.strip()
         if c:
             # A code picked from the list, or a name typed in — which
             # joins the list if it's a carrier we haven't seen.
             from .models import Carrier
             order.carrier = Carrier.resolve(c, user=user)
+        else:
+            order.carrier = None
     if tracking is not None:
-        tstr = (tracking or "").strip()
-        if tstr:
-            order.tracking_number = tstr
+        order.tracking_number = tracking.strip() or None
 
     entering_ship = changing and new_status in SHIPPED_CLASS and old_status not in SHIPPED_CLASS
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses

@@ -2790,14 +2790,11 @@
         const taken = takeReceipts();
         if (taken) fd.delete('cargo_receipts');  // appended below, once shrunk
         const typed = { carrier: carrierSel ? carrierSel.value : '', tracking: trackingInp ? trackingInp.value : '' };
-        // A field left blank keeps what the order has: the server stores
-        // only what was entered.
-        const opts = carrierSel ? Array.from(carrierSel.options) : [];
-        const carrierOpt = typed.carrier ? carrierSel.selectedOptions[0] : opts.find(o => o.defaultSelected && o.value);
+        // A field left blank is saved blank: the server clears it.
+        const carrierOpt = typed.carrier ? carrierSel.selectedOptions[0] : null;
         const before = shipView ? shipView.innerHTML : '';
         // The card answers at once; the save itself goes on behind it.
-        drawSaving(carrierOpt ? carrierOpt.text : '',
-                   typed.tracking.trim() || (trackingInp ? trackingInp.defaultValue : ''), taken);
+        drawSaving(carrierOpt ? carrierOpt.text : '', typed.tracking.trim(), taken);
         setEditing(false);
         shipSave.disabled = true;
         if (unlockBtn) unlockBtn.disabled = true;

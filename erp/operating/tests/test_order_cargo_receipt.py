@@ -252,6 +252,21 @@ class CargoSavedInTheBackground(_AnOrderToComplete, TestCase):
         # Once to store what was picked, once to name it on the card.
         self.assertEqual(sum('FROM "operating_carrier"' in q for q in sql), 2)
 
+    def test_a_carrier_and_number_taken_out_are_saved_blank(self, upload):
+        Order.objects.filter(pk=self.order.pk).update(status="shipped")
+        self._save()
+        data = self._save(carrier="", tracking_number="").json()
+        self.assertTrue(data["ok"])
+        self.assertEqual((data["carrier"], data["tracking_number"]), ("", ""))
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.carrier, self.order.tracking_number), (None, None))
+
+    def test_a_status_change_without_cargo_fields_keeps_the_saved_ones(self, upload):
+        self._save(status="pending")
+        self.client.post(self.url, {"action": "update_status", "status": "packaging"})
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.carrier, self.order.tracking_number), ("surat-kargo", "16865"))
+
     def test_a_turned_away_file_comes_back_as_a_warning(self, upload):
         bad = SimpleUploadedFile("notes.txt", b"hi", content_type="text/plain")
         data = self._save(bad, status="pending").json()

@@ -13951,6 +13951,9 @@ msgstr "tükenmiş"
 msgid "part of it has been used"
 msgstr "bir kısmı kullanılmış"
 
+msgid "cut for an order"
+msgstr "bir sipariş için kesilmiş"
+
 msgid "held for an order"
 msgstr "bir sipariş için ayrılmış"
 
@@ -14076,8 +14079,8 @@ msgstr "Henüz bir şey eklenmedi."
 msgid "stock items"
 msgstr "stok kalemi"
 
-msgid "Only whole stock items that are not held for an order can be transferred."
-msgstr "Yalnızca bütün olan ve bir sipariş için ayrılmamış stok kalemleri transfer edilebilir."
+msgid "Stock items cut for an order or held for one can't be transferred. Meters written off, given as samples or put on display stay behind; the rest goes."
+msgstr "Bir sipariş için kesilmiş ya da ayrılmış stok kalemleri transfer edilemez. Zayi, numune ya da teşhir olarak düşülen metreler burada kalır; geri kalanı gider."
 
 msgid "Transfer at cost"
 msgstr "Maliyetine transfer et"

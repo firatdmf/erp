@@ -217,6 +217,56 @@ class WhatCannotGo(TransferBase):
                            member=self.user.member)
 
 
+class AnAdjustedRoll(TransferBase):
+    """Meters adjusted off a roll stay written off where they were; the
+    rest of the roll goes. Meters cut for an order keep it at home."""
+
+    def take_off(self, roll, meters, purpose):
+        roll.quantity_remaining -= Decimal(meters)
+        roll.status = "partial"
+        roll.save(update_fields=["quantity_remaining", "status"])
+        StockMovement.objects.create(product=roll.product, stock_item=roll, movement_type="out",
+                                     quantity=Decimal(meters), purpose=purpose)
+
+    def test_a_roll_with_meters_written_off_goes_with_what_is_left(self):
+        self.take_off(self.first, "1.37", "loss")
+        transfer = self.send(self.first)
+        self.assertEqual(list(transfer.lines.values_list("quantity", flat=True)),
+                         [Decimal("61.00")])
+        self.assertEqual(transfer.purchase.total, Decimal("207.40"))
+        self.first.refresh_from_db()
+        self.assertEqual(self.first.product.warehouse, self.shop)
+
+    def test_samples_and_display_pieces_are_adjustments_too(self):
+        self.take_off(self.first, "1", "sample")
+        self.take_off(self.first, "2", "display")
+        self.send(self.first)
+        self.first.refresh_from_db()
+        self.assertEqual(self.first.product.warehouse, self.shop)
+
+    def test_a_roll_cut_for_an_order_stays(self):
+        self.take_off(self.first, "1.37", "loss")
+        self.take_off(self.first, "5", "")
+        with self.assertRaises(TransferError) as caught:
+            self.send(self.first)
+        self.assertEqual([b["barcode"] for b in caught.exception.blocked], ["E-0001"])
+
+    def test_meters_missing_with_nothing_to_say_why_keep_it_at_home(self):
+        self.take_off(self.first, "1.37", "loss")
+        self.first.quantity_remaining -= Decimal("4")
+        self.first.save(update_fields=["quantity_remaining"])
+        with self.assertRaises(TransferError):
+            self.send(self.first)
+
+    def test_an_adjustment_after_arrival_blocks_the_undo(self):
+        transfer = self.send(self.first)
+        self.first.refresh_from_db()
+        self.take_off(self.first, "2", "loss")
+        with self.assertRaises(TransferError) as caught:
+            undo_stock_transfer(transfer, user=self.user, member=self.user.member)
+        self.assertEqual([b["barcode"] for b in caught.exception.blocked], ["E-0001"])
+
+
 class TakingItBack(TransferBase):
     def test_undo_puts_everything_back(self):
         transfer = self.send()

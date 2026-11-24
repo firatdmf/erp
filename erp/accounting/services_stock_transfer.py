@@ -3,11 +3,13 @@
 See models_transfer for what a transfer is. This is the one place it is
 made and the one place it is taken back.
 
-Only whole, free rolls go. A roll meters have already come off carries the
-record of an order in the book it was cut in — reopening that order puts
-the meters back on the roll — and a roll held for an order is promised to
-that book's customer. Either would follow the roll into a ledger that never
-sold anything.
+Only free rolls nothing has been cut from go. A roll meters have been cut
+from carries the record of an order in the book it was cut in — reopening
+that order puts the meters back on the roll — and a roll held for an order
+is promised to that book's customer. Either would follow the roll into a
+ledger that never sold anything. Meters adjusted off a roll (lost, a
+sample, on display) are no such record: they stay written off where they
+were, and the rest of the roll goes.
 """
 from collections import OrderedDict
 from decimal import Decimal
@@ -57,11 +59,28 @@ def _left(roll):
     return Decimal(left or 0)
 
 
+def _adjusted_off(roll):
+    """Meters taken off this roll by adjusting it — written off as lost or
+    damaged, given as a sample, put on display — as opposed to cut for an
+    order. An adjustment always says why (StockMovement.purpose); a cut
+    never does."""
+    from django.db.models import Sum
+
+    total = (roll.movements.filter(movement_type="out").exclude(purpose="")
+             .aggregate(s=Sum("quantity"))["s"])
+    return Decimal(total or 0)
+
+
 def roll_problem(roll):
     """Why this roll can't be transferred, or None when it can."""
     if roll.status == "consumed" or _left(roll) <= 0:
         return _("used up")
-    if _left(roll) != Decimal(roll.quantity or 0) or roll.movements.filter(movement_type="out").exists():
+    # Adjusted meters stay behind in this book's ledger and go nowhere;
+    # what is left goes. A cut doesn't stay behind: reopening its order
+    # puts the meters back on the roll.
+    if roll.movements.filter(movement_type="out", purpose="").exists():
+        return _("cut for an order")
+    if Decimal(roll.quantity or 0) - _left(roll) != _adjusted_off(roll):
         return _("part of it has been used")
     if roll.reservations.exists():
         return _("held for an order")
@@ -265,6 +284,10 @@ def undo_stock_transfer(transfer, *, user=None, member=None):
         elif (roll.purchase_invoice_item is None
               or roll.purchase_invoice_item.invoice_id != invoice.pk):
             reason = _("belongs to another purchase now")
+        elif _left(roll) != line.quantity:
+            # Even an adjustment: it was written off in this book, and the
+            # cancelled purchase would take back meters that aren't there.
+            reason = _("part of it has been used")
         else:
             reason = roll_problem(roll)
         if reason:

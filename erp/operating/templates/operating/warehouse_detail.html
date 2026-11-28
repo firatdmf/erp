@@ -326,8 +326,13 @@
      left edge follows the pill's, past the chevron. */
   .od-prods .wh-sku-catalog {
     display: block; margin-top: -7px; padding: 0 10px 11px 30px;
-    color: #147F74; font-size: 12px; white-space: nowrap; text-decoration: none;
+    color: #147F74; font-size: 12px; text-decoration: none;
+    overflow-wrap: anywhere;
   }
+  /* The name breaks anywhere (below), so on its own the table would squeeze
+     it to a letter or two wide and hand the room to the SKU column; this
+     keeps it a readable width. */
+  .od-prods th.wh-name-col { width: 220px; }
   .od-prods .wh-sku-catalog:hover { text-decoration: underline; }
   .od-prods tbody td.wh-vrow-sku > .wh-sku-catalog { padding-left: 54px; }
   .od-prods th {
@@ -1631,7 +1636,7 @@
               <tr>
                 <th class="wh-photo-cell" aria-label="{% trans 'Photo' %}"></th>
                 <th>{% trans "SKU" %}</th>
-                <th>{% trans "Name" %}</th>
+                <th class="wh-name-col">{% trans "Name" %}</th>
                 {% comment %}A combined (ortak) warehouse lists its members'
                 stock in one table, so every row has to say WHICH shelf it is
                 on — its own column rather than a pill tacked onto the SKU,

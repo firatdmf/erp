@@ -48,6 +48,52 @@ class CatalogSyncRefusesTest(TestCase):
         self.assertEqual(again.pk, variant.pk)
         self.assertEqual(variant_attributes(again), [("color", "ecru")])
 
+    def _counted(self, **kw):
+        return Product.objects.create(title="PREMIUM SATIN 300 TC", sku=None, featured=False,
+                                      unit="piece", pack_type="loose",
+                                      tracking=kw.get("tracking", "variant"))
+
+    def test_counted_goods_named_by_their_printed_barcode_need_no_value(self, _up):
+        # Almaty's shipments: twenty duvet designs under one name, told
+        # apart by nothing but the EAN printed on each packet.
+        product = self._counted()
+        _p, variant, _pc, created = sync_roll_to_catalog(
+            base_name=product.title, existing_base_product=product,
+            variant_sku="8681910532267", variant_barcode="8681910532267")
+        self.assertTrue(created)
+        self.assertEqual(variant.product_id, product.pk)
+        self.assertEqual(variant_attributes(variant), [])
+
+    def test_found_by_title_the_barcode_names_it_too(self, _up):
+        product = self._counted()
+        _p, variant, _pc, created = sync_roll_to_catalog(
+            base_name=product.title, variant_sku="8681910532205",
+            variant_barcode="8681910532205")
+        self.assertTrue(created)
+        self.assertEqual(variant.product_id, product.pk)
+
+    def test_counted_goods_without_a_barcode_still_need_a_value(self, _up):
+        product = self._counted()
+        with self.assertRaises(UndescribedVariant):
+            sync_roll_to_catalog(base_name=product.title, existing_base_product=product,
+                                 variant_sku="PREMIUM.1")
+        self.assertFalse(ProductVariant.objects.exists())
+
+    def test_goods_tracked_item_by_item_still_need_a_value(self, _up):
+        # A roll's label names one roll, not the variant: HAVANA.1 again.
+        product = self._counted(tracking="item")
+        with self.assertRaises(UndescribedVariant):
+            sync_roll_to_catalog(base_name=product.title, existing_base_product=product,
+                                 variant_sku="HAVANA.1", variant_barcode="R-000123")
+        self.assertFalse(ProductVariant.objects.exists())
+
+    def test_a_new_product_with_a_barcode_still_needs_a_value(self, _up):
+        # A main product made by the sync is a fabric, sold by the meter.
+        with self.assertRaises(UndescribedVariant):
+            sync_roll_to_catalog(base_name="NEW THING", variant_sku="8680000000001",
+                                 variant_barcode="8680000000001")
+        self.assertFalse(Product.objects.exists())
+
     def test_describing_a_variant_with_nothing_is_refused(self, _up):
         _p, variant, _pc, _vc = sync_roll_to_catalog(
             base_name="HAVANA", variant_sku="HAVANA.ECRU", attributes=[("color", "ecru")])

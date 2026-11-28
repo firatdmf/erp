@@ -49,7 +49,8 @@ class LookAlikeVariant(CatalogSyncConflict):
 class UndescribedVariant(CatalogSyncConflict):
     """A variant with no attribute value. Every variant says what it is —
     a colour, a width, a model — single items included, so one is never
-    made, or left, with nothing but a SKU."""
+    made, or left, with nothing but a SKU. The one exception is a variant
+    the printed barcode already names (barcode_names_it)."""
 
     def __init__(self, sku):
         self.sku = sku
@@ -301,6 +302,34 @@ def set_variant_attributes(variant, attributes, *, replace):
                                       productvariantattributevalue_id=value_obj.id)
 
 
+def barcode_names_it(product, barcode):
+    """Whether a variant of `product` carrying `barcode` needs no attribute
+    value to say what it is.
+
+    A value is how a person tells one variant from the next. Goods sold by
+    count carry the same printed barcode on every piece (a duvet set's EAN),
+    so scanning any of them finds exactly that variant, and goods that come
+    in unsorted (Almaty's shipments: whatever the factory had) often arrive
+    with nothing else to say what they are. A fabric's roll label names one
+    roll, not the variant, so a fabric still needs its colour or width —
+    the HAVANA.1 case the rule was made for."""
+    return bool(product is not None and product.sold_by_count
+                and (barcode or "").strip())
+
+
+def _find_base_product(base_name):
+    """The product _base_product would file `base_name` under, without
+    making one: a SKU match, else a hidden product of that title."""
+    from marketing.models import Product
+
+    b = (base_name or "").strip()
+    if not b:
+        return None
+    return (Product.objects.filter(sku__iexact=b).order_by("id").first()
+            or Product.objects.filter(title__iexact=b, featured=False)
+                              .order_by("id").first())
+
+
 def _base_product(base_name, existing_base_product=None):
     """The main product a variant belongs under, made hidden if there is
     none. Returns (product, created)."""
@@ -379,7 +408,8 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
       The older single `attribute_name`/`attribute_value` still works.
     - `refuse_lookalike`: raise LookAlikeVariant rather than create a variant
       whose values equal an existing one's.
-    - Raises UndescribedVariant rather than create a variant with no value.
+    - Raises UndescribedVariant rather than create a variant with no value,
+      unless its printed barcode names it (barcode_names_it).
     - Raises CatalogSyncConflict if variant_sku already belongs to another product.
     """
     from marketing.models import Product, ProductVariant
@@ -389,9 +419,13 @@ def sync_roll_to_catalog(*, base_name, attribute_name=None, attribute_value=None
         raise CatalogSyncConflict("variant_sku is required")
     pairs = _attribute_pairs(attributes, attribute_name, attribute_value)
     # Before a main product is made for it: a new variant with nothing to
-    # say what it is is refused, and leaves nothing behind.
+    # say what it is is refused, and leaves nothing behind. A product made
+    # here is a fabric (sold by the meter), so only a variant going under
+    # a product that already exists can be named by its barcode alone.
     if not pairs and not ProductVariant.everywhere.filter(variant_sku=variant_sku).exists():
-        raise UndescribedVariant(variant_sku)
+        parent = existing_base_product or _find_base_product(base_name or variant_sku)
+        if not barcode_names_it(parent, variant_barcode):
+            raise UndescribedVariant(variant_sku)
 
     base_name = (base_name or "").strip() or variant_sku
     cost_dec = _to_decimal(cost)
